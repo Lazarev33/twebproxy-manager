@@ -1,0 +1,6 @@
+*.tar.gz
+*.log
+*.sha256.tmp
+.DS_Store
+.idea/
+.vscode/
