@@ -1,9 +1,5 @@
 # TWebProxy Manager
 
-**TWebProxy Manager** — installer и manager для self-hosted Telegram **WEB Proxy** на Debian/Ubuntu.
-
-Репозиторий: https://github.com/Lazarev33/twebproxy-manager
-
 Текущая версия: **0.2.6 beta**.
 
 ## Архитектура
