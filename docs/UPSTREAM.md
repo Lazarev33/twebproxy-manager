@@ -16,7 +16,7 @@ The first successful field E2E on 2026-08-23 used:
 2873a08806d6e4d84830b9b5c4b0ec0f46af91f8
 ```
 
-Fresh `core-install` in release 0.2.5 checks out exactly this commit before running the upstream Go test suite and building the relay. This prevents a release archive from silently changing behaviour because upstream `master` moved after the release was tested.
+Fresh `core-install` in release 0.2.6 checks out exactly this commit before running the upstream Go test suite and building the relay. This prevents a release archive from silently changing behaviour because upstream `master` moved after the release was tested.
 
 `twebproxy update` is intentionally different: it fetches the current upstream `master`, runs upstream tests, builds a candidate, checks every local instance configuration, swaps the binary, then performs health checks. If the candidate fails the runtime health gate, the previous binary is restored.
 
@@ -49,3 +49,13 @@ Diagnostic reports copy this provenance into `REPORT-META.txt`, so a field repor
 ## Upgrade rule
 
 Do not mix an upstream update with an unrelated backend/carrier/frontend migration when debugging a regression. Change one layer at a time and collect a report after each change.
+## Manager release source
+
+Manager updates are checked against:
+
+```text
+https://github.com/Lazarev33/twebproxy-manager
+```
+
+`check-update` prefers the latest stable GitHub Release and falls back to the repository `VERSION` file. `manager-update` requires a matching `SHA256SUMS` entry for `twebproxy-manager.sh` before replacing the installed manager.
+

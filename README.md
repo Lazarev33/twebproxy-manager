@@ -1,54 +1,43 @@
 # TWebProxy Manager
 
-**TWebProxy Manager** — интерактивный установщик и менеджер self-hosted Telegram **WEB Proxy** для Linux.
+**TWebProxy Manager** — installer и manager для self-hosted Telegram **WEB Proxy** на Debian/Ubuntu.
 
-Проект разворачивает официальный [`telegramdesktop/tproxy-server`](https://github.com/telegramdesktop/tproxy-server) как WEB relay и официальный [`TelegramMessenger/MTProxy`](https://github.com/TelegramMessenger/MTProxy) как backend.
+Репозиторий: https://github.com/Lazarev33/twebproxy-manager
 
-> Статус: **beta**  
-> Текущая версия: **0.2.5**
+Текущая версия: **0.2.6 beta**.
 
-## Как это работает
+## Архитектура
 
 ```text
 Telegram Desktop
-        ↓
-Telegram WEB Proxy
-        ↓ HTTPS / WSS :443
+    ↓ HTTPS / WSS :443
 Caddy / Nginx
-        ↓
+    ↓ loopback
 tproxy-server
-        ↓
+    ↓
 MTProxy
-        ↓
+    ↓
 Telegram
 ```
 
-Внешний клиент подключается только к обычному HTTPS-порту `443`.  
-Relay, admin-интерфейс и MTProxy backend управляются отдельно и изолируются от внешнего доступа.
+WEB relay — официальный `telegramdesktop/tproxy-server`.
+Backend — официальный `TelegramMessenger/MTProxy`.
 
 ## Возможности
 
-- интерактивная установка и управление;
-- несколько hostname на одном сервере;
+- несколько hostname на одном VPS;
 - несколько profiles / secrets;
-- carrier modes:
-  - `https`
-  - `https-lanes`
-  - `websocket`
-  - `websocket-lanes`
-- автоматический подбор внутренних портов;
+- carriers: `https`, `https-lanes`, `websocket`, `websocket-lanes`;
 - Caddy + automatic TLS;
 - Nginx + Let's Encrypt;
-- Nginx + собственный сертификат;
-- manual frontend для уже существующего Nginx/Caddy;
-- systemd services и автоматический restart;
-- systemd `LoadCredential` для конфигурации и секретов;
+- Nginx + custom certificate;
+- manual frontend для существующего Caddy/Nginx;
+- systemd services и autostart;
+- systemd credentials для конфигурации и секретов;
 - nftables isolation backend-портов;
-- обновление `tproxy-server` с тестами, health-check и rollback;
-- смена secret и carrier без переустановки;
-- диагностика, аудит и восстановление конфигурации;
-- persistent installer/runtime logs;
-- safe и FULL diagnostic reports.
+- диагностика, audit, repair и diagnostic reports;
+- безопасное обновление `tproxy-server` с test/build/health-check/rollback;
+- проверка и обновление самого TWebProxy Manager через GitHub.
 
 ## Требования
 
@@ -57,23 +46,9 @@ Relay, admin-интерфейс и MTProxy backend управляются отд
 - systemd;
 - root/sudo;
 - публичный IPv4;
-- домен или поддомен с `A`-записью на сервер;
-- TCP `443`;
-- для автоматического получения сертификата также TCP `80`.
-
-Пример DNS:
-
-```text
-A  webproxy.example.com  -> 203.0.113.10
-```
-
-В manager указывается только hostname:
-
-```text
-webproxy.example.com
-```
-
-без `https://`, порта и path.
+- hostname с `A`-записью на VPS;
+- TCP 443;
+- TCP 80 для автоматического выпуска TLS-сертификата.
 
 ## Установка
 
@@ -82,121 +57,80 @@ chmod +x twebproxy-manager.sh
 sudo ./twebproxy-manager.sh
 ```
 
-После установки доступна команда:
+После установки:
 
 ```bash
 sudo twebproxy
 ```
 
-CLI-вариант:
-
-```bash
-sudo ./twebproxy-manager.sh core-install
-sudo twebproxy add
-```
-
 ## Основные команды
 
 ```bash
-twebproxy add
-twebproxy list
-twebproxy show [hostname]
+# Instances
+sudo twebproxy add
+sudo twebproxy list
+sudo twebproxy show [hostname]
+sudo twebproxy status [hostname]
+sudo twebproxy restart [hostname]
+sudo twebproxy repair [hostname]
+sudo twebproxy diagnose [hostname]
+sudo twebproxy audit [hostname]
 
-twebproxy status [hostname]
-twebproxy stats [hostname]
-twebproxy diagnose [hostname]
-twebproxy audit [hostname]
-twebproxy repair [hostname]
-twebproxy restart [hostname]
+# Profiles
+sudo twebproxy profile-list [hostname]
+sudo twebproxy profile-add [hostname]
+sudo twebproxy profile-rotate [hostname] [profile]
+sudo twebproxy profile-carrier [hostname] [profile]
+sudo twebproxy profile-delete [hostname] [profile]
 
-twebproxy profile-list [hostname]
-twebproxy profile-add [hostname]
-twebproxy profile-show [hostname] [profile]
-twebproxy profile-rotate [hostname] [profile]
-twebproxy profile-carrier [hostname] [profile]
-twebproxy profile-delete [hostname] [profile]
+# Updates
+sudo twebproxy check-update
+sudo twebproxy manager-update
+sudo twebproxy update
 
-twebproxy update
-twebproxy report
-twebproxy logs
-twebproxy logs-tail [lines]
-```
-
-## Логи
-
-Логи проекта сохраняются в:
-
-```text
-/opt/twebproxy-manager/logs/
-```
-
-Для обычного диагностического архива:
-
-```bash
-sudo twebproxy logs-pack
-```
-
-Для полного отчёта тестового сервера:
-
-```bash
+# Logs
+sudo twebproxy logs
 sudo twebproxy report
 ```
 
-FULL report может содержать WEB/MTProxy secrets, но не собирает root/sudo password, `/etc/shadow`, SSH private keys и содержимое TLS private keys.
+`twebproxy manager-update` обновляет сам manager из `Lazarev33/twebproxy-manager` и проверяет `SHA256SUMS`, синтаксис Bash и версию candidate перед установкой.
+
+`twebproxy update` обновляет только upstream `tproxy-server` и использует config-check, health-check и rollback.
 
 ## Проверенный baseline
 
-Первый подтверждённый E2E-сценарий:
-
 ```text
-OS:       Ubuntu 24.04
-Frontend: Caddy
-Carrier:  https
-Backend:  official MTProxy
-Client:   Telegram Desktop native WEB proxy
-Result:   CONNECTED
+Ubuntu 24.04
+Caddy
+https carrier
+official MTProxy
+Telegram Desktop native WEB Proxy
+reboot/autostart: PASS
 ```
 
-`https-lanes`, `websocket`, `websocket-lanes` и Nginx входят в дальнейшую тестовую матрицу.
-
-## Безопасность
-
-Основные меры:
-
-- конфигурация и secrets хранятся с ограниченными правами;
-- сервисы работают от отдельных системных пользователей;
-- чувствительные файлы передаются сервисам через systemd credentials;
-- relay/admin работают на loopback;
-- backend/stats ports закрываются через nftables;
-- managed HTTP access logs отключены;
-- private keys не включаются в diagnostic bundles.
-
-Подробнее: [`docs/SECURITY.md`](docs/SECURITY.md).
-
-## Upstream
-
-TWebProxy Manager не реализует Telegram WEB Proxy protocol самостоятельно.
-
-Используются:
-
-- `telegramdesktop/tproxy-server` — WEB relay;
-- `TelegramMessenger/MTProxy` — baseline backend.
-
-Fresh install закреплён на проверенном commit `tproxy-server`:
+Fresh install использует проверенный commit `tproxy-server`:
 
 ```text
 2873a08806d6e4d84830b9b5c4b0ec0f46af91f8
 ```
 
-Переход на более свежий upstream выполняется отдельно через:
+## Логи
+
+```text
+/opt/twebproxy-manager/logs/
+```
+
+Полный диагностический архив:
 
 ```bash
-sudo twebproxy update
+sudo twebproxy report
 ```
+
+FULL report может содержать WEB/MTProxy secrets. SSH/TLS private keys, `/etc/shadow` и root/sudo credentials не собираются.
 
 ## Документация
 
-Дополнительные материалы находятся в `docs/`:
+Дополнительные детали находятся в `docs/`:
 
 - `ARCHITECTURE.md`
 - `SECURITY.md`

@@ -36,3 +36,9 @@ The stock MTProxy baseline is treated as potentially wildcard-bound. nftables is
 Managed Caddy/Nginx access logs are disabled for the WEB hostname. Do not add raw URI, authorization or bearer logging without understanding what the WEB transport carries.
 
 For Manual mode, forward the complete hostname to `tproxy-server`; splitting special locations around the relay changes the public surface and is unsupported by this manager.
+## Manager self-update
+
+`manager-update` downloads only over HTTPS from the configured GitHub repository, requires a SHA-256 entry from `SHA256SUMS`, validates Bash syntax and checks that the embedded manager version matches the remote release metadata before installation. The previous installed manager is retained as `/opt/twebproxy-manager/twebproxy-manager.previous.sh`.
+
+The checksum protects against transfer/caching corruption; it does not protect against compromise of the GitHub repository itself.
+

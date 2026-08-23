@@ -2,12 +2,12 @@
 set -Eeuo pipefail
 umask 077
 
-# TWebProxy Manager v0.2.5
+# TWebProxy Manager v0.2.6
 # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
 # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
 
 APP="twebproxy"
-MANAGER_VERSION="0.2.5"
+MANAGER_VERSION="0.2.6"
 TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
 TPROXY_BRANCH="master"
 # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
@@ -16,6 +16,15 @@ TPROXY_INSTALL_COMMIT="2873a08806d6e4d84830b9b5c4b0ec0f46af91f8"
 MTPROXY_REPO="https://github.com/TelegramMessenger/MTProxy.git"
 # Pinned by the upstream tproxy-server deployment docs at the time v0.2.0 was built.
 MTPROXY_COMMIT="f36d8af769ffaeac36978d38c2c0f6d1104c2137"
+
+# Manager release/update source. `check-update` prefers the latest stable GitHub
+# release and falls back to the repository VERSION file on the default branch.
+MANAGER_REPO_SLUG="Lazarev33/twebproxy-manager"
+MANAGER_REPO_URL="https://github.com/$MANAGER_REPO_SLUG"
+MANAGER_API_URL="https://api.github.com/repos/$MANAGER_REPO_SLUG"
+MANAGER_RAW_URL="https://raw.githubusercontent.com/$MANAGER_REPO_SLUG"
+MANAGER_DEFAULT_BRANCH="main"
+MANAGER_UPDATE_CACHE_TTL=21600
 
 BASE_DIR="/etc/twebproxy"
 INSTANCES_DIR="$BASE_DIR/instances"
@@ -40,7 +49,9 @@ LOG_MANAGER_DIR="$LOG_DIR/manager"
 LOG_RUNTIME_DIR="$LOG_DIR/runtime"
 LOG_BUNDLE_DIR="$LOG_DIR/bundles"
 LOG_FULL_DIR="$LOG_DIR/full"
+UPDATE_CACHE_FILE="$PROJECT_DIR/update-check.env"
 CURRENT_LOG=""
+MANAGER_UPDATE_HINT_ATTEMPTED=0
 
 C_RESET='\033[0m'; C_RED='\033[31m'; C_GREEN='\033[32m'; C_YELLOW='\033[33m'; C_BLUE='\033[34m'; C_CYAN='\033[36m'; C_BOLD='\033[1m'; C_DIM='\033[2m'
 
@@ -684,6 +695,242 @@ install_manager_copy() {
   fi
 }
 
+valid_manager_version() {
+  [[ "${1:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+version_is_newer() {
+  local candidate="$1" current="$2"
+  valid_manager_version "$candidate" && valid_manager_version "$current" || return 1
+  [[ "$candidate" != "$current" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "$current" "$candidate" | sort -V | tail -n1)" == "$candidate" ]]
+}
+
+manager_update_cache_fresh() {
+  [[ -f "$UPDATE_CACHE_FILE" ]] || return 1
+  local now mtime
+  now="$(date +%s)"
+  mtime="$(stat -c %Y "$UPDATE_CACHE_FILE" 2>/dev/null || printf '0')"
+  [[ "$mtime" =~ ^[0-9]+$ ]] || return 1
+  (( now - mtime < MANAGER_UPDATE_CACHE_TTL ))
+}
+
+write_manager_update_cache() {
+  local version="$1" ref="$2" source="$3"
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || return 0
+  install -d -o root -g root -m 0700 "$PROJECT_DIR"
+  {
+    printf 'REMOTE_MANAGER_VERSION=%q\n' "$version"
+    printf 'REMOTE_MANAGER_REF=%q\n' "$ref"
+    printf 'REMOTE_MANAGER_SOURCE=%q\n' "$source"
+    printf 'CHECKED_AT=%q\n' "$(date -Is)"
+  } > "$UPDATE_CACHE_FILE"
+  chmod 0600 "$UPDATE_CACHE_FILE"
+}
+
+load_manager_update_cache() {
+  manager_update_cache_fresh || return 1
+  unset REMOTE_MANAGER_VERSION REMOTE_MANAGER_REF REMOTE_MANAGER_SOURCE CHECKED_AT
+  # shellcheck disable=SC1090
+  source "$UPDATE_CACHE_FILE"
+  valid_manager_version "${REMOTE_MANAGER_VERSION:-}" || return 1
+  [[ -n "${REMOTE_MANAGER_REF:-}" && -n "${REMOTE_MANAGER_SOURCE:-}" ]] || return 1
+}
+
+fetch_manager_update_info() {
+  local allow_cache="${1:-yes}" json tag version branch
+  local best_version="" best_ref="" best_source=""
+  unset REMOTE_MANAGER_VERSION REMOTE_MANAGER_REF REMOTE_MANAGER_SOURCE
+
+  if [[ "$allow_cache" == "yes" ]] && load_manager_update_cache; then
+    return 0
+  fi
+  command -v curl >/dev/null 2>&1 || return 1
+
+  # Evaluate both the latest stable Release and VERSION on the repository branch.
+  # If main is ahead of the latest GitHub Release, the newer repository version
+  # is still visible; when versions are equal, the immutable release tag wins.
+  json="$(curl -fsSL --connect-timeout 3 --max-time 8 --retry 1 \
+    --proto '=https' --tlsv1.2 \
+    -H 'Accept: application/vnd.github+json' \
+    -H 'User-Agent: twebproxy-manager-update-check' \
+    "$MANAGER_API_URL/releases/latest" 2>/dev/null || true)"
+  if [[ -n "$json" ]]; then
+    tag="$(grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' <<<"$json" | head -n1 | sed -E 's/.*:[[:space:]]*"([^"]+)"/\1/')"
+    version="${tag#v}"
+    if valid_manager_version "$version"; then
+      best_version="$version"
+      best_ref="$tag"
+      best_source="release"
+    fi
+  fi
+
+  for branch in "$MANAGER_DEFAULT_BRANCH" master; do
+    version="$(curl -fsSL --connect-timeout 3 --max-time 8 --retry 1 \
+      --proto '=https' --tlsv1.2 \
+      -H 'User-Agent: twebproxy-manager-update-check' \
+      "$MANAGER_RAW_URL/$branch/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+    if valid_manager_version "$version"; then
+      if [[ -z "$best_version" ]] || version_is_newer "$version" "$best_version"; then
+        best_version="$version"
+        best_ref="$branch"
+        best_source="branch"
+      fi
+      break
+    fi
+  done
+
+  [[ -n "$best_version" ]] || return 1
+  REMOTE_MANAGER_VERSION="$best_version"
+  REMOTE_MANAGER_REF="$best_ref"
+  REMOTE_MANAGER_SOURCE="$best_source"
+  write_manager_update_cache "$best_version" "$best_ref" "$best_source"
+  return 0
+}
+
+manager_check_update_impl() {
+  local allow_cache="${1:-yes}"
+  if ! fetch_manager_update_info "$allow_cache"; then
+    warn "Не удалось проверить обновление manager на $MANAGER_REPO_URL"
+    return 2
+  fi
+
+  echo "Manager:  local=$MANAGER_VERSION remote=$REMOTE_MANAGER_VERSION source=$REMOTE_MANAGER_SOURCE ref=$REMOTE_MANAGER_REF"
+  if version_is_newer "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"; then
+    warn "Доступна новая версия TWebProxy Manager: $REMOTE_MANAGER_VERSION"
+    echo "Обновить: sudo twebproxy manager-update"
+    return 10
+  fi
+  if version_is_newer "$MANAGER_VERSION" "$REMOTE_MANAGER_VERSION"; then
+    log "Локальная версия $MANAGER_VERSION новее опубликованной $REMOTE_MANAGER_VERSION."
+    return 0
+  fi
+  ok "TWebProxy Manager $MANAGER_VERSION — актуальная версия."
+  return 0
+}
+
+manager_check_update_cmd() {
+  banner
+  local rc=0
+  if manager_check_update_impl no; then
+    return 0
+  else
+    rc=$?
+  fi
+  # Availability of GitHub is not a proxy/runtime failure. The implementation
+  # already printed the reason, so keep the administrative command non-fatal.
+  [[ $rc -eq 10 || $rc -eq 2 ]] && return 0
+  return "$rc"
+}
+
+set_global_manager_version() {
+  local new_version="$1" upstream=unknown mtcommit="$MTPROXY_COMMIT"
+  [[ -f "$GLOBAL_ENV" ]] || return 0
+  upstream="$( (unset TPROXY_UPSTREAM_COMMIT; source "$GLOBAL_ENV"; printf '%s' "${TPROXY_UPSTREAM_COMMIT:-unknown}") )"
+  mtcommit="$( (unset MTPROXY_COMMIT; source "$GLOBAL_ENV"; printf '%s' "${MTPROXY_COMMIT:-$mtcommit}") )"
+  {
+    printf 'MANAGER_VERSION=%q\n' "$new_version"
+    printf 'TPROXY_UPSTREAM_COMMIT=%q\n' "$upstream"
+    printf 'MTPROXY_COMMIT=%q\n' "$mtcommit"
+  } > "$GLOBAL_ENV"
+  chmod 0600 "$GLOBAL_ENV"
+}
+
+manager_update_cmd() {
+  need_root; banner
+  local force=0 candidate checksums expected actual embedded ref script_url checksum_url
+  [[ "${1:-}" == "--force" ]] && force=1
+
+  fetch_manager_update_info no || die "Не удалось получить информацию об обновлении с $MANAGER_REPO_URL"
+  if (( ! force )) && ! version_is_newer "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"; then
+    if [[ "$REMOTE_MANAGER_VERSION" == "$MANAGER_VERSION" ]]; then
+      ok "TWebProxy Manager $MANAGER_VERSION уже актуален."
+      return 0
+    fi
+    die "Опубликованная версия $REMOTE_MANAGER_VERSION не новее локальной $MANAGER_VERSION. Для принудительной установки: manager-update --force"
+  fi
+
+  ref="$REMOTE_MANAGER_REF"
+  script_url="$MANAGER_RAW_URL/$ref/twebproxy-manager.sh"
+  checksum_url="$MANAGER_RAW_URL/$ref/SHA256SUMS"
+  candidate="$(mktemp /tmp/twebproxy-manager.XXXXXX.sh)"
+  checksums="$(mktemp /tmp/twebproxy-manager.XXXXXX.sha256)"
+  trap 'rm -f "$candidate" "$checksums"' RETURN
+
+  log "Скачиваю TWebProxy Manager $REMOTE_MANAGER_VERSION ($REMOTE_MANAGER_SOURCE/$ref)..."
+  curl -fL --connect-timeout 5 --max-time 30 --retry 2 \
+    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+    -H 'User-Agent: twebproxy-manager-updater' \
+    -o "$candidate" "$script_url"
+  curl -fL --connect-timeout 5 --max-time 20 --retry 2 \
+    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+    -H 'User-Agent: twebproxy-manager-updater' \
+    -o "$checksums" "$checksum_url" \
+    || die "В $ref нет SHA256SUMS. Автообновление manager остановлено: release должен публиковать checksum."
+
+  expected="$(awk '$2 == "twebproxy-manager.sh" {print $1; exit}' "$checksums")"
+  [[ "$expected" =~ ^[0-9a-fA-F]{64}$ ]] || die "SHA256SUMS не содержит корректный hash для twebproxy-manager.sh"
+  actual="$(sha256sum "$candidate" | awk '{print $1}')"
+  [[ "${actual,,}" == "${expected,,}" ]] || die "SHA-256 manager candidate не совпал с SHA256SUMS"
+
+  bash -n "$candidate" || die "Скачанный manager не проходит bash -n"
+  embedded="$(sed -nE 's/^MANAGER_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$candidate" | head -n1)"
+  [[ "$embedded" == "$REMOTE_MANAGER_VERSION" ]] || die "VERSION mismatch: metadata=$REMOTE_MANAGER_VERSION script=${embedded:-unknown}"
+  chmod 0755 "$candidate"
+  TWEBPROXY_NO_LOG=1 "$candidate" --help >/dev/null || die "Скачанный manager не проходит self-smoke --help"
+
+  install -d -o root -g root -m 0700 "$PROJECT_DIR"
+  local backup_bin="$PROJECT_DIR/twebproxy-manager.previous.sh" backup_project="$PROJECT_DIR/twebproxy-manager.project.previous.sh"
+  [[ -f "$MANAGER_BIN" ]] && cp -a "$MANAGER_BIN" "$backup_bin"
+  [[ -f "$PROJECT_MANAGER_COPY" ]] && cp -a "$PROJECT_MANAGER_COPY" "$backup_project"
+  if ! install -o root -g root -m 0755 "$candidate" "$MANAGER_BIN" \
+     || ! install -o root -g root -m 0755 "$candidate" "$PROJECT_MANAGER_COPY"; then
+    warn "Установка manager candidate не завершилась. Восстанавливаю предыдущую копию."
+    [[ -f "$backup_bin" ]] && install -o root -g root -m 0755 "$backup_bin" "$MANAGER_BIN" || true
+    [[ -f "$backup_project" ]] && install -o root -g root -m 0755 "$backup_project" "$PROJECT_MANAGER_COPY" || true
+    die "Manager update откатан."
+  fi
+  rm -f "$backup_project"
+  if ! set_global_manager_version "$REMOTE_MANAGER_VERSION"; then
+    warn "Manager обновлён, но не удалось обновить metadata в global.env; следующий repair исправит metadata."
+  fi
+  rm -f "$UPDATE_CACHE_FILE"
+  trap - RETURN
+  rm -f "$candidate" "$checksums"
+  ok "TWebProxy Manager обновлён: $MANAGER_VERSION -> $REMOTE_MANAGER_VERSION"
+  echo "Следующий запуск 'twebproxy' уже использует новую версию. Backup: $PROJECT_DIR/twebproxy-manager.previous.sh"
+}
+
+fetch_manager_update_hint_info() {
+  local version
+  if load_manager_update_cache; then
+    return 0
+  fi
+  command -v curl >/dev/null 2>&1 || return 1
+  # The automatic hint is deliberately cheap: one short request to VERSION.
+  # Full release/main evaluation is reserved for explicit check-update.
+  version="$(curl -fsSL --connect-timeout 2 --max-time 3 \
+    --proto '=https' --tlsv1.2 \
+    -H 'User-Agent: twebproxy-manager-update-hint' \
+    "$MANAGER_RAW_URL/$MANAGER_DEFAULT_BRANCH/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+  valid_manager_version "$version" || return 1
+  REMOTE_MANAGER_VERSION="$version"
+  REMOTE_MANAGER_REF="$MANAGER_DEFAULT_BRANCH"
+  REMOTE_MANAGER_SOURCE="branch"
+  write_manager_update_cache "$version" "$MANAGER_DEFAULT_BRANCH" branch
+}
+
+manager_update_hint() {
+  # At most one quick check per interactive process. GitHub outage must never
+  # make every menu redraw slow or prevent normal administration.
+  (( MANAGER_UPDATE_HINT_ATTEMPTED == 0 )) || return 0
+  MANAGER_UPDATE_HINT_ATTEMPTED=1
+  if fetch_manager_update_hint_info 2>/dev/null && version_is_newer "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"; then
+    printf "%b[update]%b Доступен TWebProxy Manager %s (сейчас %s). Команда: twebproxy manager-update\n\n" \
+      "$C_YELLOW" "$C_RESET" "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"
+  fi
+  return 0
+}
 
 legacy_v1_detected() {
   [[ -f "$BASE_DIR/manager.env" || -f "$SYSTEMD_DIR/twebproxy.service" || -f "$SYSTEMD_DIR/mtproxy.service" ]]
@@ -1637,21 +1884,34 @@ stats_cmd() {
   printf "%bПримечание:%b upstream даёт сессии/потоки и backend connection stats, но не идентифицирует реальных Telegram-пользователей.\n" "$C_DIM" "$C_RESET"
 }
 
-listener_line_for_port() {
+listener_lines_for_port() {
   local port="$1"
-  ss -H -ltnp "sport = :$port" 2>/dev/null | head -n1 || true
+  ss -H -ltnp "sport = :$port" 2>/dev/null || true
 }
 
-listener_addr_for_port() {
-  local port="$1" line
-  line="$(listener_line_for_port "$port")"
-  [[ -n "$line" ]] || return 1
-  awk '{print $4}' <<<"$line"
+listener_line_for_port() {
+  local port="$1"
+  listener_lines_for_port "$port" | head -n1 || true
+}
+
+listener_addrs_for_port() {
+  local port="$1"
+  listener_lines_for_port "$port" | awk '{print $4}' | sort -u
 }
 
 is_loopback_listener_addr() {
   local addr="$1" port="$2"
   [[ "$addr" == "127.0.0.1:$port" || "$addr" == "[::1]:$port" || "$addr" == "::1:$port" ]]
+}
+
+port_has_only_loopback_listeners() {
+  local port="$1" addr seen=0
+  while read -r addr; do
+    [[ -n "$addr" ]] || continue
+    seen=1
+    is_loopback_listener_addr "$addr" "$port" || return 1
+  done < <(listener_addrs_for_port "$port")
+  (( seen == 1 ))
 }
 
 firewall_has_backend_port() {
@@ -1678,15 +1938,15 @@ audit_instance_impl() {
   fi
 
   for spec in "relay:$RELAY_PORT" "admin:$ADMIN_PORT"; do
-    local label="${spec%%:*}" port="${spec##*:}"
-    addr="$(listener_addr_for_port "$port" || true)"
-    if [[ -z "$addr" ]]; then
+    local label="${spec%%:*}" port="${spec##*:}" addrs
+    addrs="$(listener_addrs_for_port "$port")"
+    if [[ -z "$addrs" ]]; then
       warn "AUDIT FAIL: $label port $port не слушается"
       failures=$((failures+1))
-    elif is_loopback_listener_addr "$addr" "$port"; then
-      ok "$label $addr — loopback only"
+    elif port_has_only_loopback_listeners "$port"; then
+      ok "$label $(paste -sd, <<<"$addrs") — loopback only"
     else
-      warn "AUDIT FAIL: $label port $port слушает $addr вместо loopback"
+      warn "AUDIT FAIL: $label port $port имеет non-loopback listener(s): $(paste -sd, <<<"$addrs")"
       failures=$((failures+1))
     fi
   done
@@ -1723,10 +1983,9 @@ audit_instance_impl() {
     fi
 
     for spec in "backend:$BACKEND_PORT" "stats:$STATS_PORT"; do
-      local label="${spec%%:*}" port="${spec##*:}"
-      line="$(listener_line_for_port "$port")"
-      addr="$(awk '{print $4}' <<<"$line" 2>/dev/null || true)"
-      if [[ -z "$line" ]]; then
+      local label="${spec%%:*}" port="${spec##*:}" addrs
+      addrs="$(listener_addrs_for_port "$port")"
+      if [[ -z "$addrs" ]]; then
         warn "AUDIT FAIL: $p $label port $port не слушается"
         failures=$((failures+1))
         continue
@@ -1739,12 +1998,13 @@ audit_instance_impl() {
         failures=$((failures+1))
       fi
 
-      if is_loopback_listener_addr "$addr" "$port"; then
-        ok "$p: $label listener $addr — loopback only"
+      if port_has_only_loopback_listeners "$port"; then
+        ok "$p: $label listener(s) $(paste -sd, <<<"$addrs") — loopback only"
       else
-        # Stock Telegram MTProxy commonly creates wildcard listeners for -H/-p.
-        # This is acceptable only while the manager-owned nftables boundary is active.
-        log "$p: $label listener $addr; isolation обеспечивается nftables"
+        # Inspect every socket on the port. v0.2.5 looked only at the first ss row,
+        # which could incorrectly report "loopback only" when another worker had
+        # a wildcard socket on the same port.
+        log "$p: $label listener(s) $(paste -sd, <<<"$addrs"); external isolation обеспечивается nftables"
       fi
     done
 
@@ -1755,11 +2015,13 @@ audit_instance_impl() {
   done < <(list_profiles_array "$host")
 
   if [[ "$TLS_MODE" != manual ]]; then
-    if curl -fsSI --max-time 8 "https://$host/" >/dev/null 2>&1; then
-      ok "public HTTPS отвечает"
+    # Strict verification: no -k. A managed frontend is not healthy if DNS, the
+    # certificate chain, hostname verification or HTTPS request fails.
+    if curl -fsS --max-time 10 --proto '=https' --tlsv1.2 -o /dev/null "https://$host/" >/dev/null 2>&1; then
+      ok "public HTTPS + TLS verification PASS"
     else
-      warn "AUDIT WARN: public HTTPS пока не отвечает (DNS/ACME/frontend может ещё сходиться)"
-      warnings=$((warnings+1))
+      warn "AUDIT FAIL: public HTTPS/TLS verification failed (DNS, certificate chain, hostname or frontend)"
+      failures=$((failures+1))
     fi
   fi
 
@@ -1963,7 +2225,7 @@ copy_recent_files() {
 }
 
 collect_runtime_snapshot() {
-  local mode="${1:-safe}" label="${2:-runtime}" ts out host p unit filter_cmd
+  local mode="${1:-safe}" label="${2:-runtime}" ts out host p unit filter_cmd rc
   [[ "$mode" == "safe" || "$mode" == "full" ]] || die "snapshot mode: safe|full"
   if [[ "$mode" == "full" ]]; then
     install -d -o root -g root -m 0700 "$LOG_FULL_DIR"
@@ -1984,6 +2246,7 @@ collect_runtime_snapshot() {
     echo "mode=$mode"
     echo "created_at=$(date -Is)"
     echo "manager_version=$MANAGER_VERSION"
+    echo "manager_repo=$MANAGER_REPO_URL"
     echo "manager_path=${PROJECT_MANAGER_COPY:-unknown}"
     [[ -f "$GLOBAL_ENV" ]] && grep -E '^(MANAGER_VERSION|VERSION|TPROXY_UPSTREAM_COMMIT|MTPROXY_COMMIT)=' "$GLOBAL_ENV" || true
     echo
@@ -2046,7 +2309,14 @@ collect_runtime_snapshot() {
         echo "-- health --"
         curl -vfsS --max-time 5 "http://127.0.0.1:$ADMIN_PORT/healthz" 2>&1 || true; echo
         curl -vfsS --max-time 5 "http://127.0.0.1:$ADMIN_PORT/readyz" 2>&1 || true; echo
-        echo "-- external HTTPS --"
+        echo "-- external HTTPS strict verification --"
+        if curl -fsS --max-time 10 --proto '=https' --tlsv1.2 -o /dev/null "https://$host/"; then
+          echo "STRICT_TLS=PASS"
+        else
+          rc=$?
+          echo "STRICT_TLS=FAIL rc=$rc"
+        fi
+        echo "-- external HTTPS debug handshake (verification disabled intentionally) --"
         curl -vkI --max-time 10 "https://$host/" 2>&1 || true
         echo "-- certificate metadata --"
         timeout 10 openssl s_client -connect "$host:443" -servername "$host" </dev/null 2>/dev/null \
@@ -2187,6 +2457,7 @@ logs_pack_cmd() {
   fi
   {
     echo "manager_version=$MANAGER_VERSION"
+    echo "manager_repo=$MANAGER_REPO_URL"
     echo "created_at=$(date -Is)"
     echo "mode=$mode"
     echo "current_snapshot=$snap"
@@ -2289,6 +2560,7 @@ menu() {
     clear 2>/dev/null || true; banner
     if core_installed; then
       printf "Core: %binstalled%b | Instances: %s\n\n" "$C_GREEN" "$C_RESET" "$(count_instances)"
+      manager_update_hint
       list_cmd; echo
       local c; c="$(choose 'Действие:' \
         'Добавить WEB proxy hostname' \
@@ -2302,7 +2574,9 @@ menu() {
         'Диагностика' \
         'Audit сетевой изоляции' \
         'Логи / пакет для отчёта' \
-        'Обновить relay' \
+        'Проверить обновление TWebProxy Manager' \
+        'Установить обновление TWebProxy Manager' \
+        'Обновить relay upstream' \
         'Удалить hostname' \
         'Удалить core (только когда hostname нет)' \
         'Выход')"
@@ -2318,10 +2592,12 @@ menu() {
         9) diagnose_cmd; pause;;
         10) audit_cmd; pause;;
         11) menu_logs;;
-        12) update_cmd; pause;;
-        13) delete_instance_cmd; pause;;
-        14) core_uninstall_cmd; pause;;
-        15) exit 0;;
+        12) manager_check_update_cmd; pause;;
+        13) manager_update_cmd; pause;;
+        14) update_cmd; pause;;
+        15) delete_instance_cmd; pause;;
+        16) core_uninstall_cmd; pause;;
+        17) exit 0;;
       esac
     else
       local c; c="$(choose 'Действие:' 'Установить TWebProxy core' 'Установить core и сразу добавить hostname' 'Выход')"
@@ -2336,9 +2612,11 @@ TWebProxy Manager v$MANAGER_VERSION
 
 Usage: twebproxy [command] [args]
 
-Core:
+Manager / Core:
+  check-update                 проверить новую версию manager на GitHub
+  manager-update [--force]     обновить manager с SHA-256 + bash validation
   core-install                 установить зависимости, relay и MTProxy
-  update                       обновить tproxy-server с config-check и rollback
+  update                       обновить tproxy-server upstream с config-check и rollback
   core-uninstall               удалить core (когда нет инстансов)
 
 Instances / hostnames:
@@ -2381,6 +2659,8 @@ EOF
 cmd="${1:-menu}"; shift || true
 setup_logging "$cmd"
 case "$cmd" in
+  check-update) manager_check_update_cmd ;;
+  manager-update) manager_update_cmd "${1:-}" ;;
   core-install) core_install_cmd ;;
   add) add_instance_cmd ;;
   list) list_cmd ;;

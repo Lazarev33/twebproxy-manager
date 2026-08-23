@@ -1,6 +1,6 @@
 # Roadmap
 
-## 0.2.5 — current beta
+## 0.2.6 — current beta
 
 Goal: preserve the first known-good E2E baseline and remove issues observed in the successful report.
 
@@ -11,21 +11,23 @@ Done:
 - MTProxy `AF_NETLINK` correction;
 - isolation audit;
 - compact current/history reports;
-- transactional managed Caddy changes.
+- transactional managed Caddy changes;
+- reboot/autostart validated on the field VPS;
+- GitHub manager update channel with checksum validation;
+- strict TLS and all-listener audit improvements.
 
 ## Next field tests
 
 Do not add a second backend implementation before these tests are separated cleanly:
 
-1. VPS reboot/autostart.
-2. `https-lanes`.
-3. `websocket`.
-4. `websocket-lanes`.
-5. Nginx + Let's Encrypt.
-6. large media/file transfer.
-7. reconnect after client sleep/network switch.
-8. intentional backend crash and relay crash recovery.
-9. external scan proving backend/stats ports are unreachable.
+1. `https-lanes`.
+2. `websocket`.
+3. `websocket-lanes`.
+4. Nginx + Let's Encrypt.
+5. large media/file transfer.
+6. reconnect after client sleep/network switch.
+7. intentional backend crash and relay crash recovery.
+8. external scan proving backend/stats ports are unreachable.
 
 ## 0.2.x cleanup after field matrix
 

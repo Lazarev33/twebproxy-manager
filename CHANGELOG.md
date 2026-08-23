@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.6 — 2026-08-23 — GitHub updates / stricter audit
+
+- Добавлена проверка обновлений самого TWebProxy Manager из `Lazarev33/twebproxy-manager`.
+- Добавлены команды `check-update` и `manager-update [--force]`.
+- Проверка версии предпочитает latest stable GitHub Release и использует `VERSION` из репозитория как fallback.
+- `manager-update` требует `SHA256SUMS`, проверяет SHA-256, `bash -n`, встроенную `MANAGER_VERSION` и self-smoke перед установкой.
+- Предыдущая копия manager сохраняется в `/opt/twebproxy-manager/twebproxy-manager.previous.sh`.
+- В TUI добавлена ненавязчивая проверка новой версии с кешем; недоступность GitHub не блокирует управление proxy.
+- `audit` теперь анализирует все listener sockets на порту, а не только первую строку `ss`; это исключает ложное `loopback only` при нескольких worker sockets.
+- Для managed frontend `audit` выполняет строгую HTTPS/TLS-проверку без `-k`; ошибка DNS/certificate chain/hostname/frontend считается critical failure.
+- FULL report теперь отдельно пишет strict TLS PASS/FAIL и затем debug handshake с отключённой verification.
+- В report metadata добавлен URL репозитория manager.
+- README сокращён до описания проекта, установки и основных команд.
+- Reboot/autostart baseline для `Caddy + https + stock MTProxy` подтверждён полевым тестом.
+
 ## 0.2.5 — 2026-08-23 — first E2E cleanup / isolation audit
 
 - Зафиксирован первый реальный E2E PASS: Telegram Desktop native WEB -> Caddy/HTTPS -> tproxy-server -> official MTProxy.
