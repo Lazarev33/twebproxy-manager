@@ -111,33 +111,13 @@ export MOCK_NFT_LIVE="$TMP/live.nft"
 SYSTEMCTL_ACTIVE_DIR="$TMP/systemctl-active"
 SYSTEMCTL_LOG="$TMP/systemctl.log"
 install -d "$SYSTEMCTL_ACTIVE_DIR"
-systemctl() {
-  local command="${1:-}" unit=""
-  printf '%q ' "$@" >> "$SYSTEMCTL_LOG"; printf '\n' >> "$SYSTEMCTL_LOG"
-  shift || true
-  case "$command" in
-    daemon-reload) return 0;;
-    enable)
-      while (($#)); do
-        case "$1" in --now) ;; *) unit="$1";; esac
-        shift
-      done
-      [[ -n "$unit" ]] && : > "$SYSTEMCTL_ACTIVE_DIR/$unit"
-      ;;
-    restart) unit="${1:-}"; : > "$SYSTEMCTL_ACTIVE_DIR/$unit";;
-    disable)
-      while (($#)); do
-        case "$1" in --now) ;; *) rm -f "$SYSTEMCTL_ACTIVE_DIR/$1";; esac
-        shift
-      done
-      ;;
-    is-active)
-      [[ "${1:-}" == --quiet ]] && shift
-      [[ -f "$SYSTEMCTL_ACTIVE_DIR/${1:-}" ]]
-      ;;
-    *) return 0;;
-  esac
-}
+# Field fix 3: the previous inline stub treated `disable` as "clear the active
+# marker for every unit named", so a multi-unit `systemctl disable --now A B`
+# with a missing unit file still looked like it stopped both units - which is
+# exactly the defect that reached the field. Both DPI fixtures now share the
+# faithful model in tests/lib/systemctl-model.sh.
+# shellcheck source=/dev/null
+source "$PROJECT_DIR_UNDER_TEST/tests/lib/systemctl-model.sh"
 id() {
   [[ "${1:-}" == twebproxy-dpi ]] && return 0
   command id "$@"

@@ -233,6 +233,8 @@ dpi_invalid_mode	Unknown compatibility mode: %s	Неизвестный режи�
 dpi_resolution_failed	%s must resolve to exactly one public IPv4 address before a compatibility mode can be changed.	Перед изменением режима %s должен разрешаться ровно в один публичный IPv4-адрес.
 dpi_ack_required	Address-wide confirmation is required. Re-run with --accept-shared-scope.	Требуется подтверждение области действия для всего адреса. Повторите с --accept-shared-scope.
 dpi_transaction_failed	Compatibility change failed; the previous exact state was restored.	Не удалось изменить режим совместимости; предыдущее точное состояние восстановлено.
+dpi_transaction_failed_stage	Could not apply %s (stage: %s); the previous state was restored.	Не удалось применить %s (этап: %s); предыдущее состояние восстановлено.
+dpi_transaction_failed_at_stage	Compatibility change failed at stage: %s; the previous exact state was restored.	Не удалось изменить режим совместимости на этапе: %s; предыдущее точное состояние восстановлено.
 dpi_scope_not_local	The resolved public IPv4 %s for %s is not configured on any local interface. Packets leaving this host do not carry that address, so an address-scoped compatibility rule could never match it. This usually means the public address is provided by external 1:1 NAT (common on EC2/Lightsail, GCE, Azure). Compatibility modes were not activated. Locally configured IPv4 addresses: %s	Разрешённый публичный IPv4 %s для %s не настроен ни на одном локальном интерфейсе. Пакеты, покидающие этот хост, не содержат этот адрес, поэтому правило совместимости, привязанное к адресу, никогда не совпадёт. Обычно это означает, что публичный адрес выдаётся внешним 1:1 NAT (типично для EC2/Lightsail, GCE, Azure). Режимы совместимости не активированы. Локально настроенные адреса IPv4: %s
 dpi_scope_probe_unavailable	The set of locally configured IPv4 addresses could not be determined, so it is not possible to confirm that scope %s can match outgoing packets. Compatibility modes were not activated. Install iproute2 (or provide hostname -I) and retry.	Не удалось определить набор локально настроенных адресов IPv4, поэтому невозможно подтвердить, что область %s может совпасть с исходящими пакетами. Режимы совместимости не активированы. Установите iproute2 (или обеспечьте hostname -I) и повторите попытку.
 firewall_backend_state_invalid	Backend state file %s is incomplete or invalid. The firewall isolation ruleset was not rebuilt, so the existing ruleset stays in force. Repair or remove that backend and retry.	Файл состояния backend %s неполон или некорректен. Правила изоляции межсетевого экрана не пересобраны, поэтому продолжает действовать существующий набор правил. Восстановите или удалите этот backend и повторите попытку.
@@ -1577,20 +1579,147 @@ dpi_remove_owned_nfqws_runtime_files() {
   done
 }
 
+# --- DPI stage diagnostics -------------------------------------------------
+# Activation and reconciliation are a fixed sequence of named stages. Each stage
+# records its name, the operation invoked and the exit status, so a failure is
+# attributable instead of collapsing into one opaque "transaction failed" line.
+# Detail goes to the manager transcript only; the TUI keeps its concise result.
+DPI_LAST_STAGE=""
+DPI_LAST_STAGE_OP=""
+DPI_LAST_STAGE_RC=""
+DPI_LAST_STAGE_REASON=""
+# Marks the diagnostics emitted while a rollback reconciliation is running, so a
+# rollback's own stages are not confused with the stages of the failed attempt.
+DPI_DIAG_PHASE=""
+
+dpi_stage_reset() { DPI_LAST_STAGE=""; DPI_LAST_STAGE_OP=""; DPI_LAST_STAGE_RC=""; DPI_LAST_STAGE_REASON=""; }
+
+# Appends one diagnostic line to the manager transcript written by
+# setup_logging. Without a transcript (TWEBPROXY_NO_LOG, non-root) the manager
+# stays silent rather than adding noise to the TUI. Diagnostics carry only
+# operational fields - stage, operation, exit status, reason, unit, rollback.
+dpi_diag_log() {
+  local target="${CURRENT_LOG:-}"
+  [[ -n "$target" && -w "$target" ]] || return 0
+  printf '[dpi] %s %s%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || true)" \
+    "${DPI_DIAG_PHASE:+phase=$DPI_DIAG_PHASE }" "$*" \
+    | sanitize_log_stream >> "$target" 2>/dev/null || true
+  return 0
+}
+
+# dpi_stage_run STAGE REASON COMMAND [ARG...]
+# Runs exactly one reconciliation stage and returns the command's exit status.
+dpi_stage_run() {
+  local stage="$1" reason="$2"; shift 2
+  local rc=0 op="$*"
+  DPI_LAST_STAGE="$stage"; DPI_LAST_STAGE_OP="$op"; DPI_LAST_STAGE_RC=0; DPI_LAST_STAGE_REASON=""
+  # Forced-failure seam. Extends the existing TWEBPROXY_DPI_TEST_FAIL_POINT
+  # variable: "stage:<name>" injects a deterministic failure at exactly one
+  # named stage. The legacy point names keep working unchanged.
+  if [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" == "stage:$stage" ]]; then
+    rc=90
+  else
+    "$@" || rc=$?
+  fi
+  if (( rc != 0 )); then
+    # Re-assert: a nested helper may have recorded its own sub-stage, but the
+    # stage reported to the operator is the one that was actually being run.
+    DPI_LAST_STAGE="$stage"; DPI_LAST_STAGE_OP="$op"
+    DPI_LAST_STAGE_RC="$rc"; DPI_LAST_STAGE_REASON="$reason"
+    dpi_diag_log "stage=$stage op=$op status=$rc result=failed reason=$reason"
+    return "$rc"
+  fi
+  dpi_diag_log "stage=$stage op=$op status=0 result=ok"
+  return 0
+}
+
+# Records a stage failure raised outside dpi_stage_run.
+dpi_stage_fail() {
+  local stage="$1" op="$2" rc="$3" reason="$4"
+  DPI_LAST_STAGE="$stage"; DPI_LAST_STAGE_OP="$op"; DPI_LAST_STAGE_RC="$rc"; DPI_LAST_STAGE_REASON="$reason"
+  dpi_diag_log "stage=$stage op=$op status=$rc result=failed reason=$reason"
+  return 0
+}
+
+# systemctl wrapper preserving the quiet call sites the TUI relies on.
+dpi_systemctl_quiet() { systemctl "$@" >/dev/null; }
+
+# Tears exactly one TWebProxy DPI unit down, completely and idempotently.
+#
+# Field fix 3: the previous code passed both unit names to a single
+# `systemctl disable --now A B`. systemd resolves every named unit file up front
+# and fails the whole call when one is missing - which is always the case for
+# the non-nfqws modes, where the nfqws unit was never installed. `|| true`
+# swallowed that failure, the firewall unit was never stopped, and its unit file
+# was then deleted underneath the still-running unit, leaving the field-observed
+# "Loaded: not-found / Active: active (exited)" ghost.
+#
+# Units are therefore stopped one at a time, while their unit file still exists,
+# and the result is verified afterwards.
+dpi_unit_teardown() {
+  local unit="$1"
+  # Only ever act on the two units TWebProxy owns; never on unrelated units.
+  case "$unit" in
+    "$DPI_FIREWALL_UNIT"|"$DPI_NFQWS_UNIT") ;;
+    *) return 1;;
+  esac
+  systemctl stop "$unit" >/dev/null 2>&1 || true
+  systemctl disable "$unit" >/dev/null 2>&1 || true
+  rm -f -- "$SYSTEMD_DIR/$unit"
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  # Idempotent repair of an already-orphaned unit: a unit file removed while the
+  # unit was active leaves it active across the reload, so stop it again and
+  # clear any lingering failed state.
+  if systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
+    systemctl stop "$unit" >/dev/null 2>&1 || true
+    systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+  if systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
+    dpi_stage_fail 'cleanup unit runtime' "systemctl stop $unit" 1 "unit still active after teardown"
+    return 1
+  fi
+  return 0
+}
+
+# Zero active TWebProxy DPI firewall runtime state is the STOCK contract.
+dpi_runtime_units_inactive() {
+  local unit
+  for unit in "$DPI_FIREWALL_UNIT" "$DPI_NFQWS_UNIT"; do
+    if systemctl is-active --quiet "$unit" >/dev/null 2>&1; then return 1; fi
+  done
+  return 0
+}
+
 dpi_cleanup_nfqws_runtime() {
-  systemctl disable --now "$DPI_NFQWS_UNIT" >/dev/null 2>&1 || true
-  rm -f -- "$SYSTEMD_DIR/$DPI_NFQWS_UNIT"
-  dpi_remove_owned_nfqws_runtime_files || return 1
+  local rc=0
+  dpi_unit_teardown "$DPI_NFQWS_UNIT" || rc=1
+  # A refused removal of the TWebProxy-owned nfqws runtime files is a cleanup
+  # failure and stops here, exactly as before this pass. dpi_stage_fail only
+  # records the reason - it returns 0 - so the refusal is returned explicitly.
+  if ! dpi_remove_owned_nfqws_runtime_files; then
+    dpi_stage_fail 'cleanup nfqws runtime' dpi_remove_owned_nfqws_runtime_files 1 \
+      'owned nfqws runtime files could not be removed safely'
+    return 1
+  fi
   rm -f -- "$DPI_DOC_DIR/nfqws-LICENSE.txt"
   id twebproxy-dpi >/dev/null 2>&1 && userdel twebproxy-dpi >/dev/null 2>&1 || true
+  return "$rc"
 }
 
 dpi_cleanup_stock_runtime() {
-  systemctl disable --now "$DPI_NFQWS_UNIT" "$DPI_FIREWALL_UNIT" >/dev/null 2>&1 || true
+  local rc=0
+  dpi_cleanup_nfqws_runtime || rc=1
+  dpi_unit_teardown "$DPI_FIREWALL_UNIT" || rc=1
   dpi_apply_rules_file /dev/null || true
-  dpi_cleanup_nfqws_runtime
-  rm -f "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"
+  rm -f -- "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"
   systemctl daemon-reload >/dev/null 2>&1 || true
+  # Fail closed: STOCK is only reached when no DPI unit is active any more.
+  if ! dpi_runtime_units_inactive; then
+    dpi_stage_fail 'cleanup stock runtime' dpi_cleanup_stock_runtime 1 "a TWebProxy DPI unit is still active"
+    rc=1
+  fi
+  return "$rc"
 }
 
 dpi_verify_runtime() {
@@ -1608,63 +1737,139 @@ dpi_verify_runtime() {
   fi
 }
 
-dpi_reconcile_runtime() {
-  local need_nfqws=0
+# Extracted so the first reconciliation stage is a single callable operation.
+dpi_prepare_runtime_dirs() {
   install -d -o root -g root -m 0700 "$DPI_DIR" "$DPI_STATE_DIR" || return 1
   [[ ! -L "$DPI_DIR" && ! -L "$DPI_STATE_DIR" ]] || return 1
-  dpi_render_rules "$DPI_STATE_DIR" "$DPI_NFT_FILE" || return 1
-  if [[ ! -s "$DPI_NFT_FILE" ]]; then dpi_cleanup_stock_runtime; return 0; fi
-  dpi_rules_need_nfqws "$DPI_STATE_DIR" && need_nfqws=1
-  dpi_write_firewall_runtime || return 1
-  if (( need_nfqws )); then
-    dpi_install_nfqws && dpi_write_nfqws_unit || return 1
-  fi
-  systemctl daemon-reload || return 1
-  systemctl enable "$DPI_FIREWALL_UNIT" >/dev/null || return 1
-  dpi_apply_rules_file "$DPI_NFT_FILE" || return 1
-  [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" != after_firewall ]] || return 1
-  systemctl restart "$DPI_FIREWALL_UNIT" >/dev/null || return 1
-  if (( need_nfqws )); then
-    [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" != nfqws_start ]] || return 1
-    systemctl enable --now "$DPI_NFQWS_UNIT" >/dev/null || return 1
-  else
-    dpi_cleanup_nfqws_runtime
-    systemctl daemon-reload >/dev/null || return 1
-  fi
-  dpi_verify_runtime "$need_nfqws"
 }
+
+# Each step is a named stage so an activation failure can be attributed exactly.
+# The sequence and the operations themselves are unchanged.
+dpi_reconcile_runtime() {
+  local need_nfqws=0
+  dpi_stage_reset
+  dpi_stage_run 'prepare runtime' 'DPI state directories could not be created or are symlinked' \
+    dpi_prepare_runtime_dirs || return 1
+  dpi_stage_run 'render rules' 'the nftables ruleset could not be rendered from the scope state' \
+    dpi_render_rules "$DPI_STATE_DIR" "$DPI_NFT_FILE" || return 1
+  if [[ ! -s "$DPI_NFT_FILE" ]]; then
+    dpi_stage_run 'cleanup stock runtime' 'DPI runtime state could not be fully removed' \
+      dpi_cleanup_stock_runtime || return 1
+    return 0
+  fi
+  dpi_rules_need_nfqws "$DPI_STATE_DIR" && need_nfqws=1
+  dpi_stage_run 'write firewall unit' 'the firewall helper or unit file could not be written' \
+    dpi_write_firewall_runtime || return 1
+  if (( need_nfqws )); then
+    dpi_stage_run 'install nfqws runtime' 'the pinned nfqws binary could not be installed or verified' \
+      dpi_install_nfqws || return 1
+    dpi_stage_run 'write nfqws unit' 'the nfqws unit file or its service account could not be created' \
+      dpi_write_nfqws_unit || return 1
+  fi
+  dpi_stage_run 'daemon-reload' 'systemd did not reload the unit files' \
+    systemctl daemon-reload || return 1
+  dpi_stage_run 'enable unit' 'the firewall unit could not be enabled' \
+    dpi_systemctl_quiet enable "$DPI_FIREWALL_UNIT" || return 1
+  dpi_stage_run 'apply nft candidate' 'the rendered ruleset was rejected by nft' \
+    dpi_apply_rules_file "$DPI_NFT_FILE" || return 1
+  [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" != after_firewall ]] || {
+    dpi_stage_fail 'restart unit' 'systemctl restart' 1 'forced test failure point after_firewall'
+    return 1
+  }
+  dpi_stage_run 'restart unit' 'the firewall unit could not be started' \
+    dpi_systemctl_quiet restart "$DPI_FIREWALL_UNIT" || return 1
+  if (( need_nfqws )); then
+    [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" != nfqws_start ]] || {
+      dpi_stage_fail 'enable nfqws unit' 'systemctl enable --now' 1 'forced test failure point nfqws_start'
+      return 1
+    }
+    dpi_stage_run 'enable nfqws unit' 'the nfqws worker could not be enabled or started' \
+      dpi_systemctl_quiet enable --now "$DPI_NFQWS_UNIT" || return 1
+  else
+    # Modes without nfqws must leave no nfqws runtime behind. The teardown
+    # performs its own daemon-reload.
+    dpi_stage_run 'cleanup nfqws runtime' 'leftover nfqws runtime could not be removed' \
+      dpi_cleanup_nfqws_runtime || return 1
+  fi
+  dpi_stage_run 'verify runtime' 'the live runtime does not match the committed state' \
+    dpi_verify_runtime "$need_nfqws" || return 1
+  return 0
+}
+
 
 dpi_restore_snapshot() {
   local snapshot="$1" injected="${TWEBPROXY_DPI_TEST_FAIL_POINT:-}"
+  local prev_phase="${DPI_DIAG_PHASE:-}"
   rm -rf "$DPI_DIR"
   if [[ -d "$snapshot/dpi" ]]; then cp -a "$snapshot/dpi" "$DPI_DIR"; fi
   unset TWEBPROXY_DPI_TEST_FAIL_POINT
+  DPI_DIAG_PHASE=rollback
   if dpi_reconcile_runtime >/dev/null 2>&1; then
+    DPI_DIAG_PHASE="$prev_phase"
     [[ -n "$injected" ]] && export TWEBPROXY_DPI_TEST_FAIL_POINT="$injected"
     return 0
   fi
+  DPI_DIAG_PHASE="$prev_phase"
   [[ -n "$injected" ]] && export TWEBPROXY_DPI_TEST_FAIL_POINT="$injected"
   # A rollback that cannot be re-applied must fail closed. Remove only the
   # manager-owned DPI table/state; the accepted backend firewall is untouched.
   rm -rf "$DPI_DIR"
-  dpi_cleanup_stock_runtime
+  dpi_cleanup_stock_runtime || true
   return 1
 }
 
 dpi_commit_candidate_state() {
   local proposed="$1" snapshot="$2"
+  dpi_stage_reset
+  DPI_LAST_STAGE='commit state'
   install -d -o root -g root -m 0700 "$DPI_DIR"
   rm -rf "$DPI_STATE_DIR"
   cp -a "$proposed" "$DPI_STATE_DIR"
-  [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" != after_state ]] || { dpi_restore_snapshot "$snapshot"; return 1; }
-  if ! dpi_reconcile_runtime; then
-    dpi_restore_snapshot "$snapshot"
+  if [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" == after_state \
+     || "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" == 'stage:commit state' ]]; then
+    dpi_stage_fail 'commit state' dpi_commit_candidate_state 1 'forced test failure point after the state was written'
+    dpi_rollback_to_snapshot "$snapshot"
     return 1
+  fi
+  if ! dpi_reconcile_runtime; then
+    dpi_rollback_to_snapshot "$snapshot"
+    return 1
+  fi
+  dpi_diag_log "stage=commit state op=dpi_commit_candidate_state status=0 result=ok"
+  return 0
+}
+
+# Rolls back after a failed stage and reports the outcome without losing the
+# identity of the stage that actually failed - dpi_restore_snapshot reconciles
+# again and would otherwise overwrite it.
+dpi_rollback_to_snapshot() {
+  local snapshot="$1"
+  local stage="${DPI_LAST_STAGE:-unknown}" op="${DPI_LAST_STAGE_OP:-}"
+  local rc="${DPI_LAST_STAGE_RC:-1}" reason="${DPI_LAST_STAGE_REASON:-}"
+  local rollback=restored
+  dpi_restore_snapshot "$snapshot" || rollback=failed-fell-back-to-STOCK
+  DPI_LAST_STAGE="$stage"; DPI_LAST_STAGE_OP="$op"
+  DPI_LAST_STAGE_RC="$rc"; DPI_LAST_STAGE_REASON="$reason"
+  dpi_diag_log "stage=$stage op=$op status=$rc result=failed reason=$reason rollback=$rollback"
+  [[ "$rollback" == restored ]]
+}
+
+# The concise TUI line for a failed compatibility change, naming the stage that
+# failed when one was recorded.
+dpi_transaction_failure_message() {
+  local mode="${1:-}"
+  if [[ -n "${DPI_LAST_STAGE:-}" && -n "$mode" ]]; then
+    ui_msgf dpi_transaction_failed_stage "$mode" "$DPI_LAST_STAGE"
+  elif [[ -n "${DPI_LAST_STAGE:-}" ]]; then
+    ui_msgf dpi_transaction_failed_at_stage "$DPI_LAST_STAGE"
+  else
+    ui_msg dpi_transaction_failed
   fi
 }
 
 dpi_transaction_set() {
   local ip="$1" mode="$2" host="$3" work snapshot proposed
+  dpi_stage_reset
   # Fail closed before any state is touched: an unmatchable scope must never be
   # committed, and a previously working mode must survive the refusal.
   dpi_scope_locally_configured "$ip" || return 1
@@ -1674,16 +1879,25 @@ dpi_transaction_set() {
   [[ -d "$DPI_DIR" ]] && cp -a "$DPI_DIR" "$snapshot/dpi"
   [[ -d "$DPI_STATE_DIR" ]] && cp -a "$DPI_STATE_DIR/." "$proposed/"
   find "$proposed" -maxdepth 1 -type f -name '*.env' -exec chmod 0600 {} + 2>/dev/null || true
-  dpi_write_scope_state "$proposed" "$ip" "$mode" "$host" || { rm -rf "$work"; return 1; }
+  # Pre-commit validation stages: nothing has been changed yet, but a refusal
+  # here is just as opaque to the operator as a runtime failure.
+  dpi_write_scope_state "$proposed" "$ip" "$mode" "$host" || {
+    dpi_stage_fail 'write scope state' dpi_write_scope_state 1 'the proposed scope state could not be written'
+    rm -rf "$work"; return 1; }
   local candidate="$work/candidate.nft"
-  dpi_render_rules "$proposed" "$candidate" || { rm -rf "$work"; return 1; }
-  [[ -x "$DPI_NFT_BIN" ]] && "$DPI_NFT_BIN" -c -f "$candidate" >/dev/null || { rm -rf "$work"; return 1; }
+  dpi_render_rules "$proposed" "$candidate" || {
+    dpi_stage_fail 'render candidate rules' dpi_render_rules 1 'the proposed ruleset could not be rendered'
+    rm -rf "$work"; return 1; }
+  [[ -x "$DPI_NFT_BIN" ]] && "$DPI_NFT_BIN" -c -f "$candidate" >/dev/null || {
+    dpi_stage_fail 'check nft candidate' "$DPI_NFT_BIN -c -f" 1 'nft rejected the proposed ruleset'
+    rm -rf "$work"; return 1; }
   if dpi_commit_candidate_state "$proposed" "$snapshot"; then rm -rf "$work"; return 0; fi
   rm -rf "$work"; return 1
 }
 
 dpi_transaction_disable_ip() {
   local ip="$1" work snapshot proposed
+  dpi_stage_reset
   work="$(mktemp -d /tmp/twebproxy-dpi.XXXXXX)" || return 1
   snapshot="$work/snapshot"; proposed="$work/proposed"
   mkdir -p "$snapshot" "$proposed"
@@ -1769,7 +1983,7 @@ dpi_set_cmd() {
   if dpi_transaction_set "$ip" "$mode" "$host"; then
     ok "$(ui_msgf dpi_applied "$mode" "$host" "$ip")"
   else
-    die "$(ui_msg dpi_transaction_failed)"
+    die "$(dpi_transaction_failure_message "$mode")"
   fi
 }
 
@@ -1789,7 +2003,7 @@ dpi_disable_cmd() {
   if [[ ! -f "$(dpi_state_path "$DPI_STATE_DIR" "$ip")" ]]; then
     ok "$(ui_msgf dpi_disabled "$host")"; return 0
   fi
-  dpi_transaction_disable_ip "$ip" || die "$(ui_msg dpi_transaction_failed)"
+  dpi_transaction_disable_ip "$ip" || die "$(dpi_transaction_failure_message)"
   ok "$(ui_msgf dpi_disabled "$host")"
 }
 
@@ -1807,8 +2021,9 @@ dpi_repair_all() {
   [[ -d "$DPI_STATE_DIR" ]] || return 0
   if ! dpi_prune_orphan_state || ! dpi_reconcile_runtime; then
     warn "$(ui_msg dpi_repair_warning)"
+    dpi_diag_log "stage=${DPI_LAST_STAGE:-repair} op=dpi_repair_all status=${DPI_LAST_STAGE_RC:-1} result=failed reason=${DPI_LAST_STAGE_REASON:-repair could not reconcile DPI state} rollback=forced-to-STOCK"
     rm -rf "$DPI_DIR"
-    dpi_cleanup_stock_runtime
+    dpi_cleanup_stock_runtime || true
     return 1
   fi
 }
@@ -1857,7 +2072,9 @@ dpi_collect_host_check() {
 
 dpi_full_uninstall() {
   rm -rf "$DPI_DIR"
-  dpi_cleanup_stock_runtime
+  # Best effort: uninstall must continue even if a unit refuses to go away, but
+  # the residual state is recorded in the transcript.
+  dpi_cleanup_stock_runtime || true
   rm -f "$DPI_DOC_DIR/nfqws-LICENSE.txt"
 }
 

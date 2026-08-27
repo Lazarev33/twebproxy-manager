@@ -49,10 +49,23 @@ set +e
 BASE_DIR="$TMP/etc"; INSTANCES_DIR="$BASE_DIR/instances"
 DPI_DIR="$BASE_DIR/dpi"; DPI_STATE_DIR="$DPI_DIR/scopes"; DPI_NFT_FILE="$DPI_DIR/firewall.nft"
 LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"; DPI_DOC_DIR="$TMP/doc"
+# The owned nfqws runtime files always live inside LIBEXEC_DIR; redirecting
+# LIBEXEC_DIR alone leaves a layout the manager cannot be installed into, which
+# trips dpi_remove_owned_nfqws_runtime_files' ownership guard for reasons that
+# have nothing to do with this test's subject. Wire them together, as the other
+# DPI fixtures do.
+DPI_NFQWS_BIN="$LIBEXEC_DIR/twebproxy-nfqws"
+DPI_NFQWS_SUM_FILE="$LIBEXEC_DIR/twebproxy-nfqws.sha256"
 DPI_NFT_BIN="$TMP/bin/nft"
 install -d -m 0700 "$BASE_DIR" "$INSTANCES_DIR"; mkdir -p "$LIBEXEC_DIR" "$SYSTEMD_DIR"
 UI_LANGUAGE=en
-systemctl() { return 0; }
+# systemd is not PID 1 here. A blanket `systemctl() { return 0; }` used to claim
+# every unit was always active, which is not how `is-active` behaves for a unit
+# that was never installed; the shared model gets that right.
+SYSTEMCTL_ACTIVE_DIR="$TMP/systemctl-active"
+SYSTEMCTL_LOG="$TMP/systemctl.log"
+# shellcheck source=/dev/null
+source "$ROOT/tests/lib/systemctl-model.sh"
 useradd() { return 0; }; userdel() { return 0; }
 
 # Control which addresses the host appears to own. Overriding this function is

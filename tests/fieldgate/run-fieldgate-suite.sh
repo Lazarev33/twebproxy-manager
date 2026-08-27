@@ -19,6 +19,8 @@ declare -a NAMES=(
   "TG-5b/TWP-003 production-errexit control flow:tg5b-errexit-control-flow.sh:300"
   "TG-7/TWP-005 backend state isolation:tg7-backend-state-isolation.sh:300"
   "FD-1 field diagnostics (field-report):fd1-field-report.sh:900"
+  "DF-3 DPI cleanup + stage diagnostics:df3-dpi-cleanup-stage-diagnostics.sh:600"
+  "DF-3b nfqws cleanup failure propagation:df3b-nfqws-cleanup-propagation.sh:300"
 )
 rc=0
 for entry in "${NAMES[@]}"; do
@@ -33,5 +35,5 @@ for entry in "${NAMES[@]}"; do
     rc=1
   fi
 done
-printf '\nfieldgate-suite: %s\n' "$( ((rc==0)) && echo 'PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1)' || echo FAIL )"
+printf '\nfieldgate-suite: %s\n' "$( ((rc==0)) && echo 'PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1, DF-3, DF-3b)' || echo FAIL )"
 exit "$rc"
