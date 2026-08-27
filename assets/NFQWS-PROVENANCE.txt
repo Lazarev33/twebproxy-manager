@@ -1,0 +1,35 @@
+TWebProxy Manager 0.2.8-dpi-beta — bundled nfqws provenance
+
+Upstream project: https://github.com/bol-van/zapret
+Release tag: v72.13
+Pinned commit: 87e058624c72863db53bdaf7fb6f16576dddb6ab
+Release page: https://github.com/bol-van/zapret/releases/tag/v72.13
+Official archive: zapret-v72.13.tar.gz
+Official archive URL: https://github.com/bol-van/zapret/releases/download/v72.13/zapret-v72.13.tar.gz
+Downloaded archive SHA-256: 25c74e6c5f48963fa244c2955e76694a07c39447245a0457e2efdc74b3317e68
+
+Bundled upstream path: zapret-v72.13/binaries/linux-x86_64/nfqws
+Bundled filename: nfqws-linux-x86_64
+Pinned binary size: 125760 bytes
+Bundled binary SHA-256: f34615964d7321650197cd69d3f7cbfdaabe8118b5a0d57c6e41dccdff658999
+Upstream sha256sum.txt value: f34615964d7321650197cd69d3f7cbfdaabe8118b5a0d57c6e41dccdff658999
+License SHA-256: dcf5abd3e5d876c1065982871c0cec7368c0e61fc795c541798729516bb6b54f
+
+The binary identifies itself as:
+  github version v72.13 (87e058624c72863db53bdaf7fb6f16576dddb6ab)
+
+TWebProxy validates the pinned hash before installation, writes a fixed
+installed checksum manifest, validates the exact arguments with --dry-run,
+and checks the installed hash before every systemd start.
+
+The release-tree binary is used when it is adjacent to the executing Manager.
+An installed /usr/local/sbin/twebproxy or script-only Stage 4 update has no
+adjacent assets directory. In that state, the first explicit nfqws activation
+downloads the official pinned release archive over HTTPS, extracts only the
+fixed linux-x86_64 member into a private temporary directory, limits and checks
+its exact size, verifies the pinned binary SHA-256 before any execution, and
+then verifies the exact version/commit line and approved --dry-run arguments.
+The verified copy is published only to the TWebProxy-owned runtime location.
+Returning to STOCK removes it; no persistent nfqws cache is kept in STOCK.
+
+The upstream license is included as nfqws-LICENSE.txt.

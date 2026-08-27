@@ -1,0 +1,17 @@
+instance.state.present	OK	hostname:fixture.example
+relay.service.active	OK	hostname:fixture.example
+relay.listener.loopback	OK	hostname:fixture.example
+admin.listener.loopback	OK	hostname:fixture.example
+firewall.backend.boundary	OK	global
+profiles.present	OK	hostname:fixture.example
+profile.backend.service.active	OK	profile:fixture.example/default
+profile.backend.sandbox.af_netlink	OK	profile:fixture.example/default
+profile.backend.firewall.coverage	OK	profile:fixture.example/default
+profile.backend.listener.isolation	OK	profile:fixture.example/default
+profile.stats.firewall.coverage	OK	profile:fixture.example/default
+profile.stats.listener.isolation	OK	profile:fixture.example/default
+profile.stats.endpoint	OK	profile:fixture.example/default
+tls.public.certificate.validity	OK	hostname:fixture.example
+tls.manager.active	OK	hostname:fixture.example
+https.public.strict	OK	hostname:fixture.example
+anti_dpi.mode	DISABLED	hostname:fixture.example

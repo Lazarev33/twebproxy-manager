@@ -1,0 +1,7 @@
+instance.state.loaded	OK	hostname:fixture.example
+tls.certificate.summary	OK	hostname:fixture.example
+relay.service.active	OK	hostname:fixture.example
+profile.backend.service.active	OK	profile:fixture.example/default
+relay.healthz	OK	hostname:fixture.example
+relay.readyz	OK	hostname:fixture.example
+anti_dpi.mode	DISABLED	hostname:fixture.example
