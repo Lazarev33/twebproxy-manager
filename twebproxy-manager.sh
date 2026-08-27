@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 umask 077
 
-# TWebProxy Manager v0.2.8-dpi-beta
+# TWebProxy Manager v0.2.9-dpi-beta
 # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
 # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
 
 APP="twebproxy"
-MANAGER_VERSION="0.2.8"
-MANAGER_RELEASE_VERSION="0.2.8-dpi-beta"
+MANAGER_VERSION="0.2.9"
+MANAGER_RELEASE_VERSION="0.2.9-dpi-beta"
 TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
 TPROXY_BRANCH="master"
 # First real E2E baseline validated on 2026-08-23. Fresh core installs use this

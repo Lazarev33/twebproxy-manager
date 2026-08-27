@@ -4,7 +4,7 @@
 
 Репозиторий: https://github.com/Lazarev33/twebproxy-manager
 
-Текущий выпуск: **0.2.8-dpi-beta**. Машиночитаемый `VERSION` — **0.2.8**:
+Текущий выпуск: **0.2.9-dpi-beta**. Машиночитаемый `VERSION` — **0.2.9**:
 это строгий semver, совместимый с уже принятой Stage 4 update/rollback-проверкой;
 beta-метка хранится отдельно в `MANAGER_RELEASE_VERSION` и используется в UI.
 
@@ -209,6 +209,12 @@ Fresh install использует проверенный commit `tproxy-server`
 ```
 
 ## Изменения по версиям
+
+### 0.2.9-dpi-beta
+
+- Field Fix 3: исправлена очистка systemd DPI units после STOCK/rollback и добавлена точная stage-диагностика DPI activation.
+- Исправлена propagation-ошибка cleanup nfqws runtime: отказ удаления больше не может завершиться false-success.
+- Версия поднята до `0.2.9`, чтобы штатный `check-update` / `manager-update` видел этот patch как обновление.
 
 ### 0.2.8-dpi-beta
 

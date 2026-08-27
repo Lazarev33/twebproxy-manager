@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.9-dpi-beta — 2026-08-28 — DPI Field Fix 3
+
+- Исправлен lifecycle `twebproxy-dpi-firewall.service`: STOCK/rollback останавливает каждый TWebProxy DPI unit отдельно до удаления unit file и очищает orphaned `active (exited)` state.
+- Добавлена точная stage-диагностика DPI activation/reconciliation с сохранением failed stage через rollback.
+- Исправлена propagation-ошибка `dpi_cleanup_nfqws_runtime`: ошибка безопасного удаления TWebProxy-owned nfqws runtime теперь возвращается вызывающему коду как failure, а не маскируется как success.
+- Machine-readable `VERSION` поднят до `0.2.9`, `MANAGER_RELEASE_VERSION` — до `0.2.9-dpi-beta`, чтобы штатный updater обнаруживал patch.
+- DPI six-mode architecture, nfqws pin/strategy и Stage 4 update/rollback semantics не менялись.
+
 ## 0.2.8-dpi-beta — 2026-08-25 — optional IPv4 network compatibility
 
 - Добавлена единая необязательная DPI-подсистема с режимами `stock`,
