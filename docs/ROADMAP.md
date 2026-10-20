@@ -1,62 +1,125 @@
-# Roadmap
+# TWebProxy Manager — Development Roadmap
 
-## 0.2.6 — current beta
+Updated: 2026-10-20. This document tracks **planned work**, not production release status.
 
-Goal: preserve the first known-good E2E baseline and remove issues observed in the successful report.
+## Product goal
 
-Done:
+A dependable, easy-to-operate manager for Telegram native WEB Proxy: official `telegramdesktop/tproxy-server` + stock MTProxy, HTTPS/WebSocket transports, Caddy/Nginx, a real public website on the same hostname, optional carefully scoped anti-DPI methods, secure updates and meaningful diagnostics.
 
-- Caddy + `https` + stock MTProxy baseline;
-- systemd credential permission model;
-- MTProxy `AF_NETLINK` correction;
-- isolation audit;
-- compact current/history reports;
-- transactional managed Caddy changes;
-- reboot/autostart validated on the field VPS;
-- GitHub manager update channel with checksum validation;
-- strict TLS and all-listener audit improvements.
+Two supported user journeys:
+- **Quick setup:** domain → HTTPS → real website → WEB proxy → client connection information, with safe defaults.
+- **Advanced administration:** instances, profiles, keys, carriers, backend isolation, diagnostics, certificates, optional anti-DPI and rollback.
 
-## Next field tests
+Keep the public website genuinely functional; do not claim that HTML alone can hide the server's IP, SNI, TLS fingerprint or traffic characteristics. Do not promise complete DPI invisibility.
 
-Do not add a second backend implementation before these tests are separated cleanly:
+## Current checkpoints and release status
 
-1. `https-lanes`.
-2. `websocket`.
-3. `websocket-lanes`.
-4. Nginx + Let's Encrypt.
-5. large media/file transfer.
-6. reconnect after client sleep/network switch.
-7. intentional backend crash and relay crash recovery.
-8. external scan proving backend/stats ports are unreachable.
+| Checkpoint | Status | Notes |
+| --- | --- | --- |
+| v0.2.9 (`main` at planning time) | Earlier GitHub baseline | Existing field-tested stock setup; not evidence for newer changes |
+| v0.2.10 Stage A | Development completed | DPI state transaction and isolation improvements |
+| v0.2.11 Stage A.1 | Development checkpoint | F01/F02/F11/F12/F18 and TUI shared-IPv4 consent; real nft and ENOSPC gates incomplete |
+| v0.2.12 Stage B | **Blocked for acceptance** | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
+| v0.2.13 Stage B.1 | **Next proposed correction** | Narrow corrections and test safety; not implemented yet |
 
-## 0.2.x cleanup after field matrix
+All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
-Candidates:
+## Non-negotiable engineering constraints
 
-- make managed Nginx configuration changes transactional with rollback, matching the Caddy path;
-- collect concise per-test metrics without enabling raw request logging;
-- add an explicit noninteractive preflight command suitable for CI/VPS smoke testing;
-- document restore/backup semantics before introducing automated migration.
+- No production VPS changes during development, audits or fault injection.
+- No resurrection of rejected advanced Stage 3 recovery, LKG, journal or generic exact-state engine. Use bounded, operation-local transactions and the simple backup-before-update / rollback-to-previous-version approach.
+- Preserve stock MTProxy as the backend baseline; Caddy is the recommended greenfield frontend, Nginx remains supported for existing setups.
+- The six existing DPI mode IDs and pinned nfqws binary remain stable until a separately approved change.
+- Anti-DPI on local outgoing IPv4 TCP:443 may affect unrelated services on the same IP. STOCK default; explicit shared-scope consent; no automatic aggressive DPI changes.
+- Keep protected Stage 4 functions unchanged until updater/supply-chain work is specifically authorized.
+- Any production manager code change bumps machine-readable `VERSION`, `MANAGER_VERSION` and release label coherently; refresh SHA manifests and relevant fixtures.
+- Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
+- No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## 0.3 experiment branch
+## Immediate work: Stage B.1
 
-Introduce backend abstraction only after stock MTProxy remains a stable baseline:
+Scope: close independently verified Stage B regressions and dangerous test behavior **before Stage C**.
 
-```text
-backend=stock-mtproxy
-backend=telemt-direct
-backend=telemt-middle-end
-```
+1. **P0 — executable directory permissions:** correct the v0.2.12 `rebuild_firewall()` path that changes `/usr/local/libexec/twebproxy` from traversable 0755 to root-only 0700, breaking the `mtproxy` service user. Apply a minimal independently verified patch and regression for non-root execution.
+2. **P0 — privileged test safety:** make real nftables/systemd/mount/ENOSPC tests opt-in and disposable-environment-only. A production host must never be modified merely by invoking a general test suite.
+3. **Investigate, don't pre-judge:** `nftables.service` reload/restart ownership (audit R1), systemd dependency and stop propagation (R2), nft command timeout and ambiguous kernel outcome (R3). Fix only reproducible defects within a clearly defined B.1 scope.
+4. Preserve all Stage A/A.1 behavior, Stage 4 protected hash, foreign firewall objects, and the existing managed backend service behavior. Do not add protocols, a new UI or generic recovery.
+5. Version proposal: `0.2.13-beta` if this becomes a distinct shipped source checkpoint. Later numbering must be recalculated rather than reused.
 
-Telemt should be evaluated by changing only the backend while keeping hostname, carrier and client test constant.
+Acceptance: regression for permissions, safe negative/positive tests, reviewed diff, verified artifact hashes, explicit limitations. **A correction is not by itself proof of the real-kernel guarantee.**
 
-## RC / external audit
+## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
-Before 1.0:
+Use a separate sacrificial Linux VM/host with an isolated firewall/network, root test privileges and controlled test filesystems. **Never use the live Telegram proxy VPS.**
 
-1. clean-install E2E on at least two fresh VPS images;
-2. upgrade from previous manager release without recreating profiles;
-3. static architecture/security review;
-4. hostile review of partial-install, rollback, port collision and existing-frontend cases;
-5. rerun every accepted finding on a real VPS;
-6. freeze a reproducible release artifact with checksums.
+- Actual nft kernel transactions: valid replacement, invalid candidate, deliberately failed batch, initial install, zero/one/multiple backends, foreign table invariance, restart/reload/uninstall behavior, postconditions.
+- Actual systemd unit lifecycle: normal start/reload/restart/stop and dependency propagation; no unexpected service disruption during routine firewall rebuilds.
+- Actual DPI verifier with nft JSON and rendered rules (F12); six existing modes and scope collisions.
+- Actual ENOSPC interruption using an isolated filesystem or mount namespace; state preservation and truthful test result.
+- Negative control: prove test runner refuses unsafe environments.
+
+Record commands, pre/post states, exit codes and exact environment. An unavailable test is NOT_EXECUTED, not PASS. Real-kernel validation may run while later development proceeds in isolation, but it is a hard release gate.
+
+## Core implementation stages (after B.1)
+
+| Stage | Scope | Acceptance principle |
+| --- | --- | --- |
+| **C1 — state and profiles** | Correct profile selection/clobbered globals, atomic profile/backend persistence, rotation races, local lifecycle locks, port allocation | No wrong target, lost secret, partial state or false success |
+| **C2 — relay lifecycle** | Relay binary update, restart/health failure rollback, instance lifecycle failure propagation | Previous working binary/state retained on failure |
+| **D — frontend / TLS** | Transactional Caddy managed markers, safe Nginx LE issuance/renewal, candidate validation, rollback | Existing website and TLS survive failed changes |
+| **E — operations / diagnostics** | TUI EOF/default-no, read-only diagnostic timeouts, truthful status, logs/report handling | No false-green output, hangs or accidental yes |
+| **F — updater / supply chain** | Explicitly authorized Stage 4 updater changes, lock cleanup, provenance/signatures or strong pinned artifact verification, rollback | Trusted, verifiable update with prior-version recovery |
+| **G — hardening** | Privilege boundaries, config validation, ownership, bounded resources, remaining confirmed audit backlog | Safe defaults and predictable degradation |
+| **H — user experience** | Main-menu Anti-DPI, guided quick setup, advanced controls, actionable statuses, RU/EN, desktop/mobile guidance | Novice usability without bypassing safety gates |
+
+Stage identifiers are fixed planning names; exact `0.2.x` version numbers after B.1 are **TBD** and must be assigned sequentially at implementation time. Keep work bounded; do not turn each stage into a full release audit.
+
+## WEB transport, compatibility and anti-DPI research
+
+Create an evidence-backed **research / design gate before implementation**. Do not blend it into B.1 or the core reliability corrections.
+
+- Re-evaluate pinned official `tproxy-server` versus the current upstream commit/protocol and the third-party `tgwebproxy` implementation. Review license, support, session token signing and `token_key_file` migration, config compatibility, release pinning and client requirements.
+- Compare `https`, `https-lanes`, `websocket`, `websocket-lanes` under consistent network conditions, with throughput, connection survival, background/resume behavior, large media and actual Telegram handshakes. WebSocket is a candidate, **not** a proven universal default.
+- Research official `base_path` capability and routing behind a genuine existing website; it requires matching client capability, frontend rules and safe migration.
+- Compare existing STOCK/Window1152/MSS88/nfqws combinations with current zapret/zapret2 (`nfqws2`) server modes. Assess directionality, nft scope, side effects, overhead and reproducible benefit. Research is not authorization to install or change the pinned anti-DPI binary.
+- Assess CDN only against actual WebView, long-poll and WebSocket behavior; JS challenges and origin routing can break the bridge.
+- Maintain an explicit Desktop / Android / iOS client-version matrix including foreground, background, network switching, reconnect and media tests. Avoid claiming client compatibility from `/readyz` alone.
+- Separate `systemd running`, `TLS valid`, `relay ready`, `WEB handshake proven` and `Telegram client confirmed` in the product status model.
+
+Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
+
+## Public website / Decoy Site Manager — dedicated future stage
+
+Bring the original product idea back: a real, maintainable HTTPS website on the same hostname as the WEB bridge rather than the current generic “Gateway / The service is online” page.
+
+Candidate supported modes:
+1. **Generated real site:** user-selected title, purpose, pages, content, assets, favicon, styling and basic accessibility; sensible template defaults, not an identical fingerprinted placeholder across hosts.
+2. **Upload owned site:** HTML/CSS/JS/assets with path, ownership, symlink and content checks; publish transactionally.
+3. **Use existing website:** explicit reverse proxy to user-managed `public_upstream` without disrupting routes or TLS.
+4. **Authorized snapshot:** import only the operator's own website or content with permission; avoid deceptive copying of third-party branding.
+5. **Redirect:** secondary/manual mode only; warn that it is not an equivalent public site and may impair bridge behavior.
+
+Technical requirements: never expose relay secrets or local ports, validate/candidate-publish web configuration, keep a working site when edits fail, preserve user-managed files and Caddy/Nginx blocks, keep WEB transport paths compatible, and test base-path routing separately. The site's existence alone does not guarantee censorship resistance or transport indistinguishability.
+
+UI: website creation and maintenance belong in quick setup and per-site management, with preview, certificate/status view, undo and clear failure messages.
+
+## Release candidate and v1.0 gates
+
+After implementation milestones, perform an **integrated validation campaign** instead of repeated all-project audit loops after every small stage:
+
+- Fresh Debian/Ubuntu installs and safe upgrades preserving existing profiles and sites.
+- Disposable kernel nft/systemd/ENOSPC failure injection and reproducible test isolation.
+- Independent code/security review of real candidate artifacts; every confirmed blocker has a reproducer and a regression test.
+- Four WEB carriers, desktop and eligible mobile client matrix, sleep/reconnect, media transfer, firewall external scans, cert renewal and restart/crash behavior.
+- Real website and WEB bridge coexistence on a single hostname, no secrets in publicly served content.
+- TUI RU/EN, 40/80/120-column terminal behavior, installation, logs, errors and rollback.
+- Supply-chain and artifact checks: exact pinned dependencies, manifests, reproducible version identity, rollback.
+- Versioned RC checkpoint (proposal `0.9.0-rc1`), then `1.0.0` only with explicit acceptance.
+
+## Historical roadmap notes (kept for continuity)
+
+The earlier v0.2.6–v0.2.9 baseline delivered Caddy + HTTPS + stock MTProxy, systemd credential/AF_NETLINK fixes, isolation audit, compact diagnostics, field reboot/autostart checks, manager update channel and TLS/listener checks.
+
+Earlier planned field tests remain relevant: `https-lanes`, `websocket`, `websocket-lanes`, Nginx + Let's Encrypt, large transfers, sleep/network switch, backend/relay crash, and external backend-port scans. These are incorporated into the client/lab matrix above.
+
+The earlier `0.3 experiment branch` idea (`stock-mtproxy`, `telemt-direct`, `telemt-middle-end`) is **deferred research**, not an approved additional backend for the current 1.0 path. Only evaluate after the stock baseline and WEB/decoy roadmap are proven.
