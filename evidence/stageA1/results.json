@@ -1,0 +1,168 @@
+{
+  "status": "PARTIAL",
+  "stage": "A.1",
+  "version": "0.2.11",
+  "release_label": "0.2.11-dpi-beta",
+  "baseline": {
+    "zip_sha256": "d5dfc292683e99931de7731256d68ad63a5d0fb585915039d96d05241061e76d",
+    "manager_sha256": "5643680ce7bb2a92f8e38a31e90c0a36df1a06e1071972c142440fb6f00c5854",
+    "local_commit": "7a413ad19c723287babad135b1169d2df09dca97"
+  },
+  "candidate_manager_sha256": "91998dd80e019a5aed54043578b271b95fe6eb89f54e20084c307cab9c31a7b8",
+  "stage4_protected_function_set_sha256": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb",
+  "nfqws": {
+    "version": "v72.13",
+    "commit": "87e058624c72863db53bdaf7fb6f16576dddb6ab",
+    "sha256": "f34615964d7321650197cd69d3f7cbfdaabe8118b5a0d57c6e41dccdff658999"
+  },
+  "findings": {
+    "F01": "IMPLEMENTED_TARGETED_PASS",
+    "F02": "IMPLEMENTED_TARGETED_PASS",
+    "F11": "IMPLEMENTED_TARGETED_PASS",
+    "F12": "IMPLEMENTED_MODEL_PASS_REAL_NFT_NOT_EXECUTED",
+    "F18": "IMPLEMENTED_RESULT_ACCOUNTING_PASS",
+    "TUI": "IMPLEMENTED_EN_RU_PIPED_MENU_PASS"
+  },
+  "tests": [
+    {
+      "name": "Stage A final suite",
+      "exit_code": 77,
+      "status": "INCOMPLETE",
+      "groups_pass": 7,
+      "groups_fail": 0,
+      "groups_not_executed": 2
+    },
+    {
+      "name": "sa1 SIGPIPE",
+      "status": "PASS",
+      "assertions": 12
+    },
+    {
+      "name": "sa2 orphan",
+      "status": "PASS",
+      "assertions": 76
+    },
+    {
+      "name": "sa3 publication",
+      "status": "INCOMPLETE",
+      "assertions_pass": 59,
+      "assertions_fail": 0,
+      "mandatory_not_executed": 1
+    },
+    {
+      "name": "sa4 DNS",
+      "status": "PASS",
+      "assertions": 27
+    },
+    {
+      "name": "sa5 concurrency",
+      "status": "PASS",
+      "assertions": 12
+    },
+    {
+      "name": "sa6 release metadata",
+      "status": "PASS",
+      "assertions": 6
+    },
+    {
+      "name": "Stage A.1 targeted scenarios",
+      "status": "PASS",
+      "cases": 32
+    },
+    {
+      "name": "Runner status meta-test",
+      "status": "PASS"
+    },
+    {
+      "name": "Real nft JSON kernel round-trip",
+      "status": "NOT_EXECUTED",
+      "exit_code": 77,
+      "reason": "nft unavailable; disposable network namespace denied"
+    },
+    {
+      "name": "Real ENOSPC tmpfs",
+      "status": "NOT_EXECUTED",
+      "reason": "mount unavailable"
+    },
+    {
+      "name": "Existing six-mode DPI fixture",
+      "status": "PASS",
+      "assertions": 110
+    },
+    {
+      "name": "Installed-manager DPI lifecycle fixture",
+      "status": "PASS",
+      "assertions": 53
+    },
+    {
+      "name": "DF3 cleanup/stages",
+      "status": "PASS",
+      "assertions": 171
+    },
+    {
+      "name": "DF3b nfqws cleanup propagation",
+      "status": "PASS",
+      "assertions": 37
+    },
+    {
+      "name": "TG5 local address gate",
+      "status": "PASS",
+      "assertions": 13
+    },
+    {
+      "name": "TG5b errexit gate",
+      "status": "PASS",
+      "assertions": 19
+    },
+    {
+      "name": "FixUI fixture",
+      "status": "PASS"
+    },
+    {
+      "name": "TUI presentation fixture",
+      "status": "PASS"
+    },
+    {
+      "name": "Read-only core fixture",
+      "status": "PASS"
+    },
+    {
+      "name": "Localization static and flow C.UTF-8",
+      "status": "PASS"
+    },
+    {
+      "name": "Localization static and flow C",
+      "status": "PASS"
+    },
+    {
+      "name": "Static smoke",
+      "status": "PASS"
+    },
+    {
+      "name": "Certificate smoke",
+      "status": "PASS"
+    },
+    {
+      "name": "Protected scope comparison",
+      "status": "PASS",
+      "existing_functions_unchanged": 300,
+      "existing_functions_modified_allowed": 14
+    },
+    {
+      "name": "Full project validation campaign",
+      "status": "NOT_RUN_BY_SCOPE"
+    },
+    {
+      "name": "Stage 4 A-V suite",
+      "status": "NOT_RERUN_BY_SCOPE",
+      "protection": "exact function-set hash unchanged"
+    }
+  ],
+  "production_touched": false,
+  "push_performed": false,
+  "stage_b_started": false,
+  "verifier_schema_references": [
+    "https://manpages.debian.org/bookworm/libnftables1/libnftables-json.5.en.html",
+    "https://netfilter.org/projects/nftables/manpage.html"
+  ]
+}

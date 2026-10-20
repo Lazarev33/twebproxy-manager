@@ -1,0 +1,199 @@
+
+--- A. STOCK cleanup leaves no active DPI firewall runtime state ---
+PASS A_cleanup_returns_success
+PASS A_firewall_not_active
+PASS A_unit_file_removed
+PASS A_is_enabled_reports_not_found
+PASS A_nft_table_removed
+PASS A_helper_removed
+PASS A_stop_issued_before_unit_file_removed
+PASS A_no_multi_unit_systemctl_call
+
+--- B. Cleanup is idempotent ---
+PASS B_second_cleanup_ok
+PASS B_third_cleanup_ok
+PASS B_still_not_active
+
+--- C. An already-ghosted unit (file gone, still active) is repaired ---
+PASS C_precondition_ghost_active
+PASS C_cleanup_returns_success
+PASS C_ghost_cleared
+
+--- D. Unrelated systemd units are never touched ---
+PASS D_backend_firewall_still_active
+PASS D_nginx_still_active
+PASS D_backend_firewall_still_enabled
+PASS D_no_foreign_unit_in_calls
+
+--- E. Normal STOCK disable leaves the service non-active ---
+PASS E_activation_succeeds
+PASS E_firewall_active_after_set
+PASS E_disable_succeeds
+PASS E_state_removed
+PASS E_firewall_not_active_after_disable
+PASS E_unit_file_removed_after_disable
+
+--- F. Failed activation from STOCK rolls back to a clean STOCK ---
+PASS F_restart_unit_transaction_fails
+PASS F_restart_unit_no_active_firewall
+PASS F_restart_unit_no_active_nfqws
+PASS F_restart_unit_no_state_committed
+PASS F_restart_unit_no_live_dpi_table
+PASS F_restart_unit_transcript_names_stage
+PASS F_restart_unit_transcript_result_failed
+PASS F_restart_unit_transcript_reports_rollback
+PASS F_restart_unit_last_stage_recorded
+PASS F_cleanup_nfqws_runtime_transaction_fails
+PASS F_cleanup_nfqws_runtime_no_active_firewall
+PASS F_cleanup_nfqws_runtime_no_active_nfqws
+PASS F_cleanup_nfqws_runtime_no_state_committed
+PASS F_cleanup_nfqws_runtime_no_live_dpi_table
+PASS F_cleanup_nfqws_runtime_transcript_names_stage
+PASS F_cleanup_nfqws_runtime_transcript_result_failed
+PASS F_cleanup_nfqws_runtime_transcript_reports_rollback
+PASS F_cleanup_nfqws_runtime_last_stage_recorded
+PASS F_verify_runtime_transaction_fails
+PASS F_verify_runtime_no_active_firewall
+PASS F_verify_runtime_no_active_nfqws
+PASS F_verify_runtime_no_state_committed
+PASS F_verify_runtime_no_live_dpi_table
+PASS F_verify_runtime_transcript_names_stage
+PASS F_verify_runtime_transcript_result_failed
+PASS F_verify_runtime_transcript_reports_rollback
+PASS F_verify_runtime_last_stage_recorded
+PASS F_commit_state_transaction_fails
+PASS F_commit_state_no_active_firewall
+PASS F_commit_state_no_active_nfqws
+PASS F_commit_state_no_state_committed
+PASS F_commit_state_no_live_dpi_table
+PASS F_commit_state_transcript_names_stage
+PASS F_commit_state_transcript_result_failed
+PASS F_commit_state_transcript_reports_rollback
+PASS F_commit_state_last_stage_recorded
+
+--- G. Rollback restores the previous DPI mode and runtime ---
+PASS G_restart_unit_fails
+PASS G_restart_unit_previous_mode_kept
+PASS G_restart_unit_previous_rules_restored
+PASS G_restart_unit_firewall_active_again
+PASS G_verify_runtime_fails
+PASS G_verify_runtime_previous_mode_kept
+PASS G_verify_runtime_previous_rules_restored
+PASS G_verify_runtime_firewall_active_again
+PASS G_commit_state_fails
+PASS G_commit_state_previous_mode_kept
+PASS G_commit_state_previous_rules_restored
+PASS G_commit_state_firewall_active_again
+
+--- H. Every reconciliation stage is individually attributable ---
+PASS H_prepare_runtime_fails
+PASS H_prepare_runtime_stage_recorded
+PASS H_prepare_runtime_transcript_line
+PASS H_prepare_runtime_transcript_has_status
+PASS H_prepare_runtime_transcript_has_op
+PASS H_prepare_runtime_transcript_has_reason
+PASS H_render_rules_fails
+PASS H_render_rules_stage_recorded
+PASS H_render_rules_transcript_line
+PASS H_render_rules_transcript_has_status
+PASS H_render_rules_transcript_has_op
+PASS H_render_rules_transcript_has_reason
+PASS H_write_firewall_unit_fails
+PASS H_write_firewall_unit_stage_recorded
+PASS H_write_firewall_unit_transcript_line
+PASS H_write_firewall_unit_transcript_has_status
+PASS H_write_firewall_unit_transcript_has_op
+PASS H_write_firewall_unit_transcript_has_reason
+PASS H_daemon-reload_fails
+PASS H_daemon-reload_stage_recorded
+PASS H_daemon-reload_transcript_line
+PASS H_daemon-reload_transcript_has_status
+PASS H_daemon-reload_transcript_has_op
+PASS H_daemon-reload_transcript_has_reason
+PASS H_enable_unit_fails
+PASS H_enable_unit_stage_recorded
+PASS H_enable_unit_transcript_line
+PASS H_enable_unit_transcript_has_status
+PASS H_enable_unit_transcript_has_op
+PASS H_enable_unit_transcript_has_reason
+PASS H_apply_nft_candidate_fails
+PASS H_apply_nft_candidate_stage_recorded
+PASS H_apply_nft_candidate_transcript_line
+PASS H_apply_nft_candidate_transcript_has_status
+PASS H_apply_nft_candidate_transcript_has_op
+PASS H_apply_nft_candidate_transcript_has_reason
+PASS H_restart_unit_fails
+PASS H_restart_unit_stage_recorded
+PASS H_restart_unit_transcript_line
+PASS H_restart_unit_transcript_has_status
+PASS H_restart_unit_transcript_has_op
+PASS H_restart_unit_transcript_has_reason
+PASS H_cleanup_nfqws_runtime_fails
+PASS H_cleanup_nfqws_runtime_stage_recorded
+PASS H_cleanup_nfqws_runtime_transcript_line
+PASS H_cleanup_nfqws_runtime_transcript_has_status
+PASS H_cleanup_nfqws_runtime_transcript_has_op
+PASS H_cleanup_nfqws_runtime_transcript_has_reason
+PASS H_verify_runtime_fails
+PASS H_verify_runtime_stage_recorded
+PASS H_verify_runtime_transcript_line
+PASS H_verify_runtime_transcript_has_status
+PASS H_verify_runtime_transcript_has_op
+PASS H_verify_runtime_transcript_has_reason
+
+--- H2. nfqws-only stages are attributable too ---
+PASS H2_install_nfqws_runtime_fails
+PASS H2_install_nfqws_runtime_stage_recorded
+PASS H2_install_nfqws_runtime_transcript_line
+PASS H2_install_nfqws_runtime_no_active_nfqws
+PASS H2_write_nfqws_unit_fails
+PASS H2_write_nfqws_unit_stage_recorded
+PASS H2_write_nfqws_unit_transcript_line
+PASS H2_write_nfqws_unit_no_active_nfqws
+PASS H2_enable_nfqws_unit_fails
+PASS H2_enable_nfqws_unit_stage_recorded
+PASS H2_enable_nfqws_unit_transcript_line
+PASS H2_enable_nfqws_unit_no_active_nfqws
+
+--- I. Legacy forced-failure points still behave as before ---
+PASS I_after_firewall_fails
+PASS I_after_firewall_no_state
+PASS I_after_firewall_no_active_firewall
+PASS I_nfqws_start_fails
+PASS I_nfqws_start_no_state
+PASS I_nfqws_start_no_active_firewall
+PASS I_after_state_fails
+PASS I_after_state_no_state
+PASS I_after_state_no_active_firewall
+
+--- I2. Legacy points and pre-commit refusals are attributable too ---
+PASS I2_after_firewall_names_prevented_stage
+PASS I2_candidate_check_fails
+PASS I2_candidate_stage_recorded
+PASS I2_candidate_refusal_commits_nothing
+PASS I2_nested_failure_fails
+PASS I2_outer_stage_wins
+
+--- J. Failure line names the stage; TUI stays concise ---
+PASS J_message_key_defined
+PASS J_message_names_stage
+PASS J_message_names_mode
+PASS J_message_ru_localized
+PASS J_message_ru_names_mode
+PASS J_message_is_single_line
+PASS J_falls_back_without_stage
+PASS J_stage_detail_not_on_stdout
+PASS J_stage_detail_in_transcript
+PASS J_diagnostics_use_known_fields_only
+PASS J_no_secret_field
+
+--- K. Repair-to-STOCK and full uninstall leave no active unit ---
+PASS K_repair_leaves_no_active_firewall
+PASS K_repair_removes_unit_file
+PASS K_uninstall_no_active_firewall
+PASS K_uninstall_no_active_nfqws
+PASS K_uninstall_removes_firewall_unit
+PASS K_uninstall_removes_nfqws_unit
+PASS K_uninstall_removes_state
+
+df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail

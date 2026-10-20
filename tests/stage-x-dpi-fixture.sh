@@ -7,6 +7,7 @@ TMP="$(mktemp -d /tmp/twebproxy-stage-x-dpi.XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
 
 export TWEBPROXY_NO_LOG=1
+export TWEBPROXY_TEST_NFT_JSON_MODEL="$PROJECT_DIR_UNDER_TEST/tests/lib/nft-json-model.sh"
 export TWEBPROXY_UI_LANGUAGE=en
 export TWEBPROXY_LANGUAGE_FILE="$TMP/ui-language"
 export TWEBPROXY_DPI_DIR="$TMP/etc/twebproxy/dpi"
@@ -23,6 +24,17 @@ set -Eeuo pipefail
 live="${MOCK_NFT_LIVE:?}"
 log="${MOCK_NFT_LOG:?}"
 printf '%q ' "$@" >> "$log"; printf '\n' >> "$log"
+if [[ "${1:-}" == -j ]]; then
+  shift; [[ "${1:-}" != -n ]] || shift
+  [[ "${MOCK_NFT_LIST_FAIL:-0}" != 1 ]] || exit 77
+  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
+    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
+    else printf '%s\n' '{"nftables":[]}'; fi
+  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
+    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
+  else exit 2; fi
+  exit
+fi
 if [[ "${1:-}" == -c && "${2:-}" == -f ]]; then
   [[ "${MOCK_NFT_CHECK_FAIL:-0}" != 1 ]] && grep -q '^table ip twebproxy_dpi {' "$3"
 elif [[ "${1:-}" == -f ]]; then

@@ -1,0 +1,558 @@
+
+===== A1 verify-runtime SIGPIPE/pipefail =====
+PASS sa1_pipefail_is_active_in_this_harness
+PASS sa1_scope_state_seeded
+PASS sa1_rules_rendered
+PASS sa1_rules_live
+PASS sa1_precondition_scope_is_really_in_the_live_table
+PASS sa1_producer_pipeline_is_genuinely_sigpipe_prone (5/5 false failures, rc=2)
+PASS sa1_verify_runtime_stable_under_pipefail (30/30 succeeded)
+PASS sa1_verify_runtime_still_detects_a_missing_scope (rc=1)
+PASS sa1_verify_runtime_still_detects_an_absent_table (rc=1)
+PASS sa1_verify_runtime_still_detects_empty_rules (rc=1)
+PASS sa1_verify_runtime_stable_with_multiple_scopes (10/10)
+PASS sa1_verify_runtime_detects_one_missing_scope_among_many (rc=1)
+
+sa1-verify-runtime-sigpipe: 12 pass, 0 fail
+A1 verify-runtime SIGPIPE/pipefail: PASS
+
+===== A2 STOCK no-state orphan reconcile =====
+
+===== public subcommand: dpi disable =====
+
+--- disable / CASE 1: orphan runtime, nothing else configured ---
+PASS sa2_disable_c1_precondition_orphan_active
+PASS sa2_disable_c1_command_succeeds
+PASS sa2_disable_c1_firewall_unit_inactive
+PASS sa2_disable_c1_nfqws_unit_inactive
+PASS sa2_disable_c1_firewall_unit_file_gone
+PASS sa2_disable_c1_dpi_table_absent
+
+--- disable / CASE 2: another valid scope must survive ---
+PASS sa2_disable_c2_precondition_other_scope_state
+PASS sa2_disable_c2_precondition_other_scope_live
+PASS sa2_disable_c2_precondition_unit_active
+PASS sa2_disable_c2_command_succeeds
+PASS sa2_disable_c2_other_scope_state_survives
+PASS sa2_disable_c2_other_scope_rule_still_live
+PASS sa2_disable_c2_other_scope_unit_still_active
+PASS sa2_disable_c2_other_scope_unit_file_present
+PASS sa2_disable_c2_target_owns_no_state
+
+--- disable / CASE 3: idempotence ---
+PASS sa2_disable_c3_second_run_succeeds
+PASS sa2_disable_c3_still_inactive
+
+--- disable / CASE 4: multi-scope safety, unrelated units ---
+PASS sa2_disable_c4_backend_firewall_untouched
+PASS sa2_disable_c4_nginx_untouched
+PASS sa2_disable_c4_no_foreign_unit_in_calls
+
+--- disable / CASE 5: pristine system ---
+PASS sa2_disable_c5_pristine_succeeds
+PASS sa2_disable_c5_no_dpi_units_activated
+PASS sa2_disable_c5_no_dpi_table
+
+--- disable / CASE 6: control, a configured scope ---
+PASS sa2_disable_c6_command_succeeds
+PASS sa2_disable_c6_state_removed
+PASS sa2_disable_c6_unit_inactive
+PASS sa2_disable_c6_table_absent
+
+--- disable / CASE 6b: host address changed ---
+PASS sa2_disable_c6b_precondition_state
+PASS sa2_disable_c6b_precondition_live
+PASS sa2_disable_c6b_command_succeeds
+PASS sa2_disable_c6b_stale_scope_removed
+PASS sa2_disable_c6b_stale_rule_not_live
+PASS sa2_disable_c6b_unit_inactive
+
+--- disable / CASE 7: orphan runtime + broken resolver ---
+PASS sa2_disable_c7_command_succeeds_without_dns
+PASS sa2_disable_c7_orphan_cleaned_without_dns
+
+--- disable / CASE 8: broken resolver + another live scope ---
+PASS sa2_disable_c8_other_scope_state_survives
+PASS sa2_disable_c8_other_scope_rule_still_live
+PASS sa2_disable_c8_other_scope_unit_still_active
+
+===== public subcommand: dpi stock =====
+
+--- stock / CASE 1: orphan runtime, nothing else configured ---
+PASS sa2_stock_c1_precondition_orphan_active
+PASS sa2_stock_c1_command_succeeds
+PASS sa2_stock_c1_firewall_unit_inactive
+PASS sa2_stock_c1_nfqws_unit_inactive
+PASS sa2_stock_c1_firewall_unit_file_gone
+PASS sa2_stock_c1_dpi_table_absent
+
+--- stock / CASE 2: another valid scope must survive ---
+PASS sa2_stock_c2_precondition_other_scope_state
+PASS sa2_stock_c2_precondition_other_scope_live
+PASS sa2_stock_c2_precondition_unit_active
+PASS sa2_stock_c2_command_succeeds
+PASS sa2_stock_c2_other_scope_state_survives
+PASS sa2_stock_c2_other_scope_rule_still_live
+PASS sa2_stock_c2_other_scope_unit_still_active
+PASS sa2_stock_c2_other_scope_unit_file_present
+PASS sa2_stock_c2_target_owns_no_state
+
+--- stock / CASE 3: idempotence ---
+PASS sa2_stock_c3_second_run_succeeds
+PASS sa2_stock_c3_still_inactive
+
+--- stock / CASE 4: multi-scope safety, unrelated units ---
+PASS sa2_stock_c4_backend_firewall_untouched
+PASS sa2_stock_c4_nginx_untouched
+PASS sa2_stock_c4_no_foreign_unit_in_calls
+
+--- stock / CASE 5: pristine system ---
+PASS sa2_stock_c5_pristine_succeeds
+PASS sa2_stock_c5_no_dpi_units_activated
+PASS sa2_stock_c5_no_dpi_table
+
+--- stock / CASE 6: control, a configured scope ---
+PASS sa2_stock_c6_command_succeeds
+PASS sa2_stock_c6_state_removed
+PASS sa2_stock_c6_unit_inactive
+PASS sa2_stock_c6_table_absent
+
+--- stock / CASE 6b: host address changed ---
+PASS sa2_stock_c6b_precondition_state
+PASS sa2_stock_c6b_precondition_live
+PASS sa2_stock_c6b_command_succeeds
+PASS sa2_stock_c6b_stale_scope_removed
+PASS sa2_stock_c6b_stale_rule_not_live
+PASS sa2_stock_c6b_unit_inactive
+
+--- stock / CASE 7: orphan runtime + broken resolver ---
+PASS sa2_stock_c7_command_succeeds_without_dns
+PASS sa2_stock_c7_orphan_cleaned_without_dns
+
+--- stock / CASE 8: broken resolver + another live scope ---
+PASS sa2_stock_c8_other_scope_state_survives
+PASS sa2_stock_c8_other_scope_rule_still_live
+PASS sa2_stock_c8_other_scope_unit_still_active
+
+sa2-stock-orphan-reconcile: 76 pass, 0 fail
+A2 STOCK no-state orphan reconcile: PASS
+
+===== A3 DPI state publication =====
+
+--- 0. baseline: a valid scope is published and live ---
+PASS sa3_precondition_state_published
+PASS sa3_precondition_rule_live
+
+--- 1. real ENOSPC during publication ---
+NOT_EXECUTED sa3_enospc_*: NOT_EXECUTED_ENVIRONMENT_LIMITATION (tmpfs mount unavailable)
+
+--- 2. failed copy at the mutating boundary ---
+sa3: injected copy failure -> /tmp/sa3-publish.Tq0nnn/etc/twebproxy/dpi/.scopes.new
+PASS sa3_fail_copy_commit_returns_failure (rc=1)
+PASS sa3_fail_copy_previous_state_survives
+PASS sa3_fail_copy_candidate_not_authoritative
+PASS sa3_fail_copy_previous_rule_still_live
+PASS sa3_fail_copy_no_false_stock
+sa3: injected PARTIAL copy -> /tmp/sa3-publish.Tq0nnn/etc/twebproxy/dpi/.scopes.new
+PASS sa3_partial_copy_commit_returns_failure (rc=1)
+PASS sa3_partial_copy_previous_state_survives
+PASS sa3_partial_copy_candidate_not_authoritative
+PASS sa3_partial_copy_previous_rule_still_live
+PASS sa3_partial_copy_no_false_stock
+
+--- 3. the same through the public transaction entrypoint ---
+PASS sa3_public_fail_copy_fails (rc=1)
+PASS sa3_public_fail_copy_previous_state_survives
+PASS sa3_public_fail_copy_candidate_not_committed
+PASS sa3_public_fail_copy_previous_rule_still_live
+PASS sa3_public_fail_copy_no_leftover_publication_dirs
+PASS sa3_public_partial_copy_fails (rc=1)
+PASS sa3_public_partial_copy_previous_state_survives
+PASS sa3_public_partial_copy_candidate_not_committed
+PASS sa3_public_partial_copy_previous_rule_still_live
+PASS sa3_public_partial_copy_no_leftover_publication_dirs
+
+--- 3b. EVERY staged-publication boundary behaves identically ---
+PASS sa3_boundary_copy_fails (rc=1)
+PASS sa3_boundary_copy_previous_state_kept
+PASS sa3_boundary_copy_previous_mode_intact
+PASS sa3_boundary_copy_candidate_not_committed
+PASS sa3_boundary_copy_previous_rule_still_live
+PASS sa3_boundary_copy_no_leftover_dirs
+PASS sa3_boundary_verify_fails (rc=1)
+PASS sa3_boundary_verify_previous_state_kept
+PASS sa3_boundary_verify_previous_mode_intact
+PASS sa3_boundary_verify_candidate_not_committed
+PASS sa3_boundary_verify_previous_rule_still_live
+PASS sa3_boundary_verify_no_leftover_dirs
+PASS sa3_boundary_retire_fails (rc=1)
+PASS sa3_boundary_retire_previous_state_kept
+PASS sa3_boundary_retire_previous_mode_intact
+PASS sa3_boundary_retire_candidate_not_committed
+PASS sa3_boundary_retire_previous_rule_still_live
+PASS sa3_boundary_retire_no_leftover_dirs
+PASS sa3_boundary_rename_fails (rc=1)
+PASS sa3_boundary_rename_previous_state_kept
+PASS sa3_boundary_rename_previous_mode_intact
+PASS sa3_boundary_rename_candidate_not_committed
+PASS sa3_boundary_rename_previous_rule_still_live
+PASS sa3_boundary_rename_no_leftover_dirs
+
+--- 3c. honest rollback reporting ---
+PASS sa3_failed_restore_transaction_fails (rc=1)
+PASS sa3_failed_restore_not_reported_as_restored
+PASS sa3_failed_restore_reported_as_failed
+PASS sa3_successful_rollback_reported_as_restored
+PASS sa3_successful_rollback_really_restored
+
+--- 4. positive control ---
+PASS sa3_control_second_scope_published
+PASS sa3_control_first_scope_kept
+PASS sa3_control_second_scope_kept
+PASS sa3_control_both_rules_live
+PASS sa3_control_mode_replaced
+PASS sa3_control_exactly_two_scopes
+PASS sa3_control_disable_keeps_other_scope
+PASS sa3_control_disable_removed_target
+
+sa3-state-publication: 59 pass, 0 fail, 1 NOT_EXECUTED
+A3 DPI state publication: NOT_EXECUTED
+
+===== A4 DNS prune safety =====
+
+--- 0. precondition ---
+PASS sa4_precondition_two_scopes
+
+--- 1.servfail transient DNS: servfail ---
+PASS sa4_servfail_scope_a_preserved
+PASS sa4_servfail_scope_b_preserved
+PASS sa4_servfail_repair_preserves_state
+
+--- 1.unreachable transient DNS: unreachable ---
+PASS sa4_unreachable_scope_a_preserved
+PASS sa4_unreachable_scope_b_preserved
+PASS sa4_unreachable_repair_preserves_state
+
+--- 1.ambiguous transient DNS: ambiguous ---
+PASS sa4_ambiguous_scope_a_preserved
+PASS sa4_ambiguous_scope_b_preserved
+PASS sa4_ambiguous_repair_preserves_state
+
+--- 2. genuine orphan with a working resolver ---
+PASS sa4_orphan_pruned
+PASS sa4_orphan_prune_leaves_other_scope
+PASS sa4_orphan_prune_returns_success
+
+--- 2b. deleted host + broken resolver: nothing else may be destroyed ---
+PASS sa4_broken_resolver_keeps_surviving_host_scope
+
+--- 2c. every instance removed: the resolver is not needed to prune ---
+PASS sa4_no_instances_prunes_a
+PASS sa4_no_instances_prunes_b
+
+--- 2d. multi-homed host present, genuine orphan elsewhere ---
+PASS sa4_multihomed_host_does_not_block_pruning
+PASS sa4_multihomed_case_keeps_owned_scope
+
+--- 2e. a multi-homed host that DOES own the address keeps it ---
+PASS sa4_multihomed_owner_keeps_its_scope
+
+--- 2f. NXDOMAIN host alongside a genuine orphan ---
+PASS sa4_nxdomain_host_does_not_freeze_pruning
+PASS sa4_nxdomain_case_keeps_owned_scope
+
+--- 2g. the scope OWN host being unresolvable still protects it ---
+PASS sa4_recording_host_unresolvable_keeps_its_scope
+
+--- 3. dpi_remove_host_state_if_orphaned ---
+PASS sa4_delete_removes_target_scope
+PASS sa4_delete_keeps_other_scope
+
+--- 3b. a shared address still owned by a live host is not removed ---
+PASS sa4_delete_keeps_scope_owned_by_a_live_host
+
+--- 3c. delete path with a broken resolver must not destroy a live scope ---
+PASS sa4_delete_broken_resolver_keeps_live_scope
+
+--- 4. diagnostics ---
+PASS sa4_undecidable_prune_is_recorded
+
+sa4-dns-prune-safety: 27 pass, 0 fail
+A4 DNS prune safety: PASS
+
+===== A5 concurrent DPI mutation =====
+PASS sa5_mutation_lock_is_inside_the_sandbox
+
+--- 1. two processes, two distinct scopes ---
+PASS sa5_gate_reached (process A is between its read and its publish)
+    process A rc=0   process B rc=0
+PASS sa5_no_lost_update_distinct_scopes (every transaction that reported success took effect)
+PASS sa5_state_and_live_table_agree
+
+--- 2. two processes, the SAME scope ---
+PASS sa5_same_scope_state_and_runtime_consistent (final MODE=mss88)
+
+--- 3. set overlapping with disable of another scope ---
+PASS sa5_set_survives_concurrent_disable_of_another_scope
+PASS sa5_concurrent_disable_took_effect
+
+--- 4. re-entrancy and read-only paths ---
+PASS sa5_nested_lock_does_not_deadlock
+PASS sa5_lock_released_after_use
+PASS sa5_read_only_path_not_blocked_by_the_mutation_lock
+PASS sa5_busy_lock_fails_fast (rc=75 after 3s)
+PASS sa5_busy_lock_changes_nothing
+
+sa5-concurrent-mutation: 12 pass, 0 fail
+A5 concurrent DPI mutation: PASS
+
+===== A6 release metadata single source =====
+PASS sa6_metadata_readable
+PASS sa6_metadata_consistent (VERSION=0.2.11 label=0.2.11-dpi-beta)
+PASS sa6_manager_header_matches_label
+PASS sa6_stage4_parser_accepts_machine_version
+PASS sa6_no_release_literals_in_gate_tests
+PASS sa6_single_embedded_machine_version
+
+sa6-release-metadata: 6 pass, 0 fail
+A6 release metadata single source: PASS
+
+===== A1.1 correction regression =====
+operation_rc=1
+PASS a1_proposed-copy
+operation_rc=1
+PASS a1_snapshot-copy
+operation_rc=1
+PASS a1_partial-copy
+operation_rc=1
+PASS a1_snapshot-partial
+operation_rc=1
+PASS a1_prepare-mkdir
+PASS a1_interrupted-set
+PASS a1_interrupted-reinvoke
+[+] Compatibility mode for beta.example returned to STOCK.
+PASS a1_interrupted-disable
+PASS a1_ambiguous-state
+PASS a1_corrupt-retired
+[+] Compatibility mode for alpha.example returned to STOCK.
+PASS a1_stock-binary
+PASS a1_stock-delete
+PASS a1_stock-query-failure
+PASS a1_stock-cli-error
+[+] Compatibility mode for beta.example returned to STOCK.
+PASS a1_stock-other-scopes
+PASS a1_stock-symlink-libexec
+PASS a1_verify-prefix
+PASS a1_verify-mode
+PASS a1_verify-good
+PASS a1_verify-multi
+PASS a1_verify-parameters
+PASS a1_verify-json-fields
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]:
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-yes
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]: [i] No changes applied.
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-no
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]: [i] No changes applied.
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-default-no
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]: [i] No changes applied.
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-eof
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]: [!] Compatibility mode activation failed; no success is reported.
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-core-error
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Back
+Hostname: alpha.example; public IPv4: 198.51.100.10
+[!] This method affects every HTTPS flow sourced from 198.51.100.10:443, not only alpha.example.
+Configured hostnames sharing this IPv4: alpha.example,alias.example
+Dedicated-address ownership cannot be proven automatically
+I understand the IPv4-wide scope and want to continue [y/N]: [!] Compatibility mode activation failed; no success is reported.
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+PASS a1_tui-die-error
+
+Совместимость сети / Anti-DPI:
+  [1] Состояние совместимости
+  [2] Доступные методы
+  [3] Выбрать метод совместимости
+  [4] Вернуть STOCK
+  [0] Назад
+Выбрать метод совместимости:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+  [0] Назад
+Hostname: alpha.example; публичный IPv4: 198.51.100.10
+[!] Этот метод влияет на весь исходящий HTTPS-трафик с 198.51.100.10:443, а не только на alpha.example.
+Настроенные hostname с этим IPv4: alpha.example,alias.example
+Невозможно автоматически подтвердить выделенность адреса
+Я понимаю область действия для всего IPv4 и хочу продолжить [y/N]:
+Совместимость сети / Anti-DPI:
+  [1] Состояние совместимости
+  [2] Доступные методы
+  [3] Выбрать метод совместимости
+  [4] Вернуть STOCK
+  [0] Назад
+PASS a1_tui-ru
+PASS a1_cli-no-flag
+PASS a1_cli-flag
+PASS a1_cli-not-local
+stage-a1-targeted: failed=0
+A1.1 correction regression: PASS
+
+===== A1.1 result accounting =====
+PASS executed
+executed: PASS
+stage-a-results: PASS=1 FAIL=0 NOT_EXECUTED=0
+stage-a-results: PASS=1 FAIL=0 NOT_EXECUTED=1
+stage-a-results: PASS=1 FAIL=0 NOT_EXECUTED=2
+stage-a-results: PASS=1 FAIL=1 NOT_EXECUTED=2
+PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+A1.1 result accounting: PASS
+
+===== A1.1 real nft JSON/runtime =====
+NOT_EXECUTED real-nft: nft executable unavailable
+A1.1 real nft JSON/runtime: NOT_EXECUTED
+stage-a-results: PASS=7 FAIL=0 NOT_EXECUTED=2
+stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)

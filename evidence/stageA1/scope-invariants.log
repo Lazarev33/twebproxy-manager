@@ -1,0 +1,16 @@
+allowed modified function: dpi_apply_rules_file
+allowed modified function: dpi_cleanup_nfqws_runtime
+allowed modified function: dpi_cleanup_stock_runtime
+allowed modified function: dpi_disable_cmd
+allowed modified function: dpi_publish_state_dir
+allowed modified function: dpi_runtime_artifacts_present
+allowed modified function: dpi_state_dir_complete
+allowed modified function: dpi_stock_postcondition_ok
+allowed modified function: dpi_transaction_disable_ip_locked
+allowed modified function: dpi_transaction_set_locked
+allowed modified function: dpi_verify_runtime
+allowed modified function: dpi_with_mutation_lock
+allowed modified function: menu_network_compatibility
+allowed modified function: ui_i18n_init
+fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set
+PASS scope: unchanged_functions=300 allowed_modified_functions=14

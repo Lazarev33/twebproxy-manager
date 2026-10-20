@@ -1,0 +1,86 @@
+operation_rc=0
+FAIL a1_proposed-copy
+operation_rc=1
+FAIL a1_snapshot-copy
+operation_rc=0
+FAIL a1_partial-copy
+cp: cannot create directory '/tmp/twebproxy-dpi.oqRGmv/snapshot/dpi': No such file or directory
+operation_rc=0
+FAIL a1_prepare-mkdir
+FAIL a1_interrupted-set
+[+] Compatibility mode for beta.example returned to STOCK.
+FAIL a1_interrupted-disable
+FAIL a1_ambiguous-state
+FAIL a1_corrupt-retired
+[+] Compatibility mode for alpha.example returned to STOCK.
+FAIL a1_stock-binary
+FAIL a1_stock-delete
+FAIL a1_stock-cli-error
+[+] Compatibility mode for beta.example returned to STOCK.
+PASS a1_stock-other-scopes
+FAIL a1_verify-prefix
+FAIL a1_verify-mode
+PASS a1_verify-good
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+[!] Enter a number.
+FAIL a1_tui-yes
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+[!] Enter a number.
+FAIL a1_tui-no
+Terminated
+FAIL a1_tui-eof
+
+Network compatibility / Anti-DPI:
+  [1] Compatibility status
+  [2] Available methods
+  [3] Set compatibility method
+  [4] Return to STOCK
+  [0] Back
+Set compatibility method:
+  [1] window1152
+  [2] mss88
+  [3] nfqws
+  [4] window1152_nfqws
+  [5] mss88_nfqws
+FAIL a1_tui-core-error
+PASS a1_cli-no-flag
+PASS a1_cli-flag
+stage-a1-targeted: failed=17

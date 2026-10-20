@@ -1,0 +1,14 @@
+PASS tg5_probe_reports_configured
+PASS tg5_probe_reports_not_configured
+PASS tg5_probe_reports_undeterminable
+PASS tg5_real_parser_handles_ip_output
+PASS tg5_local_scope_activation_proceeds
+PASS tg5_local_scope_state_written
+PASS tg5_nonlocal_scope_fails_closed
+PASS tg5_failed_activation_preserves_prior_state
+PASS tg5_failed_activation_preserves_live_rules
+PASS tg5_prior_mode_still_window1152
+PASS tg5_audit_flags_nonlocal_scope (status=ERROR)
+PASS tg5_audit_never_reports_ok_for_unmatchable_scope
+PASS tg5_undeterminable_probe_fails_closed
+tg5: pass=13 fail=0

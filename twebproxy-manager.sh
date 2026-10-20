@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 umask 077
 
-# TWebProxy Manager v0.2.9-dpi-beta
+# TWebProxy Manager v0.2.11-dpi-beta
 # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
 # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
 
 APP="twebproxy"
-MANAGER_VERSION="0.2.9"
-MANAGER_RELEASE_VERSION="0.2.9-dpi-beta"
+MANAGER_VERSION="0.2.11"
+MANAGER_RELEASE_VERSION="0.2.11-dpi-beta"
 TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
 TPROXY_BRANCH="master"
 # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
@@ -223,6 +223,9 @@ dpi_ipv6_stock	Unchanged (STOCK)	Без изменений (STOCK)
 dpi_stock_note	STOCK is the default and installs no DPI runtime artifacts.	STOCK используется по умолчанию и не устанавливает компоненты DPI.
 dpi_scope_warning	This method affects every HTTPS flow sourced from %s:443, not only %s.	Этот метод влияет на весь исходящий HTTPS-трафик с %s:443, а не только на %s.
 dpi_confirm_scope	I understand the IPv4-wide scope and want to continue	Я понимаю область действия для всего IPv4 и хочу продолжить
+dpi_tui_scope	Hostname: %s; public IPv4: %s	Hostname: %s; публичный IPv4: %s
+dpi_tui_cancelled	No changes applied.	Изменения не применены.
+dpi_tui_failed	Compatibility mode activation failed; no success is reported.	Не удалось применить режим совместимости; операция не объявлена успешной.
 dpi_shared_hosts	Configured hostnames sharing this IPv4	Настроенные hostname с этим IPv4
 dpi_dedicated_unknown	Dedicated-address ownership cannot be proven automatically	Невозможно автоматически подтвердить выделенность адреса
 dpi_applied	Compatibility mode %s is active for %s (%s).	Режим совместимости %s активен для %s (%s).
@@ -266,6 +269,8 @@ field_archive_failed	Could not write the field report archive.	Не удалос
 field_manifest_failed	Could not generate the field report manifest.	Не удалось сформировать манифест полевого отчёта.
 field_cancelled	Field report canceled; temporary data was removed and no archive was written.	Полевой отчёт отменён; временные данные удалены, архив не создан.
 dpi_repair_warning	DPI state could not be reconciled; affected address scopes were returned to STOCK.	Не удалось согласовать состояние DPI; затронутые адреса возвращены в STOCK.
+dpi_prune_unverifiable	Address ownership for %s could not be determined (resolver failure or ambiguous answer); the saved compatibility state was kept.	Не удалось определить принадлежность адреса %s (сбой resolver или неоднозначный ответ); сохранённое состояние совместимости оставлено без изменений.
+dpi_mutation_busy	Another TWebProxy DPI operation is already in progress; nothing was changed. Retry once it finishes.	Другая операция DPI TWebProxy уже выполняется; изменения не внесены. Повторите после её завершения.
 dpi_method_stock	No traffic modification; production default.	Без изменения трафика; производственный режим по умолчанию.
 dpi_method_window	Set TCP receive window 1152 on outbound IPv4 SYN+ACK from port 443.	Устанавливать окно приёма TCP 1152 в исходящих IPv4 SYN+ACK с порта 443.
 dpi_method_mss	Advertise TCP MSS 88 in outbound IPv4 SYN+ACK from port 443.	Объявлять TCP MSS 88 в исходящих IPv4 SYN+ACK с порта 443.
@@ -1546,7 +1551,8 @@ dpi_apply_rules_file() {
   if "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" >/dev/null 2>&1; then
     "$DPI_NFT_BIN" delete table ip "$DPI_NFT_TABLE" >/dev/null || return 1
   fi
-  [[ -s "$rules" ]] && "$DPI_NFT_BIN" -f "$rules" >/dev/null
+  if [[ -s "$rules" ]]; then "$DPI_NFT_BIN" -f "$rules" >/dev/null || return 1; fi
+  return 0
 }
 
 dpi_nfqws_runtime_parent_safe() {
@@ -1702,7 +1708,8 @@ dpi_cleanup_nfqws_runtime() {
       'owned nfqws runtime files could not be removed safely'
     return 1
   fi
-  rm -f -- "$DPI_DOC_DIR/nfqws-LICENSE.txt"
+  [[ ! -L "$DPI_DOC_DIR" ]] || return 1
+  rm -f -- "$DPI_DOC_DIR/nfqws-LICENSE.txt" || return 1
   id twebproxy-dpi >/dev/null 2>&1 && userdel twebproxy-dpi >/dev/null 2>&1 || true
   return "$rc"
 }
@@ -1711,30 +1718,96 @@ dpi_cleanup_stock_runtime() {
   local rc=0
   dpi_cleanup_nfqws_runtime || rc=1
   dpi_unit_teardown "$DPI_FIREWALL_UNIT" || rc=1
-  dpi_apply_rules_file /dev/null || true
-  rm -f -- "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"
-  systemctl daemon-reload >/dev/null 2>&1 || true
-  # Fail closed: STOCK is only reached when no DPI unit is active any more.
-  if ! dpi_runtime_units_inactive; then
-    dpi_stage_fail 'cleanup stock runtime' dpi_cleanup_stock_runtime 1 "a TWebProxy DPI unit is still active"
+  dpi_apply_rules_file /dev/null || rc=1
+  # Do not traverse an unexpected libexec/state parent during cleanup.
+  if dpi_nfqws_runtime_parent_safe; then
+    rm -f -- "$LIBEXEC_DIR/apply-dpi-firewall" || rc=1
+  else rc=1; fi
+  if [[ ! -L "$DPI_DIR" ]]; then rm -f -- "$DPI_NFT_FILE" || rc=1
+  else rc=1; fi
+  systemctl daemon-reload >/dev/null 2>&1 || rc=1
+  if ! dpi_stock_postcondition_ok; then
+    dpi_stage_fail 'cleanup stock runtime' dpi_cleanup_stock_runtime 1 "owned DPI runtime remains or its absence could not be verified"
     rc=1
   fi
   return "$rc"
 }
 
 dpi_verify_runtime() {
-  local need_nfqws="$1" file
+  local need_nfqws="$1" file files scopes="" live=""
   [[ -s "$DPI_NFT_FILE" ]] || return 1
-  "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" >/dev/null 2>&1 || return 1
+  # Capture the entire producer once and check its own status before parsing.
+  # JSON schema 1 is provided by supported Debian/Ubuntu nftables. No textual
+  # substring matching, locale-dependent tokens or early-exit pipeline reader.
+  live="$("$DPI_NFT_BIN" -j -n list table ip "$DPI_NFT_TABLE" 2>/dev/null)" || return 1
+  files="$(find "$DPI_STATE_DIR" -mindepth 1 -maxdepth 1 -print | sort)" || return 1
   while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
     dpi_load_scope_file "$file" || return 1
-    "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" 2>/dev/null | grep -Fq "$DPI_SCOPE_IPV4" || return 1
-  done < <(find "$DPI_STATE_DIR" -mindepth 1 -maxdepth 1 -print | sort)
+    scopes+="$DPI_SCOPE_IPV4"$'\t'"$DPI_SCOPE_MODE"$'\n'
+  done <<< "$files"
+  [[ -n "$scopes" ]] || return 1
+  jq -e --arg scopes "$scopes" --arg table "$DPI_NFT_TABLE" \
+    --argjson mark "$((DPI_NFQWS_MARK))" --argjson queue "$DPI_NFQUEUE_NUM" '
+    def payload($p;$f): {payload:{protocol:$p,field:$f}};
+    def eqm($l;$r): {match:{op:"==",left:$l,right:$r}};
+    def flags: {"&":[payload("tcp";"flags"),23]};
+    def base($ip): [eqm(payload("ip";"saddr");$ip),eqm(payload("tcp";"sport");443)];
+    def wanted($ip;$mode):
+      (if ($mode | startswith("window1152")) then
+         [{kind:"window1152",expr:(base($ip)+[eqm(flags;18),
+           {mangle:{key:payload("tcp";"window"),value:1152}},{counter:null}])}]
+       elif ($mode | startswith("mss88")) then
+         [{kind:"mss88",expr:(base($ip)+[eqm(flags;18),
+           {mangle:{key:{"tcp option":{name:"maxseg",field:"size"}},value:88}},{counter:null}])}]
+       else [] end) +
+      (if ($mode | contains("nfqws")) then
+         [{kind:"nfqws",expr:(base($ip)+[
+           eqm({"&":[{meta:{key:"mark"}},$mark]};0),
+           eqm({ct:{key:"packets",dir:"reply"}};{range:[1,6]}),
+           {counter:null},{queue:{num:$queue,flags:["bypass"]}}])}]
+       else [] end) |
+      map({family:"ip",table:$table,chain:"output",comment:("twebproxy:"+$ip+":"+.kind),expr});
+    def number:
+      if type == "number" then .
+      elif type == "string" and test("^0x[0-9a-fA-F]+$") then
+        ascii_downcase | .[2:] | explode |
+        reduce .[] as $d (0; . * 16 + (if $d <= 57 then $d-48 else $d-87 end))
+      else error("unexpected numeric representation") end;
+    def bits:
+      if type == "number" then .
+      elif type == "array" then map(bits) | unique | add
+      elif type == "string" and test("^0x") then number
+      else ({"fin":1,"syn":2,"rst":4,"psh":8,"ack":16,"urg":32,"ecn":64,"cwr":128}[.] //
+            error("unknown TCP flag")) end;
+    def normalized_expr:
+      if has("counter") then
+        if keys == ["counter"] and (.counter == null or
+          ((.counter|type) == "object" and ((.counter|keys)-["packets","bytes"]|length) == 0))
+        then {counter:null} else error("invalid counter") end
+      elif has("queue") then
+        .queue.flags |= (if type == "string" then [.] else . end | sort)
+      elif .match.left["&"][0]? == payload("tcp";"flags") then
+        .match.left["&"][1] |= bits | .match.right |= bits
+      elif .match.left["&"][0]? == {meta:{key:"mark"}} then
+        .match.left["&"][1] |= number | .match.right |= number
+      else . end;
+    (.nftables | type == "array") and
+    all(.nftables[]; (keys == ["metainfo"] or keys == ["table"] or keys == ["chain"] or keys == ["rule"])) and
+    ([.nftables[]|select(has("table"))|.table|
+      select((.flags // []) == [])|{family,name}] == [{family:"ip",name:$table}]) and
+    ([.nftables[]|select(has("chain"))|.chain|
+      select(.dev? == null)|{family,table,name,type,hook,prio,policy}] ==
+      [{family:"ip",table:$table,name:"output",type:"filter",hook:"output",prio:-150,policy:"accept"}]) and
+    ([.nftables[]|select(has("rule"))|.rule|{family,table,chain,comment,expr:(.expr|map(normalized_expr))}] ==
+      [$scopes|split("\n")[]|select(length>0)|split("\t")|wanted(.[0];.[1])[]])
+  ' <<< "$live" >/dev/null || return 1
   if (( need_nfqws )); then
     [[ -f "$DPI_NFQWS_BIN" && ! -L "$DPI_NFQWS_BIN" ]] || return 1
     [[ "$(sha256sum "$DPI_NFQWS_BIN" | awk '{print $1}')" == "$DPI_NFQWS_SHA256" ]] || return 1
     systemctl is-active --quiet "$DPI_NFQWS_UNIT" || return 1
   fi
+  return 0
 }
 
 # Extracted so the first reconciliation stage is a single callable operation.
@@ -1799,12 +1872,20 @@ dpi_reconcile_runtime() {
 
 dpi_restore_snapshot() {
   local snapshot="$1" injected="${TWEBPROXY_DPI_TEST_FAIL_POINT:-}"
-  local prev_phase="${DPI_DIAG_PHASE:-}"
+  local prev_phase="${DPI_DIAG_PHASE:-}" restored=1
   rm -rf "$DPI_DIR"
-  if [[ -d "$snapshot/dpi" ]]; then cp -a "$snapshot/dpi" "$DPI_DIR"; fi
+  if [[ -d "$snapshot/dpi" ]]; then
+    # Checked, for the same reason the publication path is: this function runs
+    # with errexit suspended, and an unchecked copy left reconciliation looking
+    # at an EMPTY state directory, taking its STOCK branch and returning 0 - so
+    # the manager logged `rollback=restored` for a rollback that never happened
+    # and the previous state was gone.
+    cp -a "$snapshot/dpi" "$DPI_DIR" || restored=0
+    dpi_state_dir_complete "$snapshot/dpi" "$DPI_DIR" || restored=0
+  fi
   unset TWEBPROXY_DPI_TEST_FAIL_POINT
   DPI_DIAG_PHASE=rollback
-  if dpi_reconcile_runtime >/dev/null 2>&1; then
+  if (( restored )) && dpi_reconcile_runtime >/dev/null 2>&1; then
     DPI_DIAG_PHASE="$prev_phase"
     [[ -n "$injected" ]] && export TWEBPROXY_DPI_TEST_FAIL_POINT="$injected"
     return 0
@@ -1818,13 +1899,126 @@ dpi_restore_snapshot() {
   return 1
 }
 
+# Verifies that every entry of the candidate arrived in the staged copy. A
+# short write or a copy that died half way leaves a directory that looks
+# plausible but is not the state the operator asked for.
+dpi_state_dir_complete() {
+  local src="$1" dst="$2"
+  [[ -d "$src" && ! -L "$src" && -d "$dst" && ! -L "$dst" ]] || return 1
+  # Compare content and entry sets, not just file sizes; never dereference links.
+  diff -qr --no-dereference -- "$src" "$dst" >/dev/null 2>&1
+}
+
+dpi_scope_dir_valid() {
+  local dir="$1" entries file
+  [[ -d "$dir" && ! -L "$dir" ]] || return 1
+  entries="$(find "$dir" -mindepth 1 -maxdepth 1 -print)" || return 1
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    dpi_load_scope_file "$file" || return 1
+  done <<< "$entries"
+}
+
+# Resolve only this operation's two-rename boundary, under the existing lock,
+# BEFORE any next read/modify/write. Two authoritative-looking directories or
+# malformed evidence are ambiguous: leave them untouched and refuse mutation.
+dpi_resolve_pending_publication() {
+  local retired="$DPI_DIR/.scopes.old" staging="$DPI_DIR/.scopes.new"
+  [[ ! -e "$DPI_DIR" && ! -L "$DPI_DIR" ]] && return 0
+  [[ -d "$DPI_DIR" && ! -L "$DPI_DIR" ]] || return 1
+  if [[ -e "$DPI_STATE_DIR" || -L "$DPI_STATE_DIR" ]]; then
+    dpi_scope_dir_valid "$DPI_STATE_DIR" || return 1
+  fi
+  if [[ -e "$retired" || -L "$retired" ]]; then
+    [[ ! -e "$DPI_STATE_DIR" && ! -L "$DPI_STATE_DIR" ]] || return 1
+    dpi_scope_dir_valid "$retired" || return 1
+    if [[ -e "$staging" || -L "$staging" ]]; then dpi_scope_dir_valid "$staging" || return 1; fi
+    mv -fT -- "$retired" "$DPI_STATE_DIR" || return 1
+  fi
+  if [[ -e "$staging" || -L "$staging" ]]; then
+    # A live directory proves that this is an unpublished candidate.
+    [[ -d "$DPI_STATE_DIR" ]] && dpi_scope_dir_valid "$staging" || return 1
+    rm -rf -- "$staging" || return 1
+  fi
+  return 0
+}
+
+dpi_prepare_transaction_state() {
+  local work="$1"
+  mkdir -p "$work/snapshot" "$work/proposed" || return 1
+  if [[ -e "$DPI_DIR" || -L "$DPI_DIR" ]]; then
+    [[ -d "$DPI_DIR" && ! -L "$DPI_DIR" ]] || return 1
+    cp -a "$DPI_DIR" "$work/snapshot/dpi" || return 1
+    dpi_state_dir_complete "$DPI_DIR" "$work/snapshot/dpi" || return 1
+  fi
+  if [[ -e "$DPI_STATE_DIR" || -L "$DPI_STATE_DIR" ]]; then
+    dpi_scope_dir_valid "$DPI_STATE_DIR" || return 1
+    cp -a "$DPI_STATE_DIR/." "$work/proposed/" || return 1
+    dpi_state_dir_complete "$DPI_STATE_DIR" "$work/proposed" || return 1
+    dpi_scope_dir_valid "$work/proposed" || return 1
+  fi
+  return 0
+}
+
+# Publishes the candidate scope set as the authoritative state directory.
+#
+# The 0.2.9 shape was `rm -rf "$DPI_STATE_DIR"; cp -a "$proposed" "$DPI_STATE_DIR"`
+# with neither command checked. This function is only ever called from a
+# conditional context, where bash suspends errexit for the whole body, so a
+# failing copy did not stop anything: the old state was already gone, the new
+# one never arrived, and reconciliation then saw an empty state directory, took
+# its STOCK branch and returned success.
+#
+# rename(2) refuses to replace a non-empty directory (ENOTEMPTY), so a single
+# `mv candidate over $DPI_STATE_DIR` is not a publication primitive here. The
+# candidate is instead materialised beside the live directory and verified
+# complete before anything authoritative is touched; only then is the old
+# directory renamed aside and the new one renamed into place. Every step is
+# checked, and the previous state is put back if the final rename fails.
+dpi_publish_state_dir() {
+  local proposed="$1"
+  local staging="$DPI_DIR/.scopes.new" retired="$DPI_DIR/.scopes.old"
+  install -d -o root -g root -m 0700 "$DPI_DIR" || return 1
+  [[ ! -L "$DPI_DIR" && ! -L "$DPI_STATE_DIR" ]] || return 1
+  # The caller must have resolved interrupted publication before reading state.
+  [[ ! -e "$retired" && ! -L "$retired" ]] || return 1
+  rm -rf -- "$staging" || return 1
+
+  dpi_stage_run 'publish state copy' 'the candidate DPI state could not be staged' \
+    cp -a -- "$proposed" "$staging" || { rm -rf -- "$staging"; return 1; }
+  dpi_stage_run 'publish state verify' 'the staged DPI state is incomplete' \
+    dpi_state_dir_complete "$proposed" "$staging" || { rm -rf -- "$staging"; return 1; }
+
+  # From here on the live directory is touched, so every failure restores it.
+  if [[ -d "$DPI_STATE_DIR" ]]; then
+    dpi_stage_run 'publish state retire' 'the previous DPI state could not be set aside' \
+      mv -fT -- "$DPI_STATE_DIR" "$retired" || { rm -rf -- "$staging"; return 1; }
+  fi
+  if ! dpi_stage_run 'publish state rename' 'the staged DPI state could not be published' \
+       mv -fT -- "$staging" "$DPI_STATE_DIR"; then
+    rm -rf -- "$staging"
+    if [[ -d "$retired" && ! -e "$DPI_STATE_DIR" ]]; then
+      # Put the previous state back. If even that fails, LEAVE .scopes.old in
+      # place: it is then the only copy, and deleting it here would destroy the
+      # very state this branch exists to preserve.
+      mv -fT -- "$retired" "$DPI_STATE_DIR" || return 1
+    fi
+    rm -rf -- "$retired"
+    return 1
+  fi
+  rm -rf -- "$retired" || return 1
+  return 0
+}
+
 dpi_commit_candidate_state() {
   local proposed="$1" snapshot="$2"
   dpi_stage_reset
   DPI_LAST_STAGE='commit state'
-  install -d -o root -g root -m 0700 "$DPI_DIR"
-  rm -rf "$DPI_STATE_DIR"
-  cp -a "$proposed" "$DPI_STATE_DIR"
+  # Checked explicitly: errexit is suspended for this whole function body.
+  if ! dpi_publish_state_dir "$proposed"; then
+    dpi_rollback_to_snapshot "$snapshot"
+    return 1
+  fi
   if [[ "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" == after_state \
      || "${TWEBPROXY_DPI_TEST_FAIL_POINT:-}" == 'stage:commit state' ]]; then
     dpi_stage_fail 'commit state' dpi_commit_candidate_state 1 'forced test failure point after the state was written'
@@ -1867,18 +2061,102 @@ dpi_transaction_failure_message() {
   fi
 }
 
+# --- DPI mutation lock -----------------------------------------------------
+# Every DPI mutation is a read-modify-write: the current scope set is copied
+# into a candidate, one scope is added or removed, and the candidate is then
+# published as the WHOLE authoritative state. Two overlapping operations each
+# publish a candidate built from a state the other has already moved on from.
+# Reproduced deterministically with two real processes in
+# tests/stagea/sa5-concurrent-mutation.sh: a `dpi set` for a different scope
+# reported success and then vanished, and a successful disable was resurrected.
+#
+# Scope of this lock is deliberately narrow - the DPI mutating lifecycle only.
+# Read-only paths (status, audit, list-methods) never take it, and Stage 4 keeps
+# its own separate update lock on its own descriptor.
+#
+# It lives in $BASE_DIR, not in $DPI_DIR: rollback and uninstall both remove
+# $DPI_DIR wholesale, which would delete the lock out from under its holder.
+DPI_LOCK_FILE="$BASE_DIR/.dpi-mutation.lock"
+DPI_LOCK_WAIT_SECONDS="${TWEBPROXY_DPI_LOCK_WAIT:-20}"
+DPI_LOCK_DEPTH=0
+# Fixed descriptor, distinct from the Stage 4 update lock's fd 9.
+DPI_LOCK_FD=8
+# Returned by dpi_with_mutation_lock when the lock could not be taken in time.
+DPI_LOCK_BUSY_RC=75
+
+dpi_mutation_lock_acquire() {
+  # Depth counted, so a locked entrypoint that calls another can never deadlock
+  # against itself.
+  if (( DPI_LOCK_DEPTH > 0 )); then
+    DPI_LOCK_DEPTH=$((DPI_LOCK_DEPTH + 1)); return 0
+  fi
+  local parent
+  # Re-derived from the CURRENT $BASE_DIR on every acquisition rather than being
+  # baked in when this file is sourced. In production BASE_DIR is a constant, so
+  # this changes nothing; it is what lets a test harness that rebinds BASE_DIR
+  # after sourcing keep the lock inside its own sandbox instead of creating and
+  # contending on the real /etc/twebproxy lock of the machine running it.
+  DPI_LOCK_FILE="$BASE_DIR/.dpi-mutation.lock"
+  parent="$(dirname -- "$DPI_LOCK_FILE")"
+  install -d -o root -g root -m 0700 "$parent" || return 1
+  [[ ! -L "$DPI_LOCK_FILE" ]] || return 1
+  exec 8>>"$DPI_LOCK_FILE" || return 1
+  chown root:root "$DPI_LOCK_FILE" 2>/dev/null || true
+  chmod 0600 "$DPI_LOCK_FILE" 2>/dev/null || true
+  if ! flock -w "$DPI_LOCK_WAIT_SECONDS" 8; then
+    exec 8>&-
+    dpi_diag_log "stage=mutation lock op=flock status=1 result=failed reason=another DPI mutation held the lock for more than ${DPI_LOCK_WAIT_SECONDS}s"
+    return 1
+  fi
+  DPI_LOCK_DEPTH=1
+  return 0
+}
+
+dpi_mutation_lock_release() {
+  (( DPI_LOCK_DEPTH > 0 )) || return 0
+  DPI_LOCK_DEPTH=$((DPI_LOCK_DEPTH - 1))
+  (( DPI_LOCK_DEPTH == 0 )) && exec 8>&-
+  return 0
+}
+
+# Runs one DPI mutating operation under the lock. Returns the operation's own
+# exit status, or DPI_LOCK_BUSY_RC when the lock could not be taken - callers
+# decide whether that is fatal, so a best-effort repair stays best-effort.
+dpi_with_mutation_lock() {
+  local rc=0
+  dpi_mutation_lock_acquire || return "$DPI_LOCK_BUSY_RC"
+  if dpi_resolve_pending_publication; then
+    "$@" || rc=$?
+  else
+    dpi_stage_fail 'prepare state' dpi_resolve_pending_publication 1 'ambiguous or invalid interrupted DPI publication'
+    rc=1
+  fi
+  dpi_mutation_lock_release
+  return "$rc"
+}
+
+# The lock is taken by the read-modify-write primitives themselves, not only by
+# the CLI, so no caller can perform an unserialised DPI mutation by accident.
 dpi_transaction_set() {
+  local rc=0
+  dpi_mutation_lock_acquire || return "$DPI_LOCK_BUSY_RC"
+  dpi_transaction_set_locked "$@" || rc=$?
+  dpi_mutation_lock_release
+  return "$rc"
+}
+
+dpi_transaction_set_locked() {
   local ip="$1" mode="$2" host="$3" work snapshot proposed
   dpi_stage_reset
   # Fail closed before any state is touched: an unmatchable scope must never be
   # committed, and a previously working mode must survive the refusal.
   dpi_scope_locally_configured "$ip" || return 1
+  dpi_resolve_pending_publication || return 1
   work="$(mktemp -d /tmp/twebproxy-dpi.XXXXXX)" || return 1
   snapshot="$work/snapshot"; proposed="$work/proposed"
-  mkdir -p "$snapshot" "$proposed"
-  [[ -d "$DPI_DIR" ]] && cp -a "$DPI_DIR" "$snapshot/dpi"
-  [[ -d "$DPI_STATE_DIR" ]] && cp -a "$DPI_STATE_DIR/." "$proposed/"
-  find "$proposed" -maxdepth 1 -type f -name '*.env' -exec chmod 0600 {} + 2>/dev/null || true
+  dpi_prepare_transaction_state "$work" || {
+    dpi_stage_fail 'prepare state' dpi_prepare_transaction_state 1 'snapshot or proposed state could not be copied completely'
+    rm -rf -- "$work"; return 1; }
   # Pre-commit validation stages: nothing has been changed yet, but a refusal
   # here is just as opaque to the operator as a runtime failure.
   dpi_write_scope_state "$proposed" "$ip" "$mode" "$host" || {
@@ -1896,14 +2174,23 @@ dpi_transaction_set() {
 }
 
 dpi_transaction_disable_ip() {
+  local rc=0
+  dpi_mutation_lock_acquire || return "$DPI_LOCK_BUSY_RC"
+  dpi_transaction_disable_ip_locked "$@" || rc=$?
+  dpi_mutation_lock_release
+  return "$rc"
+}
+
+dpi_transaction_disable_ip_locked() {
   local ip="$1" work snapshot proposed
   dpi_stage_reset
+  dpi_resolve_pending_publication || return 1
   work="$(mktemp -d /tmp/twebproxy-dpi.XXXXXX)" || return 1
   snapshot="$work/snapshot"; proposed="$work/proposed"
-  mkdir -p "$snapshot" "$proposed"
-  [[ -d "$DPI_DIR" ]] && cp -a "$DPI_DIR" "$snapshot/dpi"
-  [[ -d "$DPI_STATE_DIR" ]] && cp -a "$DPI_STATE_DIR/." "$proposed/"
-  rm -f "$(dpi_state_path "$proposed" "$ip")"
+  dpi_prepare_transaction_state "$work" || {
+    dpi_stage_fail 'prepare state' dpi_prepare_transaction_state 1 'snapshot or proposed state could not be copied completely'
+    rm -rf -- "$work"; return 1; }
+  rm -f "$(dpi_state_path "$proposed" "$ip")" || { rm -rf -- "$work"; return 1; }
   if dpi_commit_candidate_state "$proposed" "$snapshot"; then rm -rf "$work"; return 0; fi
   rm -rf "$work"; return 1
 }
@@ -1980,8 +2267,12 @@ dpi_set_cmd() {
     if [[ -t 0 && -t 1 ]]; then yesno "$(ui_msg dpi_confirm_scope)" n || exit 1
     else die "$(ui_msg dpi_ack_required)"; fi
   fi
-  if dpi_transaction_set "$ip" "$mode" "$host"; then
+  local set_rc=0
+  dpi_with_mutation_lock dpi_transaction_set "$ip" "$mode" "$host" || set_rc=$?
+  if (( set_rc == 0 )); then
     ok "$(ui_msgf dpi_applied "$mode" "$host" "$ip")"
+  elif (( set_rc == DPI_LOCK_BUSY_RC )); then
+    die "$(ui_msg dpi_mutation_busy)"
   else
     die "$(dpi_transaction_failure_message "$mode")"
   fi
@@ -1989,31 +2280,202 @@ dpi_set_cmd() {
 
 dpi_disable_cmd() {
   need_root; need_systemd
+  local host="${1:-}" rc=0
+  [[ -n "$host" ]] || die "Usage: twebproxy dpi disable HOST"
+  dpi_with_mutation_lock dpi_disable_host_locked "$host" || rc=$?
+  if (( rc != 0 )); then
+    (( rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
+    die "$(dpi_transaction_failure_message)"
+  fi
+}
+
+dpi_disable_host_locked() {
+  need_root; need_systemd
   local host="${1:-}" ip file
   [[ -n "$host" ]] || die "Usage: twebproxy dpi disable HOST"
   instance_exists "$host" || die "Нет $host"
   ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
-  if [[ -z "$ip" && -d "$DPI_STATE_DIR" ]]; then
-    while IFS= read -r file; do
-      dpi_load_scope_file "$file" || continue
-      [[ "$DPI_SCOPE_HOST" == "$host" ]] && { ip="$DPI_SCOPE_IPV4"; break; }
-    done < <(find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print | sort)
+  # Stored state is authoritative for what this host actually owns. DNS may have
+  # moved on - an address change is the usual reason a scope goes stale - so the
+  # stored scope is consulted whenever the resolved address has no state of its
+  # own, not only when DNS failed outright. Without this, `dpi stock HOST` after
+  # an address change reported STOCK while that host's old rule stayed live.
+  if [[ -z "$ip" ]] || [[ ! -f "$(dpi_state_path "$DPI_STATE_DIR" "$ip")" ]]; then
+    if [[ -d "$DPI_STATE_DIR" ]]; then
+      while IFS= read -r file; do
+        dpi_load_scope_file "$file" || continue
+        [[ "$DPI_SCOPE_HOST" == "$host" ]] && { ip="$DPI_SCOPE_IPV4"; break; }
+      done < <(find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print | sort)
+    fi
   fi
-  [[ -n "$ip" ]] || die "$(ui_msgf dpi_resolution_failed "$host")"
-  if [[ ! -f "$(dpi_state_path "$DPI_STATE_DIR" "$ip")" ]]; then
-    ok "$(ui_msgf dpi_disabled "$host")"; return 0
+  # No address from DNS and none in stored state means there is no scope this
+  # host could own: it is already STOCK, and STOCK does not need a resolvable
+  # name. Manager-owned runtime may still be orphaned, so reconcile it.
+  local dis_rc=0
+  if [[ -z "$ip" ]] || [[ ! -f "$(dpi_state_path "$DPI_STATE_DIR" "$ip")" ]]; then
+    dpi_with_mutation_lock dpi_disable_reconcile_stock "$host" || dis_rc=$?
+    return "$dis_rc"
   fi
-  dpi_transaction_disable_ip "$ip" || die "$(dpi_transaction_failure_message)"
+  dpi_with_mutation_lock dpi_transaction_disable_ip "$ip" || dis_rc=$?
+  (( dis_rc == 0 )) || {
+    (( dis_rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
+    die "$(dpi_transaction_failure_message)"
+  }
   ok "$(ui_msgf dpi_disabled "$host")"
 }
 
+# Is there any manager-owned DPI runtime that could still be orphaned?
+# Used to keep `dpi stock` on a host that never enabled DPI from creating the
+# very directories it is meant to find empty.
+dpi_runtime_artifacts_present() {
+  local path
+  for path in "$DPI_NFQWS_BIN" "$DPI_NFQWS_SUM_FILE" "$DPI_DOC_DIR/nfqws-LICENSE.txt" \
+    "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" "$SYSTEMD_DIR/$DPI_NFQWS_UNIT" \
+    "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || return 0
+  done
+  # A bare (possibly empty) $DPI_DIR is not an artifact: reconciliation recreates
+  # it, so treating its mere existence as "present" made every later `dpi stock`
+  # on a DPI-free host run a full reconcile.
+  [[ -L "$DPI_DIR" ]] && return 0
+  [[ -s "$DPI_NFT_FILE" ]] && return 0
+  [[ -d "$DPI_STATE_DIR" ]] \
+    && [[ -n "$(find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print -quit 2>/dev/null)" ]] \
+    && return 0
+  [[ -f "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" || -f "$SYSTEMD_DIR/$DPI_NFQWS_UNIT" ]] && return 0
+  [[ -f "$LIBEXEC_DIR/apply-dpi-firewall" ]] && return 0
+  dpi_runtime_units_inactive || return 0
+  [[ -x "$DPI_NFT_BIN" ]] && "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" >/dev/null 2>&1 && return 0
+  return 1
+}
+
+# With no scope state left at all, no manager-owned DPI unit may still be
+# active. While other scopes remain, their runtime is expected to stay up and
+# dpi_reconcile_runtime has already verified it.
+dpi_stock_postcondition_ok() {
+  local remaining=0 path tables
+  if [[ -d "$DPI_STATE_DIR" ]]; then
+    remaining="$(find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print | wc -l)"
+  fi
+  (( remaining > 0 )) && return 0
+  dpi_runtime_units_inactive || return 1
+  for path in "$DPI_NFQWS_BIN" "$DPI_NFQWS_SUM_FILE" "$DPI_DOC_DIR/nfqws-LICENSE.txt" \
+    "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" "$SYSTEMD_DIR/$DPI_NFQWS_UNIT" \
+    "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || return 1
+  done
+  # A failed list-table call is not proof of absence (EPERM/netlink failure).
+  tables="$("$DPI_NFT_BIN" -j list tables ip 2>/dev/null)" || return 1
+  jq -e --arg name "$DPI_NFT_TABLE" '
+    (.nftables | type == "array") and
+    all(.nftables[]; if has("metainfo") then true
+      elif has("table") then (.table.family == "ip" and .table.name != $name)
+      else false end)' <<< "$tables" >/dev/null
+}
+
+# `dpi disable|stock HOST` for a host that owns no scope.
+#
+# 0.2.9 returned success here without looking at the runtime at all, which is
+# how a real VPS ended up reporting STOCK while twebproxy-dpi-firewall.service
+# was still active with nothing behind it.
+#
+# Reconciliation is driven by the authoritative state directory, never by this
+# host: other configured scopes keep their state, their rules and their running
+# units, and the manager-owned runtime is torn down only when no scope remains.
+# It is never an unconditional global stop/delete, and success is reported only
+# after the postcondition holds.
+dpi_disable_reconcile_stock() {
+  local host="$1"
+  if dpi_runtime_artifacts_present; then
+    dpi_reconcile_runtime || die "$(dpi_transaction_failure_message)"
+  fi
+  dpi_stock_postcondition_ok || die "$(dpi_transaction_failure_message)"
+  ok "$(ui_msgf dpi_disabled "$host")"
+}
+
+# Is a stored scope still owned by a configured hostname?
+#
+#   0 = proven orphan - resolution worked and no configured host maps here
+#   1 = still owned by a configured host
+#   2 = cannot be determined right now
+#
+# The distinction is the whole point. dpi_hosts_for_ipv4 answers "empty" both
+# for a genuine orphan and for a resolver that could not answer at all, and the
+# caller used to delete the scope either way: a transient SERVFAIL, an
+# unreachable resolver or an ambiguous multi-address answer destroyed state the
+# operator had deliberately configured. A failure to prove ownership is not
+# proof of the opposite.
+#
+# With no configured instances at all the loop body never runs and the verdict
+# is a proven orphan - nothing can own a scope when nothing is configured, and
+# that conclusion needs no resolver.
+# Every valid IPv4 the resolver returns for a host, one per line. Non-zero only
+# when the resolver could not answer at all: an answer carrying several
+# addresses is data, not a failure. dpi_resolve_ipv4 deliberately refuses a
+# multi-address answer because activation needs exactly one address; ownership
+# is a different question and must not inherit that refusal, or a single
+# permanently multi-homed hostname would freeze pruning for every scope.
+dpi_resolved_ipv4_set() {
+  local host="$1" ip found=0
+  while read -r ip; do
+    dpi_ipv4_valid "$ip" || continue
+    printf '%s\n' "$ip"; found=1
+  done < <(getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u)
+  (( found ))
+}
+
+# $2 is the hostname recorded in the scope file - the host that asked for this
+# scope in the first place.
+dpi_scope_orphan_status() {
+  local ip="$1" recorded="${2:-}" host addrs addr
+  local seen=0 resolver_ok=0 recorded_unresolved=0
+  while read -r host; do
+    [[ -n "$host" ]] || continue
+    seen=1
+    if addrs="$(dpi_resolved_ipv4_set "$host")"; then
+      resolver_ok=1
+      # A host that resolved is a definite answer about this address, whether it
+      # returned one address or several.
+      while IFS= read -r addr; do
+        [[ "$addr" == "$ip" ]] && return 1
+      done <<< "$addrs"
+    elif [[ -n "$recorded" && "$host" == "$recorded" ]]; then
+      recorded_unresolved=1
+    fi
+  done < <(list_hosts_array)
+
+  # Nothing is configured: nothing can own this scope, and no resolver is needed
+  # to say so.
+  (( seen )) || return 0
+  # Not one configured host resolved - that is a resolver outage, not evidence.
+  (( resolver_ok )) || return 2
+  # The resolver is answering, but the host that wrote this scope is not
+  # answering right now (propagation, a briefly missing record). Its own mapping
+  # cannot be checked, so its intent must not be destroyed.
+  (( recorded_unresolved == 0 )) || return 2
+  # The resolver works, the recording host was checkable, and no configured host
+  # claims this address.
+  return 0
+}
+
 dpi_prune_orphan_state() {
-  local file hosts
+  local file rc
   [[ -d "$DPI_STATE_DIR" ]] || return 0
   while IFS= read -r file; do
     dpi_load_scope_file "$file" || { warn "Unsafe DPI state: $file"; return 1; }
-    hosts="$(dpi_hosts_for_ipv4 "$DPI_SCOPE_IPV4" 2>/dev/null || true)"
-    [[ -n "$hosts" ]] || rm -f "$file"
+    rc=0; dpi_scope_orphan_status "$DPI_SCOPE_IPV4" "$DPI_SCOPE_HOST" || rc=$?
+    case "$rc" in
+      0) # One unremovable file must not abort the sweep: dpi_repair_all turns a
+         # non-zero return here into `rm -rf $DPI_DIR` plus a forced STOCK for
+         # EVERY scope, which is far more destructive than the leftover.
+         rm -f -- "$file" || {
+           warn "$(ui_msgf dpi_prune_unverifiable "$DPI_SCOPE_IPV4")"
+           dpi_diag_log "stage=prune orphan state op=rm status=1 result=failed reason=orphaned scope file $file could not be removed"
+         };;
+      1) ;;
+      *) warn "$(ui_msgf dpi_prune_unverifiable "$DPI_SCOPE_IPV4")"
+         dpi_diag_log "stage=prune orphan state op=dpi_scope_orphan_status status=2 result=skipped reason=address ownership for $DPI_SCOPE_IPV4 could not be determined; state preserved";;
+    esac
   done < <(find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print | sort)
 }
 
@@ -2029,9 +2491,23 @@ dpi_repair_all() {
 }
 
 dpi_remove_host_state_if_orphaned() {
-  local old_ip="$1"
+  local old_ip="$1" rc=0
   [[ -n "$old_ip" ]] || return 0
-  [[ -n "$(dpi_hosts_for_ipv4 "$old_ip" 2>/dev/null || true)" ]] || rm -f "$(dpi_state_path "$DPI_STATE_DIR" "$old_ip")"
+  # Same three-way verdict as the prune path: this address may still be owned by
+  # another configured hostname, and a resolver that cannot answer must not be
+  # read as "nobody owns it".
+  local recorded=""
+  if dpi_load_scope_file "$(dpi_state_path "$DPI_STATE_DIR" "$old_ip")" 2>/dev/null; then
+    recorded="$DPI_SCOPE_HOST"
+  fi
+  dpi_scope_orphan_status "$old_ip" "$recorded" || rc=$?
+  case "$rc" in
+    0) rm -f -- "$(dpi_state_path "$DPI_STATE_DIR" "$old_ip")" \
+         || dpi_diag_log "stage=prune orphan state op=rm status=1 result=failed reason=orphaned scope file for $old_ip could not be removed";;
+    1) ;;
+    *) warn "$(ui_msgf dpi_prune_unverifiable "$old_ip")"
+       dpi_diag_log "stage=prune orphan state op=dpi_remove_host_state_if_orphaned status=2 result=skipped reason=address ownership for $old_ip could not be determined; state preserved";;
+  esac
   dpi_reconcile_runtime
 }
 
@@ -4064,7 +4540,7 @@ EOF
   restart_relay_wait_ready "$host"
   configure_tls_for_instance "$host"
   configure_ufw
-  dpi_repair_all || true
+  dpi_with_mutation_lock dpi_repair_all || true
   if ! audit_instance_impl "$host"; then
     die "Инстанс создан, но isolation audit для $host не пройден."
   fi
@@ -4096,7 +4572,7 @@ repair_instance_cmd() {
   restart_relay_wait_ready "$host"
   configure_tls_for_instance "$host"
   configure_ufw
-  dpi_repair_all || true
+  dpi_with_mutation_lock dpi_repair_all || true
   if ! audit_instance_impl "$host"; then
     die "Runtime восстановлен, но isolation audit для $host не пройден."
   fi
@@ -5219,7 +5695,7 @@ delete_instance_cmd() {
   remove_reverse_proxy_for_instance "$host"
   rm -rf "$(instance_dir "$host")" "$(site_dir "$host")"
   rebuild_firewall
-  dpi_remove_host_state_if_orphaned "$old_ip" || warn "$(ui_msg dpi_repair_warning)"
+  dpi_with_mutation_lock dpi_remove_host_state_if_orphaned "$old_ip" || warn "$(ui_msg dpi_repair_warning)"
   ok "$host удалён."
 }
 
@@ -5266,7 +5742,9 @@ core_uninstall_cmd() {
   (( $(count_instances) == 0 )) || die "Сначала удали все hostname через 'twebproxy delete'."
   warn "Удалится база TWebProxy, systemd templates, relay binary и официальный MTProxy build."
   yesno "Удалить core?" n || exit 0
-  dpi_full_uninstall
+  local dpi_rc=0
+  dpi_with_mutation_lock dpi_full_uninstall || dpi_rc=$?
+  (( dpi_rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
   systemctl disable --now twebproxy-refresh-mtproxy.timer twebproxy-firewall.service twebproxy-cert-renew.timer >/dev/null 2>&1 || true
   if nft list table inet twebproxy_backend >/dev/null 2>&1; then nft delete table inet twebproxy_backend || true; fi
   rm -f "$SYSTEMD_DIR/twebproxy@.service" "$SYSTEMD_DIR/twebproxy-mtproxy@.service" "$SYSTEMD_DIR/twebproxy-firewall.service" "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.service" "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.timer" "$SYSTEMD_DIR/twebproxy-cert-renew.service" "$SYSTEMD_DIR/twebproxy-cert-renew.timer"
@@ -6501,24 +6979,63 @@ menu_diagnostics() {
   done
 }
 
+# DPI-only reader: the shared legacy chooser does not distinguish EOF from an
+# invalid choice in conditional contexts. Do not change other menus here.
+dpi_tui_choose() {
+  local prompt="$1" zero="$2" choice i; shift 2
+  local options=("$@")
+  printf '%s\n' "$prompt" >&2
+  for i in "${!options[@]}"; do printf '  [%d] %s\n' "$((i+1))" "${options[$i]}" >&2; done
+  printf '  [0] %s\n' "$zero" >&2
+  while true; do
+    IFS= read -r -p '> ' choice || return 1
+    [[ "$choice" =~ ^[0-9]$ ]] || { warn "$(ui_msg enter_number)" >&2; continue; }
+    (( choice <= ${#options[@]} )) || { warn "$(ui_msg unknown_option)" >&2; continue; }
+    printf '%s' "$choice"; return 0
+  done
+}
+
+dpi_tui_confirm_scope() {
+  local host="$1" ip shared reply
+  ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null)" || { warn "$(ui_msgf dpi_resolution_failed "$host")"; return 1; }
+  [[ -n "$ip" ]] || { warn "$(ui_msgf dpi_resolution_failed "$host")"; return 1; }
+  printf '%s\n' "$(ui_msgf dpi_tui_scope "$host" "$ip")"
+  warn "$(ui_msgf dpi_scope_warning "$ip" "$host")"
+  shared="$(dpi_hosts_for_ipv4 "$ip" | paste -sd, -)" || return 1
+  [[ -z "$shared" ]] || printf '%s: %s\n' "$(ui_msg dpi_shared_hosts)" "$shared"
+  printf '%s\n' "$(ui_msg dpi_dedicated_unknown)"
+  printf '%s [y/N]: ' "$(ui_msg dpi_confirm_scope)" >&2
+  IFS= read -r reply || return 1
+  case "$reply" in y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0;; *) return 1;; esac
+}
+
 menu_network_compatibility() {
   local c host method selected
   while true; do
     clear 2>/dev/null || true; dpi_status_cmd; echo
-    c="$(menu_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
+    c="$(dpi_tui_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
       "$(ui_msg dpi_status)" "$(ui_msg dpi_methods)" \
-      "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")"
+      "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")" || return 0
     case "$c" in
       1) host="$(select_instance)"; dpi_status_cmd "$host"; pause;;
       2) dpi_list_methods_cmd; pause;;
       3)
         host="$(select_instance)"
-        selected="$(choose "$(ui_msg dpi_enable):" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)"
+        selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)" || return 0
         case "$selected" in
+          0) continue;;
           1) method=window1152;; 2) method=mss88;; 3) method=nfqws;;
           4) method=window1152_nfqws;; 5) method=mss88_nfqws;;
         esac
-        dpi_set_cmd "$host" "$method"; pause;;
+        if dpi_tui_confirm_scope "$host"; then
+          # Keep the core's CLI gate and validation unchanged. Its exit/die must
+          # not terminate the containing menu; never print success on failure.
+          if ( dpi_set_cmd "$host" "$method" --accept-shared-scope ); then :
+          else warn "$(ui_msg dpi_tui_failed)"; fi
+        else
+          log "$(ui_msg dpi_tui_cancelled)"
+        fi
+        pause;;
       4) host="$(select_instance)"; dpi_disable_cmd "$host"; pause;;
       0) return;;
     esac

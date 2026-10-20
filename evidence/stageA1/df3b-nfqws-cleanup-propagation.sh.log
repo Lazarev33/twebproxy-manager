@@ -1,0 +1,47 @@
+
+--- 0. the forcing modes really trip the guard ---
+PASS A0_dir_at_owned_binary_is_refused (rc=1)
+PASS B0_symlinked_libexec_parent_is_refused (rc=1)
+
+--- A. forcing mode: dir ---
+PASS A1_cleanup_nfqws_runtime_propagates (rc=1)
+PASS A2_cleanup_stock_runtime_propagates (rc=1)
+PASS A3_nfqws_unit_stopped_anyway
+PASS A3_nfqws_unit_file_removed_anyway
+PASS A3_firewall_unit_stopped_anyway
+PASS A4_reconcile_to_stock_fails (rc=1)
+PASS A5_reconcile_non_nfqws_mode_fails (rc=1)
+PASS A6_transaction_does_not_report_success (rc=1)
+PASS A6_no_state_committed
+PASS A6_no_failed_record_with_successful_transaction
+PASS A7_transcript_names_cleanup_stage
+PASS A7_transcript_has_reason
+PASS A7_transcript_marks_failed
+
+--- B. forcing mode: symlink ---
+PASS B1_cleanup_nfqws_runtime_propagates (rc=1)
+PASS B2_cleanup_stock_runtime_propagates (rc=1)
+PASS B3_nfqws_unit_stopped_anyway
+PASS B3_nfqws_unit_file_removed_anyway
+PASS B3_firewall_unit_stopped_anyway
+PASS B4_reconcile_to_stock_fails (rc=1)
+PASS B5_reconcile_non_nfqws_mode_fails (rc=1)
+PASS B6_transaction_does_not_report_success (rc=1)
+PASS B6_no_state_committed
+PASS B6_no_failed_record_with_successful_transaction
+PASS B7_transcript_names_cleanup_stage
+PASS B7_transcript_has_reason
+PASS B7_transcript_marks_failed
+
+--- C. control: an unobstructed system is unaffected ---
+PASS C_cleanup_nfqws_runtime_ok_when_unobstructed
+PASS C_cleanup_stock_runtime_ok_when_unobstructed
+PASS C_activation_still_succeeds
+PASS C_state_committed
+PASS C_firewall_unit_active
+PASS C_no_failed_record_on_success
+PASS C_owned_files_removal_succeeds
+PASS C_owned_binary_removed
+PASS C_owned_checksum_removed
+
+df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
