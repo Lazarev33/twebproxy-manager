@@ -1,6 +1,6 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-20. This document tracks **planned work**, not production release status.
+Updated: 2026-10-28. This document tracks **planned work**, not production release status.
 
 ## Product goal
 
@@ -16,11 +16,18 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 
 | Checkpoint | Status | Notes |
 | --- | --- | --- |
-| v0.2.9 (`main` at planning time) | Earlier GitHub baseline | Existing field-tested stock setup; not evidence for newer changes |
-| v0.2.10 Stage A | Development completed | DPI state transaction and isolation improvements |
-| v0.2.11 Stage A.1 | Development checkpoint | F01/F02/F11/F12/F18 and TUI shared-IPv4 consent; real nft and ENOSPC gates incomplete |
-| v0.2.12 Stage B | **Blocked for acceptance** | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
-| v0.2.13 Stage B.1 | **Next proposed correction** | Narrow corrections and test safety; not implemented yet |
+| v0.2.9 (`main`) | Published code baseline | Still the source shown on `main`; not the latest accepted development checkpoint |
+| v0.2.10 Stage A | Development completed | DPI state/isolation model improvements |
+| v0.2.11 Stage A.1 | Development checkpoint | Real nft and ENOSPC gates remain |
+| v0.2.12 Stage B | Superseded by B.1 | Backend firewall and isolated test corrections |
+| v0.2.13 Stage B.1 | Development checkpoint | Permission/test safety corrections; privileged gates outstanding |
+| v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | State, profile and port integrity |
+| v0.2.15 Stage C1.1 | Superseded by C1.2 | Backend stop and orphan-repair corrections |
+| v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
+| v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
+| v0.2.18 Stage D | **IN PROGRESS** | Caddy/Nginx/TLS failure-safe lifecycle; not accepted or released |
+
+**Current development stage: D — frontend / TLS.** The next planned stage is **E — operations / diagnostics**. Development acceptance is not permission for production deployment.
 
 All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -36,17 +43,15 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Stage B.1
+## Immediate work: Stage D — frontend / TLS
 
-Scope: close independently verified Stage B regressions and dangerous test behavior **before Stage C**.
+C2 (`v0.2.17-beta`) is independently accepted for continued development. Stage D (`v0.2.18-beta`) is being implemented; it is not yet accepted.
 
-1. **P0 — executable directory permissions:** correct the v0.2.12 `rebuild_firewall()` path that changes `/usr/local/libexec/twebproxy` from traversable 0755 to root-only 0700, breaking the `mtproxy` service user. Apply a minimal independently verified patch and regression for non-root execution.
-2. **P0 — privileged test safety:** make real nftables/systemd/mount/ENOSPC tests opt-in and disposable-environment-only. A production host must never be modified merely by invoking a general test suite.
-3. **Investigate, don't pre-judge:** `nftables.service` reload/restart ownership (audit R1), systemd dependency and stop propagation (R2), nft command timeout and ambiguous kernel outcome (R3). Fix only reproducible defects within a clearly defined B.1 scope.
-4. Preserve all Stage A/A.1 behavior, Stage 4 protected hash, foreign firewall objects, and the existing managed backend service behavior. Do not add protocols, a new UI or generic recovery.
-5. Version proposal: `0.2.13-beta` if this becomes a distinct shipped source checkpoint. Later numbering must be recalculated rather than reused.
+Scope: manager-owned Caddy blocks, Nginx configuration, Let's Encrypt issuance/renewal, frontend setup/repair/deletion. Validate candidates before activating, preserve working websites and valid certificates on failures, protect unmanaged configuration, and report failure/rollback truthfully. Keep the current accepted C1 and C2 behavior untouched.
 
-Acceptance: regression for permissions, safe negative/positive tests, reviewed diff, verified artifact hashes, explicit limitations. **A correction is not by itself proof of the real-kernel guarantee.**
+Acceptance: focused RED/GREEN model tests and relevant regressions, no known critical frontend/TLS blocker, versioned single-ZIP handoff, independent development review. Privileged real-host checks remain mandatory before RC on an isolated disposable VM, never the production VPS.
+
+After D acceptance, move to Stage E rather than expanding into repeated speculative D correction passes. Record noncritical follow-up items in the backlog.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
