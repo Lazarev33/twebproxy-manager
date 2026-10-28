@@ -28,9 +28,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
 | v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
 | v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
-| Stage G | **NEXT — implementation not started** | Security/privilege hardening, explicitly address two Stage F P1 failures, ACME directory traversal and material cross-system safety risks |
+| v0.2.21 Stage G | **Development accepted (focused model + real-process gates)** | Two Stage F P1 fixed; Stage G 4/4 focused suites; Stage F updater 278/278; further privileged integration before RC; source remains in verified ZIP/Git bundle |
+| Stage H | **NEXT — implementation not started** | Guided setup, clear UX, RU/EN explanations of default STOCK and optional Anti-DPI modes |
 
-**Current development stage: G — security hardening (next to implement).** Stage F passed independent model and real-host integration checks **with two known P1 failures**. It is not production-ready. Stage H — UX — follows G.
+**Current development stage: H — UX / guided setup (next to implement).** Stage G development acceptance is based on focused tests, not production release readiness. An independent Codex security/integration regression of the Stage G artifact is the next review step. Pre-RC privileged gates remain mandatory.
 
 All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -46,23 +47,15 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Stage G — security hardening
+## Immediate work: independent Stage G review, then Stage H — UX
 
-Stage F (`v0.2.20-beta`) is **DEVELOPMENT_ACCEPTED_WITH_BACKLOG**, not an RC or production release. A disposable Ubuntu 24.04.5 host ran the real Stage F update function with dedicated root-owned paths and localhost TLS: 24 real-host passes, 2 real-host failures (P1), 4 model suite passes, 3 unexecuted lab/real release scenarios. Observed success: operator-pinned trusted update, backup, offline rollback, concurrency, SIGTERM/SIGKILL recovery, true ENOSPC and actual systemd relay lifecycle. The running v0.2.9 host binaries were preserved.
+Stage G (`v0.2.21-beta`) is **DEVELOPMENT_ACCEPTED** after focused independent verification of the supplied ZIP, Git tree, Stage G suites (4/4) and Stage F updater regression (278/278). Both Stage F real-Linux P1 defects were fixed in verified test scenarios: bounded health-check with descendant stdout held open; updater flock ownership on child termination. ACME webroot permissions, offline rollback metadata and hostile hostname checks received targeted regression tests.
 
-**Confirmed P1 findings to address early in G:**
-1. `s4_manager_health`: a descendant retaining stdout can outlive the intended timeout; updater lock remains held.
-2. `curl` inherits updater lock FD 9; after parent-only SIGKILL, a blocked child retains the lock until it exits.
+Before Stage H implementation, run a **bounded independent Codex security/integration review** of the exact Stage G checkpoint, using real Linux mechanisms where possible. Do not expand it into an unlimited audit or reimplement the manager. Only confirmed critical blockers prevent H; record recoverable or minor findings in backlog.
 
-**P2 backlog:** offline restore of both old executables can leave `global.env` version metadata showing the newer version; verify and correct coherently when relevant. Review the conditional ACME directory traversal issue recorded in Stage F DEFERRED.md.
+Stage H is **NEXT; implementation not started**. Intended UX: guided domain → TLS → real public website → Telegram WEB proxy setup, RU/EN, concise status and actionable errors, desktop/mobile client guidance. Make Caddy + real HTTPS website + `STOCK` the default. Keep six existing optional Anti-DPI modes in advanced settings with clear tradeoffs and shared-public-IPv4 warnings; do not invent a new automatic DPI bypass, protocol, or website management implementation without separate design approval.
 
-Stage G scope: privilege/permissions boundaries, controlled input validation and path ownership, safe resource limits, updater child-process/FD cleanup, and regression tests. Prioritize confirmed exploit/failure paths rather than an unrestricted audit or redesign. Preserve the simple operation-local backup → verified update → health → rollback workflow. No resurrection of advanced Stage 3 recovery.
-
-Still NOT_EXECUTED: actual signed immutable GitHub release publication (no owner-pinned signing key/release), full CLI update on live default manager paths, and loop-device ENOSPC (tmpfs ENOSPC already verified). Before production RC, complete separately justified acceptance gates and signed-release trust bootstrap.
-
-GitHub `main` continues to expose the older `v0.2.9` source baseline. The accepted Stage D/E/F Git commits are retained in `handoff/history.bundle` from the Stage F all-in-one ZIP, **not yet published to separate GitHub source branches**. Updating README and ROADMAP is not source publication. Do not overwrite `main` or call a development acceptance a release.
-
-After Stage G is accepted, move to Stage H — UX. Stage G implementation has not started.
+Before RC, mandatory real isolated Linux VM validation: nftables, systemd, ENOSPC, TLS/ACME, clients and signed GitHub release trust. No production VPS changes. The GitHub `main` code remains older `v0.2.9` until separate source-branch publication from the accepted Git bundle is completed and verified.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
