@@ -12,9 +12,13 @@
 health-check теперь ограничен по времени при удержании stdout дочерним процессом,
 а `curl` не наследует блокировку обновления. Дополнительно исправлены проход
 ACME webroot, версия `global.env` после offline rollback и проверка hostname.
-Независимые проверки: Stage G 4/4 группы, updater Stage F 278/278 PASS,
-Git-дерево и контрольные суммы совпадают. **Не production-ready**: реальный
-ACME, systemd и другие обязательные предрелизные испытания ещё впереди.
+Независимый полный аудит Codex: **ACCEPTED_WITH_BACKLOG**, оба предыдущих P1
+исправлены на реальных Linux-процессах (18/18), проверены обновление и offline rollback,
+конкурентные операции, ENOSPC, отдельные сценарии systemd/Nginx и регрессии C1–G.
+Остались два подтверждённых P1: ложный полный успех offline restore, если обновить
+`global.env` не удаётся; локальная доступность MTProxy client secret через `/proc`.
+**Не production-ready**: Caddy, публичный ACME/TLS, реальные Telegram-клиенты,
+доверенный подписанный релиз и полные лабораторные nft/systemd-проверки ещё впереди.
 
 **Следующий этап — Stage H — UX и Guided Setup.** Основная схема: Caddy,
 нормальный HTTPS, настоящий публичный сайт и `STOCK` по умолчанию.
@@ -28,7 +32,7 @@ Anti-DPI остаётся расширенной опцией с описани�
 | D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
 | E `v0.2.19-beta` | **Development accepted** (независимые 48/48 модельных проверок; цельный ZIP, Git bundle; исходники ещё не загружены в GitHub) |
 | F `v0.2.20-beta` | **Development accepted with backlog**: 24 реальных PASS / 2 P1 FAIL, 4 модельных набора PASS; исходники в проверенном ZIP/Git bundle, GitHub-ветка ещё не опубликована |
-| G `v0.2.21-beta` | **Development accepted**: 4/4 целевых групп, 278/278 updater regressions; оба P1 исправлены; исходники в проверенном ZIP и Git bundle, ветка на GitHub ещё не опубликована |
+| G `v0.2.21-beta` | **Codex ACCEPTED_WITH_BACKLOG**: реальные обновление/rollback/locks/ENOSPC, Stage G oracle 18/18; 2 P1 в backlog; исходники в проверенном ZIP/Git bundle, ветка GitHub ещё не опубликована |
 | H | **NEXT**: UX, guided setup, понятные сетевые режимы и RU/EN справка |
 
 **Внимание:** development accepted не означает production-ready. Для RC
