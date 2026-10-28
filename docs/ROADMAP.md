@@ -26,9 +26,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
 | v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
 | v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
-| Stage E | **NEXT — implementation not started** | Operations & diagnostics: TUI EOF/no-by-default, bounded read-only checks, truthful status/logs/reports |
+| v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
+| Stage F | **NEXT — implementation not started** | Updater and supply-chain verification, lock cleanup, reliable rollback |
 
-**Current development stage: E — operations / diagnostics (next to implement).** Stage D is development-accepted as an isolated/model checkpoint, not a production release. Stage F — updater / supply-chain — follows E.
+**Current development stage: F — updater / supply chain (next to implement).** Stage E is independently development-accepted, not a production release. Stage G — hardening — follows F.
 
 All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -44,15 +45,17 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Stage E — operations / diagnostics
+## Immediate work: Stage F — updater / supply chain
 
-Stage D (`v0.2.18-beta`) is **DEVELOPMENT_ACCEPTED**, not production-ready. Independently repeated: Stage D model 122/122 PASS, C2 regression 100/100 PASS, Stage 4 protected hash unchanged, and source tree matches the bundled Git commit exactly. Real privileged/network checks are postponed to the isolated pre-RC lab.
+Stage E (`v0.2.19-beta`) is **DEVELOPMENT_ACCEPTED**. Independent verification: Stage E 48/48 PASS, project SHA-256 manifests and bundled Git tree matched, Stage 4 protected hash unchanged, and scope 358 unchanged / 34 modified / 8 added. Real TTY, systemd, nftables, TLS and related lab gates are still mandatory before RC.
 
-Stage E implementation has **not started**. Scope: safe TUI EOF/default-no handling, bounded non-destructive diagnostics, truthful status and error propagation, reliable logs/report output, retention and secret redaction. Confirm any issue with a focused fixture before changing behavior. Preserve all accepted C1–D invariants and do not revive the rejected generalized recovery architecture.
+Stage F is **NEXT; implementation has not started**. Scope: explicitly authorized modifications to the old Stage 4 *manager self-updater only*, update lock lifecycle/cleanup, trustworthy release provenance and artifact verification (signatures or secure pinned identities), reliable rollback to the preceding installed version with bounded post-update checks and truthful failure reporting. Keep operation-local backup → update → health → rollback; do not revive rejected Stage 3 advanced recovery. Do not rework relay updates or unrelated subsystem lifecycles.
 
-Acceptance: relevant RED/GREEN regression fixtures, no known reproducible critical diagnostics/operations blocker, existing regressions green, coherent version+hashes, one complete ZIP, and independent development review. After approval proceed to Stage F; do not treat a development checkpoint as a production release.
+Stage F changes may alter the previously protected Stage 4 function hash, but MUST document the before/after hashes, the exact updater-function scope, and specific RED/GREEN and regressions. No production deployment, no unreviewed merge/release.
 
-Current GitHub `main` still contains the older `v0.2.9` source baseline. Updating this roadmap and README does not publish Stage D source. The complete Stage D commit and Git bundle must be uploaded to a separate development branch before claiming source publication.
+Acceptance: tested self-update success/failure/rollback and lock release, independent model verification, no known reproducible critical blocker, versioned complete single ZIP and honest NOT_EXECUTED lab gates. After acceptance proceed to Stage G — hardening; do not treat a development checkpoint as production-ready.
+
+The GitHub `main` source still contains `v0.2.9`. The accepted Stage D/E source commits (`d3bf510`, `a3a2bf4`) are carried in the verified Stage E Git bundle and are **not yet published as source branches**. Updating README/ROADMAP does not publish source; publication must be verified separately.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
