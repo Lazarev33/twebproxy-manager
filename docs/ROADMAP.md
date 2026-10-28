@@ -25,9 +25,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.15 Stage C1.1 | Superseded by C1.2 | Backend stop and orphan-repair corrections |
 | v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
 | v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
-| v0.2.18 Stage D | **IN PROGRESS** | Caddy/Nginx/TLS failure-safe lifecycle; not accepted or released |
+| v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
+| Stage E | **NEXT — implementation not started** | Operations & diagnostics: TUI EOF/no-by-default, bounded read-only checks, truthful status/logs/reports |
 
-**Current development stage: D — frontend / TLS.** The next planned stage is **E — operations / diagnostics**. Development acceptance is not permission for production deployment.
+**Current development stage: E — operations / diagnostics (next to implement).** Stage D is development-accepted as an isolated/model checkpoint, not a production release. Stage F — updater / supply-chain — follows E.
 
 All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -43,15 +44,15 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Stage D — frontend / TLS
+## Immediate work: Stage E — operations / diagnostics
 
-C2 (`v0.2.17-beta`) is independently accepted for continued development. Stage D (`v0.2.18-beta`) is being implemented; it is not yet accepted.
+Stage D (`v0.2.18-beta`) is **DEVELOPMENT_ACCEPTED**, not production-ready. Independently repeated: Stage D model 122/122 PASS, C2 regression 100/100 PASS, Stage 4 protected hash unchanged, and source tree matches the bundled Git commit exactly. Real privileged/network checks are postponed to the isolated pre-RC lab.
 
-Scope: manager-owned Caddy blocks, Nginx configuration, Let's Encrypt issuance/renewal, frontend setup/repair/deletion. Validate candidates before activating, preserve working websites and valid certificates on failures, protect unmanaged configuration, and report failure/rollback truthfully. Keep the current accepted C1 and C2 behavior untouched.
+Stage E implementation has **not started**. Scope: safe TUI EOF/default-no handling, bounded non-destructive diagnostics, truthful status and error propagation, reliable logs/report output, retention and secret redaction. Confirm any issue with a focused fixture before changing behavior. Preserve all accepted C1–D invariants and do not revive the rejected generalized recovery architecture.
 
-Acceptance: focused RED/GREEN model tests and relevant regressions, no known critical frontend/TLS blocker, versioned single-ZIP handoff, independent development review. Privileged real-host checks remain mandatory before RC on an isolated disposable VM, never the production VPS.
+Acceptance: relevant RED/GREEN regression fixtures, no known reproducible critical diagnostics/operations blocker, existing regressions green, coherent version+hashes, one complete ZIP, and independent development review. After approval proceed to Stage F; do not treat a development checkpoint as a production release.
 
-After D acceptance, move to Stage E rather than expanding into repeated speculative D correction passes. Record noncritical follow-up items in the backlog.
+Current GitHub `main` still contains the older `v0.2.9` source baseline. Updating this roadmap and README does not publish Stage D source. The complete Stage D commit and Git bundle must be uploaded to a separate development branch before claiming source publication.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
