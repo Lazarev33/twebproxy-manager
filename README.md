@@ -7,16 +7,19 @@
 
 ## Статус разработки
 
-**Последний принятый checkpoint разработки: Stage F — v0.2.20-beta (с backlog).**
-Независимая кампания на disposable Ubuntu 24.04.5 подтвердила реальные обновление
-с operator-pinned SHA-256, backup, offline rollback, `flock`, SIGTERM/SIGKILL,
-ENOSPC и systemd: **24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (P1)**.
-Найдены два воспроизводимых P1: неограниченное ожидание health-check из-за дочернего
-stdout и наследование update-lock дочерним `curl` после SIGKILL родителя.
-Следующий этап — **Stage G — Security Hardening**, прежде всего исправление этих P1,
-проверка безопасности и сохранение принятых функций.
-Реальное подписание GitHub releases, full CLI на live-путях и production release
-ещё не проверены.
+**Последний независимо проверенный checkpoint: Stage G — v0.2.21-beta.**
+Завершено исправление двух P1, выявленных в реальных испытаниях Stage F:
+health-check теперь ограничен по времени при удержании stdout дочерним процессом,
+а `curl` не наследует блокировку обновления. Дополнительно исправлены проход
+ACME webroot, версия `global.env` после offline rollback и проверка hostname.
+Независимые проверки: Stage G 4/4 группы, updater Stage F 278/278 PASS,
+Git-дерево и контрольные суммы совпадают. **Не production-ready**: реальный
+ACME, systemd и другие обязательные предрелизные испытания ещё впереди.
+
+**Следующий этап — Stage H — UX и Guided Setup.** Основная схема: Caddy,
+нормальный HTTPS, настоящий публичный сайт и `STOCK` по умолчанию.
+Anti-DPI остаётся расширенной опцией с описанием рисков и области действия,
+без неподтверждённого «автоматического обхода блокировок».
 
 | Ветка / артефакт | Состояние |
 | --- | --- |
@@ -25,7 +28,8 @@ stdout и наследование update-lock дочерним `curl` посл�
 | D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
 | E `v0.2.19-beta` | **Development accepted** (независимые 48/48 модельных проверок; цельный ZIP, Git bundle; исходники ещё не загружены в GitHub) |
 | F `v0.2.20-beta` | **Development accepted with backlog**: 24 реальных PASS / 2 P1 FAIL, 4 модельных набора PASS; исходники в проверенном ZIP/Git bundle, GitHub-ветка ещё не опубликована |
-| G | **Следующий этап**: Security Hardening, включая два P1 из реальных Linux-испытаний Stage F |
+| G `v0.2.21-beta` | **Development accepted**: 4/4 целевых групп, 278/278 updater regressions; оба P1 исправлены; исходники в проверенном ZIP и Git bundle, ветка на GitHub ещё не опубликована |
+| H | **NEXT**: UX, guided setup, понятные сетевые режимы и RU/EN справка |
 
 **Внимание:** development accepted не означает production-ready. Для RC
 по-прежнему нужны независимые испытания на disposable Linux VM, включая
