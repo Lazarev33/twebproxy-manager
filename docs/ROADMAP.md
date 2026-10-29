@@ -1,6 +1,6 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-28. This document tracks **planned work**, not production release status.
+Updated: 2026-10-29. This document tracks **planned work**, not production release status.
 
 ## Product goal
 
@@ -29,9 +29,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
 | v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
 | v0.2.21 Stage G | **Codex ACCEPTED_WITH_BACKLOG (real Linux)** | RED Stage F 6 expected failures; Stage G oracle 18/18 PASS; real update/rollback/flock/SIGKILL/ENOSPC, Nginx & limited systemd PASS; 2 reproducible P1 in backlog, no confirmed P0; source ZIP/Git bundle not yet published to a branch |
-| Stage H | **NEXT — implementation not started** | Guided setup, clear UX, RU/EN explanations of default STOCK and optional Anti-DPI modes |
+| v0.2.22 Stage H | **DEVELOPMENT_ACCEPTED (model checks)** | Independent 98/98 Stage H UX PASS, 687/687 Git tree, RU/EN, guided setup and safer network-mode explanations; still untested real TLS/clients; GitHub source branch not yet published |
+| Pre-RC integration | **NEXT — tests and two P1 fixes required** | Disposable real Linux, nft/systemd, Caddy/Nginx/ACME, genuine clients, source publication, signed artifact provenance and readiness criteria |
 
-**Current development stage: H — UX / guided setup (next to implement).** Independent Codex full security and real-Linux regression of Stage G is complete: **ACCEPTED_WITH_BACKLOG**. Neither a production RC nor a GitHub source-branch publication is implied.
+**Current activity: RC integration / pre-release validation.** Stage H has been independently accepted as a development checkpoint, not a production release. The previous Codex Stage G findings P1-G-01 and P1-INHERITED-01 remain open before RC.
 
 All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -47,19 +48,21 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Stage H — UX and guided setup
+## Immediate work: integrated pre-RC validation
 
-**Stage G v0.2.21-beta independent Codex audit completed: ACCEPTED_WITH_BACKLOG.** Real Linux validation independently passed the Stage G process oracle (18/18), operator-pinned trusted update, backup/rollback, real concurrent `flock`, signals and SIGKILL recovery, dedicated tmpfs ENOSPC, limited systemd/Nginx checks, ACME directory permission traversal and safe diagnostic outputs. Stage A/B complete destructive nft/systemd lab gates still returned 77. Caddy, real public CA, Telegram clients and signed release remain untested.
+**Stage H v0.2.22-beta DEVELOPMENT_ACCEPTED** after independently rerunning the Stage H suite: 98/98 model UX assertions, 0 failures, static heredoc guard PASS, RU/EN catalog PASS, exact Git source tree 687/687 and unchanged updater/protected function hashes. First-run/quick/advanced workflows, DNS refusal, cancel/EOF, site/TLS choices, client help, status hints, main-menu routing and Anti-DPI risk explanations are implemented.
 
-**Known P1 before production RC (do not conceal):**
-- Offline restore of both executables can return `RESTORE_SUCCESS` / exit 0 even when `global.env` cannot be atomically updated (e.g. immutable file); metadata remains stale. Preserve error distinction in operator guidance and fix during a scoped reliability pass before RC.
-- Stock MTProxy `-S` client secret is visible through `/proc/<pid>/cmdline` to local unprivileged users without a system-wide `/proc` restriction. Inherited, documented risk; mitigate or close with explicit verified host policy before RC.
+**Scope is complete for A/B/C/D/E/F/G/H development, not yet proven for production.** Real Telegram clients and a production-like public HTTPS site have not been tested. Current quick setup can use a temporary placeholder, supplied static directory or local upstream; it does not implement a website builder.
 
-**Stage H implementation not started.** Scope: clear RU/EN guided quick setup and beginner/advanced workflows, main-menu Anti-DPI access with explanations, concise actionable statuses, desktop/mobile client guidance, predictable EOF/default-no handling and consistent prompts. Recommend Caddy + functional HTTPS site + `STOCK` by default; current code cannot yet fully manage a real custom site (dedicated later-stage scope). Preserve the six tested optional DPI modes and explicit IPv4 shared-scope consent. Do not add automatic DPI circumvention or new protocols without separate design approval.
+**Confirmed P1 gates before production RC:**
+- `P1-G-01`: offline restore may return `RESTORE_SUCCESS` / exit 0 despite failure to replace `global.env` version metadata.
+- `P1-INHERITED-01`: stock MTProxy uses a `-S` secret in argv; local users may read `/proc/<pid>/cmdline` on permissive procfs.
 
-One focused Stage H implementation + RED/GREEN regression + independent acceptance, no speculative correction chain. Before RC, full dedicated Linux VM validation of privileged firewall/systemd, Caddy/Nginx TLS, genuine client traffic and signed release policy is mandatory.
+**Development incident note:** During Stage H creation, unquoted heredoc help text containing backticks caused several noninteractive calls to the host's installed manager, leaving 18 log files. Host canary found no service/configuration changes. The final help text no longer executes commands and a static guard and dynamic sentinel tripwire check cover this.
 
-The GitHub `main` source is still `v0.2.9`; accepted source checkpoints D/E/F/G are in Git bundles, **not verified as remote branches**. Update docs without falsely asserting code publication. Do not force-push or merge to main.
+**RC acceptance plan:** privileged disposable VM tests for nftables and systemd; genuine Caddy/Nginx with ACME and a public site over 80/443; end-to-end Telegram Desktop and mobile client connections; stock and targeted Anti-DPI behavior checks across controlled networks; trust bootstrap and an actually signed release; failure/recovery behavior and closure or explicitly approved mitigations of both P1. Record exact real vs model coverage, failures and NOT_EXECUTED truthfully. A failed test does not automatically require a new development stage unless it exposes a material blocker.
+
+**GitHub source publication remains incomplete.** The verified history.bundle includes Stage D–H, but `main` remains v0.2.9 and no remote accepted source branches have been verified. Publish exact approved source commits to separate dev branches before release readiness; do not claim that README/roadmap changes published code, do not push to `main`, force-push or create a release.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
