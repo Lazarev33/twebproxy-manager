@@ -18,7 +18,7 @@
 ---
 
 > [!WARNING]
-> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В GitHub \`main\` пока опубликован **старый код v0.2.9**, а полный исходный коммит Stage H хранится в проверенном Git bundle. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с \`nftables.service\`. Не используйте эту версию как подтверждённый безопасный production-релиз.
+> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В GitHub `main` пока опубликован **старый код v0.2.9**, а полный исходный коммит Stage H хранится в проверенном Git bundle. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с `nftables.service`. Не используйте эту версию как подтверждённый безопасный production-релиз.
 
 ## Зачем нужен TWebProxy
 
@@ -34,11 +34,11 @@ TWebProxy Manager — Bash-менеджер для собственного **Te
 | **🛡️ Изоляция и диагностика** | **🧰 Обслуживание** |
 | nftables, проверка портов и служб, диагностика TLS, безопасные отчёты | Проверяемое обновление, локальный backup, откат, управление службами |
 
-В checkpoint **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками. Важно: эти новые функции ещё **не соответствуют коду, опубликованному в \`main\`**.
+В checkpoint **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками. Важно: эти новые функции ещё **не соответствуют коду, опубликованному в `main`**.
 
 ## Как это работает
 
-\`\`\`mermaid
+```mermaid
 flowchart TB
     A["Telegram · WEB Proxy"] -->|"HTTPS / WebSocket :443"| B["Caddy / Nginx"]
     U["Обычный браузер"] -->|"HTTPS :443"| B
@@ -51,29 +51,29 @@ flowchart TB
     classDef internal fill:#f2f4f7,stroke:#a5aeba,color:#252a32;
     class A,U,B public;
     class W,R,M,T internal;
-\`\`\`
+```
 
 Запросы к сайту обслуживаются как обычный HTTPS. WEB Proxy проходит через отдельный маршрут к relay и MTProxy. Backend не должен быть доступен напрямую из интернета — именно поэтому проверка firewall входит в обязательные предрелизные испытания.
 
 ## Начало работы
 
-**Требования:** Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, доменное имя с правильной DNS \`A\`-записью. Для HTTPS нужен TCP 443, для автоматических сертификатов обычно также TCP 80.
+**Требования:** Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, доменное имя с правильной DNS `A`-записью. Для HTTPS нужен TCP 443, для автоматических сертификатов обычно также TCP 80.
 
 Для **отдельной тестовой VM**:
 
-\`\`\`bash
+```bash
 git clone https://github.com/Lazarev33/twebproxy-manager.git
 cd twebproxy-manager
 chmod +x twebproxy-manager.sh
 sudo ./twebproxy-manager.sh
-\`\`\`
+```
 
 > [!IMPORTANT]
-> Эта команда пока получает **v0.2.9 из \`main\`**, а не checkpoint v0.2.22. Мы не предлагаем \`curl | bash\` и не выдаём старую ветку за актуальный релиз. После публикации проверенного исходного дерева эта секция будет переключена на конкретный тег и контрольную сумму.
+> Эта команда пока получает **v0.2.9 из `main`**, а не checkpoint v0.2.22. Мы не предлагаем `curl | bash` и не выдаём старую ветку за актуальный релиз. После публикации проверенного исходного дерева эта секция будет переключена на конкретный тег и контрольную сумму.
 
 ### Рекомендуемый сценарий в v0.2.22-beta
 
-\`\`\`text
+```text
 1. Выбрать язык → RU / EN
 2. Быстрая настройка → hostname
 3. Выбрать сайт → временная страница, static или local app
@@ -81,7 +81,7 @@ sudo ./twebproxy-manager.sh
 5. Сетевой режим → STOCK
 6. Проверить план → подтвердить
 7. Получить Telegram WEB Proxy ссылки
-\`\`\`
+```
 
 Реальный сайт на том же hostname можно подключить из статического каталога или локального приложения. **Конструктора сайтов пока нет.**
 
@@ -89,7 +89,7 @@ sudo ./twebproxy-manager.sh
 
 Основные команды для checkpoint v0.2.22 (после установки менеджера в систему):
 
-\`\`\`bash
+```bash
 sudo twebproxy                   # Интерактивное меню
 sudo twebproxy add               # Создать инстанс
 sudo twebproxy list              # Список инстансов
@@ -101,9 +101,9 @@ sudo twebproxy repair HOST       # Восстановление конфигур
 sudo twebproxy cert-status HOST  # Проверка сертификата
 sudo twebproxy profile-list HOST # Профили
 sudo twebproxy dpi list-methods  # Сетевые режимы
-\`\`\`
+```
 
-Для машинного вывода есть \`--json\` и \`--raw\`; для отключения цветовых последовательностей — \`--no-color\`. Ссылки WEB Proxy и secret не публикуйте в логах, issue и скриншотах.
+Для машинного вывода есть `--json` и `--raw`; для отключения цветовых последовательностей — `--no-color`. Ссылки WEB Proxy и secret не публикуйте в логах, issue и скриншотах.
 
 ## Совместимость сети / Anti-DPI
 
@@ -111,15 +111,15 @@ sudo twebproxy dpi list-methods  # Сетевые режимы
 
 | Режим | Назначение |
 | :--- | :--- |
-| \`stock\` | Без вмешательства в TCP; рекомендуемый baseline |
-| \`window1152\` | Объявляет уменьшенное TCP-окно в SYN+ACK |
-| \`mss88\` | Объявляет MSS 88; возможны высокие накладные расходы |
-| \`nfqws\` | Обработка первых ответных пакетов через pinned nfqws |
-| \`window1152_nfqws\` | Комбинация двух механизмов |
-| \`mss88_nfqws\` | Более агрессивная комбинация |
+| `stock` | Без вмешательства в TCP; рекомендуемый baseline |
+| `window1152` | Объявляет уменьшенное TCP-окно в SYN+ACK |
+| `mss88` | Объявляет MSS 88; возможны высокие накладные расходы |
+| `nfqws` | Обработка первых ответных пакетов через pinned nfqws |
+| `window1152_nfqws` | Комбинация двух механизмов |
+| `mss88_nfqws` | Более агрессивная комбинация |
 
 > [!CAUTION]
-> Режимы относятся к **IPv4 TCP/443 на публичном IP сервера**, а не только к одному Telegram hostname. На общем IP они могут затронуть другие HTTPS-службы. Поэтому включение требует явного \`--accept-shared-scope\`. При проблемах сначала проверьте DNS, сертификат, маршрут и доступность backend — не включайте все режимы подряд.
+> Режимы относятся к **IPv4 TCP/443 на публичном IP сервера**, а не только к одному Telegram hostname. На общем IP они могут затронуть другие HTTPS-службы. Поэтому включение требует явного `--accept-shared-scope`. При проблемах сначала проверьте DNS, сертификат, маршрут и доступность backend — не включайте все режимы подряд.
 
 ## Статус и известные риски
 
@@ -132,9 +132,9 @@ sudo twebproxy dpi list-methods  # Сетевые режимы
 
 **Открытые проблемы перед RC:**
 
-1. **Firewall / P1:** операции с \`nftables.service\` могут удалять правила изоляции backend или останавливать обе ноды.
-2. **Rollback / P1:** при отказе записи \`global.env\` возможно ложное сообщение об успешном восстановлении.
-3. **Локальные секреты / P1:** stock MTProxy передаёт \`-S\` в аргументах процесса, видимых некоторым локальным пользователям.
+1. **Firewall / P1:** операции с `nftables.service` могут удалять правила изоляции backend или останавливать обе ноды.
+2. **Rollback / P1:** при отказе записи `global.env` возможно ложное сообщение об успешном восстановлении.
+3. **Локальные секреты / P1:** stock MTProxy передаёт `-S` в аргументах процесса, видимых некоторым локальным пользователям.
 4. **DPI / P2:** после ENOSPC сохранённое состояние и реальная таблица ядра могут расходиться.
 
 Сценарии с реальными клиентами Telegram и подписанным GitHub-релизом также ещё требуют отдельной проверки. **Не воспринимайте успешные модельные тесты как доказательство production-ready.**
@@ -157,9 +157,9 @@ sudo twebproxy dpi list-methods  # Сетевые режимы
 <details>
 <summary><strong>English — short overview</strong></summary>
 
-**TWebProxy Manager** is a self-hosted Telegram WEB Proxy manager for Debian/Ubuntu. It combines Caddy/Nginx HTTPS, a real public website, the official \`tproxy-server\`, stock MTProxy, multiple instances/profiles, nftables isolation, diagnostics and verified update workflows.
+**TWebProxy Manager** is a self-hosted Telegram WEB Proxy manager for Debian/Ubuntu. It combines Caddy/Nginx HTTPS, a real public website, the official `tproxy-server`, stock MTProxy, multiple instances/profiles, nftables isolation, diagnostics and verified update workflows.
 
-The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The \`main\` branch currently still contains the older **v0.2.9** code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
+The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The `main` branch currently still contains the older **v0.2.9** code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
 
 See the roadmap and security documentation above before experimenting on a disposable VPS.
 
