@@ -1,314 +1,174 @@
+<div align="center">
+
 # TWebProxy Manager
 
-**TWebProxy Manager** — installer и manager для self-hosted Telegram **WEB Proxy** на Debian/Ubuntu.
+**Telegram WEB Proxy на своём сервере. Настоящий HTTPS, понятное управление.**
 
-Репозиторий: https://github.com/Lazarev33/twebproxy-manager
+Самостоятельное размещение · Несколько доменов и профилей · Caddy / Nginx · RU / EN
 
+![Platform](https://img.shields.io/badge/platform-Debian%20%7C%20Ubuntu-252a34?style=flat-square)
+![Shell](https://img.shields.io/badge/Bash-Linux-353b48?style=flat-square)
+![Version](https://img.shields.io/badge/latest%20checkpoint-v0.2.22--beta-3673ba?style=flat-square)
+![Status](https://img.shields.io/badge/status-pre--RC%20testing-e7a53b?style=flat-square)
 
-## Статус разработки
+[Возможности](#возможности) · [Как работает](#как-это-работает) · [Начало работы](#начало-работы) · [Команды](#управление) · [Статус разработки](#статус-и-известные-риски)
 
-**Последний независимо проверенный checkpoint — Stage H, v0.2.22-beta (DEVELOPMENT_ACCEPTED).**
-Новый guided setup: первое включение, выбор языка, короткий сценарий
-domain → website → TLS → WEB Proxy, помощь с подключением Telegram, понятное
-меню и объяснения шести сетевых режимов. Рекомендуемый baseline: Caddy +
-обычный HTTPS + STOCK. Другие режимы остаются экспериментальными и действуют
-на весь HTTPS исходящий с общего публичного IPv4:443. Конструктор настоящего
-сайта ещё не реализован (пока доступны временная страница, готовый каталог
-сайта или loopback-приложение).
+</div>
 
-Независимый повтор Stage H: **98/98 модельных проверок PASS**,
-локализация PASS, Git-дерево 687/687, обновление Stage 4/F/G не менялось.
-На следующем шаге — **RC integration / pre-release validation**: реальный
-systemd/nftables, Caddy/Nginx+ACME, установочные и ошибочные сценарии, Desktop/
-mobile клиенты и подтверждение подписанного выпуска.
+---
 
-**До RC остаются два P1 из Codex-аудита G:** при отказе обновить
-`global.env` offline restore может ошибочно сообщить полный успех;
-stock MTProxy передаёт `-S` в аргументах процесса, доступных локальным
-пользователям на некоторых конфигурациях procfs. Они не исправлены в H.
-Также Claude задокументировал случайное выполнение установленного менеджера
-при разработке справки (порождены 18 лог-файлов, системный canary неизменен);
-ошибка heredoc исправлена, добавлен регрессионный guard.
+> [!WARNING]
+> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В GitHub \`main\` пока опубликован **старый код v0.2.9**, а полный исходный коммит Stage H хранится в проверенном Git bundle. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с \`nftables.service\`. Не используйте эту версию как подтверждённый безопасный production-релиз.
 
-| Ветка / артефакт | Состояние |
-| --- | --- |
-| `main` | Публичный исходный baseline `v0.2.9-dpi-beta`, **не** текущий checkpoint |
-| D/E/F/G | Проверенная история находится в Git bundle; соответствующие исходные ветки ещё не опубликованы |
-| H `v0.2.22-beta` | **DEVELOPMENT_ACCEPTED**, исходники в едином ZIP + Git bundle; ветка `stage-h/v0.2.22` пока отсутствует на GitHub |
-| RC | Следующий этап: интеграционные испытания, P1 remediation и release readiness |
+## Зачем нужен TWebProxy
 
-**Внимание:** development accepted не означает production-ready. Для RC
-по-прежнему нужны независимые испытания на disposable Linux VM, включая
-реальный systemd/nftables, TLS и ENOSPC. Не устанавливайте dev-checkpoint на
-рабочий VPS. Текущий опубликованный в `main` исходный код и новый checkpoint
-не следует смешивать до загрузки и проверки соответствующей ветки.
+TWebProxy Manager — Bash-менеджер для собственного **Telegram WEB Proxy** на Debian/Ubuntu. Он объединяет веб-фронтенд с обычным HTTPS, Telegram relay, штатный MTProxy, сертификаты, профили, firewall и диагностику.
 
-Подробности и порядок этапов — [docs/ROADMAP.md](docs/ROADMAP.md).
+**Это именно WEB Proxy**, а не VLESS/Xray, VPN-туннель или замена Telegram-клиента. Основа — [официальный tproxy-server](https://github.com/telegramdesktop/tproxy-server) и [stock MTProxy](https://github.com/TelegramMessenger/MTProxy).
 
+### Возможности
 
-Текущая версия кода в `main`: **0.2.9-dpi-beta**. Машиночитаемый `VERSION` — **0.2.9**:
-это строгий semver, совместимый с уже принятой Stage 4 update/rollback-проверкой;
-beta-метка хранится отдельно в `MANAGER_RELEASE_VERSION` и используется в UI.
+| 🌐 HTTPS и сайт | 🔑 Пользователи и профили |
+| :--- | :--- |
+| Caddy или Nginx; Let's Encrypt или собственный сертификат; обычный сайт на том же hostname | Несколько инстансов, независимые профили и secret, ротация доступа |
+| **🛡️ Изоляция и диагностика** | **🧰 Обслуживание** |
+| nftables, проверка портов и служб, диагностика TLS, безопасные отчёты | Проверяемое обновление, локальный backup, откат, управление службами |
 
-## Архитектура
+В checkpoint **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками. Важно: эти новые функции ещё **не соответствуют коду, опубликованному в \`main\`**.
 
-```text
-Telegram Desktop
-    ↓ HTTPS / WSS :443
-Caddy / Nginx
-    ↓ loopback
-tproxy-server
-    ↓
-MTProxy
-    ↓
-Telegram
-```
+## Как это работает
 
-WEB relay — официальный `telegramdesktop/tproxy-server`.  
-Backend — официальный `TelegramMessenger/MTProxy`.
+\`\`\`mermaid
+flowchart TB
+    A["Telegram · WEB Proxy"] -->|"HTTPS / WebSocket :443"| B["Caddy / Nginx"]
+    U["Обычный браузер"] -->|"HTTPS :443"| B
+    B -->|"Сайт / приложение"| W["Публичный сайт"]
+    B -->|"WEB Proxy endpoint"| R["tproxy-server · loopback"]
+    R --> M["MTProxy · stock"]
+    M --> T["Telegram network"]
 
-## Возможности
+    classDef public fill:#e9f3ff,stroke:#528ed1,color:#19395c;
+    classDef internal fill:#f2f4f7,stroke:#a5aeba,color:#252a32;
+    class A,U,B public;
+    class W,R,M,T internal;
+\`\`\`
 
-- несколько hostname на одном VPS;
-- несколько profiles / secrets;
-- carriers: `https`, `https-lanes`, `websocket`, `websocket-lanes`;
-- Caddy + automatic TLS;
-- Nginx + Let's Encrypt с автоматическим продлением;
-- Nginx + custom certificate;
-- manual frontend для существующего Caddy/Nginx;
-- проверка срока действия и состояния TLS-сертификатов;
-- systemd services и autostart;
-- systemd credentials для конфигурации и секретов;
-- nftables isolation backend-портов;
-- диагностика, audit, repair и diagnostic reports;
-- безопасное обновление `tproxy-server` с test/build/health-check/rollback;
-- проверка и обновление самого TWebProxy Manager через GitHub.
-- дополнительный IPv4-режим совместимости сети; по умолчанию остаётся `STOCK`.
+Запросы к сайту обслуживаются как обычный HTTPS. WEB Proxy проходит через отдельный маршрут к relay и MTProxy. Backend не должен быть доступен напрямую из интернета — именно поэтому проверка firewall входит в обязательные предрелизные испытания.
 
-## Требования
+## Начало работы
 
-- Debian 12+ или Ubuntu 22.04+;
-- x86_64;
-- systemd;
-- root/sudo;
-- публичный IPv4;
-- hostname с `A`-записью на VPS;
-- TCP 443;
-- TCP 80 для автоматического выпуска/продления Let's Encrypt.
+**Требования:** Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, доменное имя с правильной DNS \`A\`-записью. Для HTTPS нужен TCP 443, для автоматических сертификатов обычно также TCP 80.
 
-## Установка
+Для **отдельной тестовой VM**:
 
-```bash
+\`\`\`bash
+git clone https://github.com/Lazarev33/twebproxy-manager.git
+cd twebproxy-manager
 chmod +x twebproxy-manager.sh
 sudo ./twebproxy-manager.sh
-```
+\`\`\`
 
-После установки:
+> [!IMPORTANT]
+> Эта команда пока получает **v0.2.9 из \`main\`**, а не checkpoint v0.2.22. Мы не предлагаем \`curl | bash\` и не выдаём старую ветку за актуальный релиз. После публикации проверенного исходного дерева эта секция будет переключена на конкретный тег и контрольную сумму.
 
-```bash
-sudo twebproxy
-```
+### Рекомендуемый сценарий в v0.2.22-beta
 
-### Язык и новое меню
+\`\`\`text
+1. Выбрать язык → RU / EN
+2. Быстрая настройка → hostname
+3. Выбрать сайт → временная страница, static или local app
+4. HTTPS → Caddy (рекомендуется)
+5. Сетевой режим → STOCK
+6. Проверить план → подтвердить
+7. Получить Telegram WEB Proxy ссылки
+\`\`\`
 
-При первой интерактивной установке Manager один раз предлагает выбрать
-`English` или `Русский` и сохраняет выбор в `/etc/twebproxy/ui-language`.
-Существующие установки без этого файла продолжают работать на русском: команды
-обновления, repair и любой неинтерактивный запуск не получают нового prompt.
-Язык можно сменить в `Settings → Language` / `Настройки → Язык`.
+Реальный сайт на том же hostname можно подключить из статического каталога или локального приложения. **Конструктора сайтов пока нет.**
 
-Главное меню сгруппировано по задачам: инстансы, профили, статус и статистика,
-обслуживание, диагностика и логи, настройки. Обычные `status` и `stats` теперь
-показывают краткую операторскую сводку. Прежние подробные данные доступны через
-`status [hostname] --verbose`, `stats [hostname] --verbose` и раздел диагностики.
-Машинные форматы `--json` и `--raw` не локализуются и сохраняют стабильную схему.
-Переменная окружения `NO_COLOR` и флаг `--no-color` отключают ANSI-цвета.
+## Управление
 
-## Основные команды
+Основные команды для checkpoint v0.2.22 (после установки менеджера в систему):
 
-```bash
-# Instances
-sudo twebproxy add
-sudo twebproxy list
-sudo twebproxy show [hostname]
-sudo twebproxy status [hostname]
-sudo twebproxy status [hostname] --verbose
-sudo twebproxy restart [hostname]
-sudo twebproxy repair [hostname]
-sudo twebproxy diagnose [hostname]
-sudo twebproxy audit [hostname]
-sudo twebproxy stats [hostname]
-sudo twebproxy stats [hostname] --verbose
+\`\`\`bash
+sudo twebproxy                   # Интерактивное меню
+sudo twebproxy add               # Создать инстанс
+sudo twebproxy list              # Список инстансов
+sudo twebproxy show HOST         # Ссылки для Telegram (содержат secret)
+sudo twebproxy status HOST       # Краткое состояние
+sudo twebproxy diagnose HOST     # Диагностика
+sudo twebproxy audit HOST        # Проверка конфигурации и изоляции
+sudo twebproxy repair HOST       # Восстановление конфигурации
+sudo twebproxy cert-status HOST  # Проверка сертификата
+sudo twebproxy profile-list HOST # Профили
+sudo twebproxy dpi list-methods  # Сетевые режимы
+\`\`\`
 
-# TLS certificates
-sudo twebproxy cert-status [hostname]
-sudo twebproxy cert-renew [hostname]
-sudo twebproxy cert-renew [hostname] --dry-run
-sudo twebproxy cert-renew [hostname] --force
+Для машинного вывода есть \`--json\` и \`--raw\`; для отключения цветовых последовательностей — \`--no-color\`. Ссылки WEB Proxy и secret не публикуйте в логах, issue и скриншотах.
 
-# Profiles
-sudo twebproxy profile-list [hostname]
-sudo twebproxy profile-add [hostname]
-sudo twebproxy profile-rotate [hostname] [profile]
-sudo twebproxy profile-carrier [hostname] [profile]
-sudo twebproxy profile-delete [hostname] [profile]
+## Совместимость сети / Anti-DPI
 
-# Updates
-sudo twebproxy check-update
-sudo twebproxy manager-update
-sudo twebproxy update
+**По умолчанию — STOCK.** Менеджер не должен без необходимости изменять сетевой трафик. Остальные режимы — расширенные экспериментальные настройки; ни один не гарантирует доступность в любой сети.
 
-# Logs
-sudo twebproxy logs
-sudo twebproxy report
+| Режим | Назначение |
+| :--- | :--- |
+| \`stock\` | Без вмешательства в TCP; рекомендуемый baseline |
+| \`window1152\` | Объявляет уменьшенное TCP-окно в SYN+ACK |
+| \`mss88\` | Объявляет MSS 88; возможны высокие накладные расходы |
+| \`nfqws\` | Обработка первых ответных пакетов через pinned nfqws |
+| \`window1152_nfqws\` | Комбинация двух механизмов |
+| \`mss88_nfqws\` | Более агрессивная комбинация |
 
-# Optional IPv4 network compatibility / Anti-DPI
-sudo twebproxy dpi status [hostname]
-sudo twebproxy dpi list-methods
-sudo twebproxy dpi set HOST MODE --accept-shared-scope
-sudo twebproxy dpi disable HOST
-```
+> [!CAUTION]
+> Режимы относятся к **IPv4 TCP/443 на публичном IP сервера**, а не только к одному Telegram hostname. На общем IP они могут затронуть другие HTTPS-службы. Поэтому включение требует явного \`--accept-shared-scope\`. При проблемах сначала проверьте DNS, сертификат, маршрут и доступность backend — не включайте все режимы подряд.
 
-## Дополнительная совместимость сети / Anti-DPI
+## Статус и известные риски
 
-Функция необязательна. После установки действует `STOCK`: Manager не создаёт
-DPI-таблицу nftables, не устанавливает `nfqws` и не запускает дополнительный
-процесс. Выбор carrier (`https`, `https-lanes`, `websocket`,
-`websocket-lanes`) остаётся независимым от DPI-режима.
+| Этап | Состояние |
+| :--- | :--- |
+| Stage A–H | Разработка завершена; Stage H независимо проверен как development checkpoint |
+| Linux-интеграция | Проверялись реальные обновления, откаты, systemd, nftables, Nginx и Caddy/ACME |
+| Предрелизная готовность | **BLOCKED** — подтверждённые дефекты ещё не исправлены |
+| Production release | **Не опубликован** |
 
-Доступны шесть режимов:
+**Открытые проблемы перед RC:**
 
-| Режим | Зрелость и действие |
-|---|---|
-| `stock` | Принятый производственный путь без изменения TCP-трафика. |
-| `window1152` | Экспериментально: окно приёма TCP 1152 в исходящем IPv4 SYN+ACK с `:443`. |
-| `mss88` | Агрессивно/экспериментально: объявление MSS 88 в исходящем SYN+ACK; увеличивает число сегментов и накладные расходы. |
-| `nfqws` | Экспериментально: первые ответные пакеты сервера обрабатывает закреплённая стратегия `nfqws`. |
-| `window1152_nfqws` | Экспериментальная комбинация Window 1152, затем `nfqws`. |
-| `mss88_nfqws` | Наиболее агрессивная комбинация MSS 88, затем `nfqws`; возможны заметные накладные расходы. |
+1. **Firewall / P1:** операции с \`nftables.service\` могут удалять правила изоляции backend или останавливать обе ноды.
+2. **Rollback / P1:** при отказе записи \`global.env\` возможно ложное сообщение об успешном восстановлении.
+3. **Локальные секреты / P1:** stock MTProxy передаёт \`-S\` в аргументах процесса, видимых некоторым локальным пользователям.
+4. **DPI / P2:** после ENOSPC сохранённое состояние и реальная таблица ядра могут расходиться.
 
-В beta-версии обработка ограничена IPv4. IPv6 всегда остаётся `STOCK`.
-Состояние привязано к фактическому публичному IPv4, а не к hostname: правило
-затрагивает весь исходящий HTTPS-трафик с этого адреса и TCP-порта 443.
-Рекомендуется отдельный IPv4. Если один адрес обслуживает несколько hostname
-или сторонние HTTPS-службы, все они попадут в ту же область. Поэтому включение
-требует явного подтверждения `--accept-shared-scope`; Manager не утверждает,
-что смог автоматически доказать выделенность адреса.
+Сценарии с реальными клиентами Telegram и подписанным GitHub-релизом также ещё требуют отдельной проверки. **Не воспринимайте успешные модельные тесты как доказательство production-ready.**
 
-Пример:
+Полная история и план исправлений — в [ROADMAP](docs/ROADMAP.md).
 
-```bash
-sudo twebproxy dpi status proxy.example
-sudo twebproxy dpi set proxy.example window1152 --accept-shared-scope
-sudo twebproxy dpi set proxy.example nfqws --accept-shared-scope
-sudo twebproxy dpi disable proxy.example
-```
+## Документация
 
-`nfqws` поставляется из upstream
-[`bol-van/zapret`](https://github.com/bol-van/zapret), tag `v72.13`, commit
-`87e058624c72863db53bdaf7fb6f16576dddb6ab`; бинарник проверяется по закреплённому
-SHA-256 перед установкой и каждым запуском службы. Если команда выполняется из
-распакованного release-tree, используется вложенный `assets/nfqws-linux-x86_64`.
-После обычной установки или script-only manager-update соседнего `assets/` нет,
-поэтому при первом явном включении одного из трёх nfqws-режимов Manager загружает
-официальный архив строго закреплённого `v72.13`, извлекает только ожидаемый
-x86_64 member и до первого исполнения проверяет точный размер и SHA-256. Затем
-отдельно проверяются строка version/commit и утверждённые аргументы `--dry-run`.
-Непроверенные байты никогда не публикуются в runtime-путь
-`/usr/local/libexec/twebproxy/twebproxy-nfqws`. Возврат в `STOCK` удаляет бинарник,
-checksum, unit, документацию и DPI-состояние, поэтому исходный zero-artifact
-инвариант сохраняется, даже если установленный бинарник повреждён: он не
-исполняется, а удаляется только по фиксированному пути TWebProxy; следующее
-явное включение повторяет полную проверяемую установку. Сторонние установки
-`nfqws` не затрагиваются. Это режимы совместимости для контролируемой
-инфраструктуры, а не обещание универсального обхода фильтрации.
+| Документ | Для чего |
+| :--- | :--- |
+| [Architecture](docs/ARCHITECTURE.md) | Компоненты, маршруты и разделение ответственности |
+| [Roadmap](docs/ROADMAP.md) | Этапы, статус и условия RC |
+| [Security](docs/SECURITY.md) | Секреты, права и границы безопасности |
+| [Testing](docs/TESTING.md) | Лабораторные наборы и пределы тестового покрытия |
+| [Updates](docs/UPDATES.md) | Проверка обновлений, backup и rollback |
+| [Upstream](docs/UPSTREAM.md) | Исходные компоненты и их происхождение |
 
-## TLS и автопродление
+---
 
-- **Caddy** сам выпускает и продлевает сертификаты; manager проверяет публичный сертификат и состояние Caddy.
-- **Nginx + Let's Encrypt** использует Certbot. Manager включает `certbot.timer`, а если системного timer нет — создаёт `twebproxy-cert-renew.timer`.
-- После успешного продления Nginx проходит `nginx -t` и выполняет graceful reload.
-- **Custom certificate** только контролируется; автоматический перевыпуск manager не выполняет.
-- **Manual frontend** полностью оставляет lifecycle сертификата внешнему frontend.
+<details>
+<summary><strong>English — short overview</strong></summary>
 
-`audit` проверяет срок сертификата, strict HTTPS и для managed Nginx сравнивает локальный certificate с реально отдаваемым на `:443`.
+**TWebProxy Manager** is a self-hosted Telegram WEB Proxy manager for Debian/Ubuntu. It combines Caddy/Nginx HTTPS, a real public website, the official \`tproxy-server\`, stock MTProxy, multiple instances/profiles, nftables isolation, diagnostics and verified update workflows.
 
-## Проверенный baseline
+The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The \`main\` branch currently still contains the older **v0.2.9** code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
 
-```text
-Ubuntu 24.04
-Caddy
-https carrier
-official MTProxy
-Telegram Desktop native WEB Proxy
-reboot/autostart: PASS
-```
+See the roadmap and security documentation above before experimenting on a disposable VPS.
 
-Fresh install использует проверенный commit `tproxy-server`:
+</details>
 
-```text
-2873a08806d6e4d84830b9b5c4b0ec0f46af91f8
-```
+<div align="center">
 
-## Изменения по версиям
+**Open source · Self-hosted · Development beta**
 
-### 0.2.9-dpi-beta
+Built around official Telegram components. No claims of invisible traffic, unblockable IPs, or guaranteed DPI circumvention.
 
-- Field Fix 3: исправлена очистка systemd DPI units после STOCK/rollback и добавлена точная stage-диагностика DPI activation.
-- Исправлена propagation-ошибка cleanup nfqws runtime: отказ удаления больше не может завершиться false-success.
-- Версия поднята до `0.2.9`, чтобы штатный `check-update` / `manager-update` видел этот patch как обновление.
-
-### 0.2.8-dpi-beta
-
-- добавлена необязательная IPv4-подсистема совместимости с шестью режимами;
-- сохранён неизменный по умолчанию `STOCK`;
-- состояние и nftables-правила привязаны к точному публичному IPv4;
-- добавлены EN/RU-интерфейс, статус, аудит, repair и диагностический отчёт;
-- добавлены транзакционное переключение, точный откат и безопасный возврат в STOCK;
-- закреплён и атрибутирован `nfqws v72.13` с проверкой SHA-256;
-- добавлено проверяемое provisioning-получение nfqws после relocation/script-only
-  update, не зависящее от сохранения исходной распаковки;
-- исправлена очистка повреждённого TWebProxy-owned nfqws с последующим
-  проверяемым повторным получением;
-- `VERSION=0.2.8` оставлен строгим Stage 4 semver, а beta-label отделён в
-  `MANAGER_RELEASE_VERSION=0.2.8-dpi-beta`.
-
-### 0.2.7
-
-- добавлен certificate lifecycle management;
-- Nginx + Let's Encrypt получил автоматическое продление через Certbot timer;
-- добавлены `cert-status` и `cert-renew`;
-- добавлен безопасный renewal `--dry-run` и явный `--force`;
-- `status` показывает краткое состояние TLS;
-- `audit` проверяет срок сертификата, auto-renew и local/public certificate match;
-- FULL report включает certificate status.
-
-### 0.2.6
-
-- добавлены `check-update` и `manager-update` через GitHub;
-- добавлена проверка `SHA256SUMS` перед self-update;
-- исправлен audit нескольких listener sockets;
-- усилена strict TLS-проверка.
-
-### 0.2.5
-
-- добавлен `audit`;
-- исправлен MTProxy systemd sandbox (`AF_NETLINK`);
-- включён HTTP stats MTProxy;
-- улучшены diagnostic reports и Caddy rollback.
-
-Полная история: [`CHANGELOG.md`](CHANGELOG.md).
-
-## Логи
-
-```text
-/opt/twebproxy-manager/logs/
-```
-
-Полный диагностический архив:
-
-```bash
-sudo twebproxy report
-```
-
-FULL report может содержать WEB/MTProxy secrets. SSH/TLS private keys, `/etc/shadow` и root/sudo credentials не собираются.
+</div>
