@@ -23,12 +23,18 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 MGR="${1:-$ROOT/twebproxy-manager.sh}"
 MGR="$(cd "$(dirname "$MGR")" && pwd -P)/$(basename "$MGR")"
+# Mounts over real installed paths: disposable lab host only (tests/LAB.md).
+source "$ROOT/tests/lib/lab-gate.sh"
+lab_gate_or_exit tg3-installed-manager
 
-# Re-exec inside a mount namespace so the real installed paths are writable
-# tmpfs and nothing escapes to the host.
+# Re-exec inside a private mount namespace so the real installed paths are
+# writable tmpfs and nothing escapes to the host. TG3_INNER alone is no bypass.
 if [[ "${TG3_INNER:-0}" != 1 ]]; then
-  exec env TG3_INNER=1 unshare -m bash "$0" "$MGR"
+  export TG3_PARENT_MNT_NS="$(readlink /proc/self/ns/mnt)"
+  exec env TG3_INNER=1 unshare --mount --propagation private bash "$0" "$MGR"
 fi
+[[ -n "${TG3_PARENT_MNT_NS:-}" && "$(readlink /proc/self/ns/mnt)" != "$TG3_PARENT_MNT_NS" ]] ||
+  { echo 'FAIL tg3: refusing to mount outside a private mount namespace'; exit 1; }
 mkdir -p /usr/local/sbin /opt/twebproxy-manager
 mount -t tmpfs none /usr/local/sbin
 mount -t tmpfs none /opt/twebproxy-manager

@@ -18,15 +18,12 @@ t_bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
 TMP="$(mktemp -d /tmp/tg7-backend.XXXXXX)"; trap 'rm -rf -- "$TMP"' EXIT
 
 # shellcheck source=/dev/null
-source "$MGR"
-# The manager sets `set -Eeuo pipefail` when sourced. This harness checks return
-# codes explicitly, so -e must not abort it on a deliberate non-zero result.
-trap - ERR
-set +e
-BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR/firewall.nft"
+source "$ROOT/tests/stageb/backend-harness.sh"
+backend_harness
 INSTANCES_DIR="$BASE_DIR/instances"
 install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$INSTANCES_DIR"
-systemctl() { return 0; }          # systemd is not the subject of this test
+# Stage B runs the actual generated helper through a behavioral nft/service
+# model. Every original backend isolation assertion below remains unchanged.
 
 backend() { # $1=name $2=client $3=stats ; omit $3 to truncate before MTPROXY_STATS_PORT
   { printf 'MTPROXY_SECRET=%s\n' "$(printf 'a%.0s' {1..32})"

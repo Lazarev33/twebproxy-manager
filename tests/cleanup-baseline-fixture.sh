@@ -60,12 +60,18 @@ declare -F stage4_create_backup stage4_manager_health stage4_rollback_exact >/de
 
 # Stage X-DPI keeps strict Stage 4-compatible machine semver while retaining a
 # separate beta display label. Assert both identities without widening Stage 4.
-actual="$(sha256sum "$PROJECT_ROOT/VERSION" | awk '{print $1}')"
-[[ "$actual" == 283571d2642fc7b3befd294f45d53b896a1d54d34c86235b13151192b380606a ]] \
-  || fail 'Stage X-DPI machine VERSION changed unexpectedly'
-[[ "$MANAGER_VERSION" == 0.2.8 ]] \
-  || fail 'Stage X-DPI embedded machine semver changed unexpectedly'
-[[ "$MANAGER_RELEASE_VERSION" == 0.2.8-dpi-beta ]] \
-  || fail 'Stage X-DPI display release label changed unexpectedly'
+# Pinning the VERSION file's SHA-256 and the literal release number here meant
+# every semver bump silently broke this gate. The invariant that actually
+# matters is that all three identities agree with the one authoritative source.
+# shellcheck source=/dev/null
+source "$PROJECT_ROOT/tests/lib/release-metadata.sh"
+release_metadata_load "$PROJECT_ROOT" \
+  || fail 'Stage X-DPI release metadata could not be read'
+release_metadata_consistent \
+  || fail 'Stage X-DPI release metadata is inconsistent with VERSION'
+[[ "$MANAGER_VERSION" == "$RELEASE_MACHINE_VERSION" ]] \
+  || fail 'Stage X-DPI embedded machine semver disagrees with VERSION'
+[[ "$MANAGER_RELEASE_VERSION" == "$RELEASE_LABEL" ]] \
+  || fail 'Stage X-DPI display release label disagrees with the manager'
 
 printf 'cleanup-baseline-fixture: PASS\n'

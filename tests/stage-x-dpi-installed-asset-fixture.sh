@@ -6,6 +6,7 @@ TMP="$(mktemp -d /tmp/twebproxy-stage-x-dpi-installed.XXXXXX)"
 trap 'rm -rf --one-file-system -- "$TMP"' EXIT
 
 export TWEBPROXY_NO_LOG=1
+export TWEBPROXY_TEST_NFT_JSON_MODEL="$PROJECT_DIR_UNDER_TEST/tests/lib/nft-json-model.sh"
 export TWEBPROXY_UI_LANGUAGE=en
 unset TWEBPROXY_DPI_NFQWS_SOURCE
 
@@ -23,9 +24,14 @@ assert() {
 contains() { grep -Fq -- "$2" "$1"; }
 not_exists() { [[ ! -e "$1" && ! -L "$1" ]]; }
 
+# Release identity comes from the authoritative VERSION file, not a literal.
+# shellcheck source=/dev/null
+source "$PROJECT_DIR_UNDER_TEST/tests/lib/release-metadata.sh"
+release_metadata_load "$PROJECT_DIR_UNDER_TEST"
+
 # Construct a disposable release extraction, install only the manager copies in
 # the same shape as production, and then remove the extraction completely.
-release_dir="$TMP/extracted/TWebProxy-Manager-v0.2.8-dpi-beta"
+release_dir="$TMP/extracted/TWebProxy-Manager-v$RELEASE_LABEL"
 install_root="$TMP/installed-root"
 archive_tree="$TMP/archive-tree/zapret-v72.13"
 good_archive="$TMP/zapret-v72.13.tar.gz"
@@ -55,6 +61,9 @@ LOG_MANAGER_DIR="$LOG_DIR/manager"
 LOG_RUNTIME_DIR="$LOG_DIR/runtime"
 LOG_BUNDLE_DIR="$LOG_DIR/bundles"
 LOG_FULL_DIR="$LOG_DIR/full"
+# install_manager_copy takes the manager update lock (Stage F): keep it in the sandbox.
+install -d -m 0700 "$install_root/run/lock"
+UPDATE_LOCK_FILE="$install_root/run/lock/twebproxy-manager-update.lock"
 install_manager_copy
 
 assert installed_usr_local_manager test -x "$MANAGER_BIN"
@@ -92,6 +101,17 @@ cat > "$DPI_NFT_BIN" <<'NFT_MOCK'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 live="${MOCK_NFT_LIVE:?}"
+if [[ "${1:-}" == -j ]]; then
+  shift; [[ "${1:-}" != -n ]] || shift
+  [[ "${MOCK_NFT_LIST_FAIL:-0}" != 1 ]] || exit 77
+  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
+    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
+    else printf '%s\n' '{"nftables":[]}'; fi
+  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
+    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
+  else exit 2; fi
+  exit
+fi
 if [[ "${1:-}" == -c && "${2:-}" == -f ]]; then
   grep -q '^table ip twebproxy_dpi {' "$3"
 elif [[ "${1:-}" == -f ]]; then
@@ -242,9 +262,11 @@ assert installed_corrupt_full_uninstall_preserves_unrelated_nfqws test \
 assert each_nfqws_mode_and_corrupt_recovery_reacquired test "$(wc -l < "$MOCK_CURL_LOG")" -eq 6
 assert each_nfqws_mode_requested_start test \
   "$(grep -Fc "enable --now $DPI_NFQWS_UNIT" "$SYSTEMCTL_LOG")" -eq 5
-assert machine_VERSION_is_stage4_semver test "$(cat "$PROJECT_DIR_UNDER_TEST/VERSION")" = 0.2.8
-assert machine_VERSION_parser_accepts valid_manager_version "$(cat "$PROJECT_DIR_UNDER_TEST/VERSION")"
-assert display_release_label_preserved test "$MANAGER_RELEASE_VERSION" = 0.2.8-dpi-beta
+# Asserted against the authoritative VERSION file rather than a literal, so a
+# semver bump does not silently break this gate (see tests/lib/release-metadata.sh).
+assert machine_VERSION_is_stage4_semver release_metadata_consistent
+assert machine_VERSION_parser_accepts valid_manager_version "$RELEASE_MACHINE_VERSION"
+assert display_release_label_preserved test "$MANAGER_RELEASE_VERSION" = "$RELEASE_LABEL"
 
 printf 'PASS total=%s mandatory_skips=0\n' "$pass"
 printf 'stage-x-dpi-installed-asset-fixture: PASS\n'

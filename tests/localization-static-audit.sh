@@ -69,6 +69,8 @@ while IFS= read -r sample; do
 done < <({
   sed -nE 's/.*\b(log|ok|warn|die|ask|yesno|choose)[[:space:]]+"([^"\\]*(\\.[^"\\]*)*)".*/\2/p' "$SCRIPT"
   sed -nE "s/.*\\b(log|ok|warn|die|ask|yesno|choose)[[:space:]]+'([^']*)'.*/\\2/p" "$SCRIPT"
+  # Stage F: refusals print UPDATE_REFUSED and then go through die.
+  sed -nE 's/.*\bstage4_update_refuse[[:space:]]+[a-z-]+[[:space:]]+"([^"\\]*(\\.[^"\\]*)*)".*/\1/p' "$SCRIPT"
 } | sort -u)
 (( audited >= 200 )) || fail "too few presentation call-sites audited: $audited"
 

@@ -63,3 +63,11 @@ fetch -> go test -> build candidate -> config check all instances
 ```
 
 MTProxy is separately pinned; it is not silently advanced together with relay.
+
+Manager self-update (`manager-update`, [UPDATES.md](UPDATES.md)):
+
+```text
+lock -> staging -> helper/preflight -> latest stable release -> trust
+(signed manifest or operator SHA-256) -> download + verify -> verified backup
+-> install both copies -> bounded health -> success | unchanged | exact rollback
+```

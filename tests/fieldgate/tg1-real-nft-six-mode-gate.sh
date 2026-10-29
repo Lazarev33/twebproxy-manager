@@ -10,11 +10,16 @@
 # host's REAL nft, exactly as production line "nft -c -f" does. No mock, no
 # grep, no regex substitute.
 #
+# It talks to the running kernel, so it runs only on a disposable lab host
+# (tests/LAB.md); everywhere else it is NOT_EXECUTED, never PASS.
+#
 # Usage: tg1-real-nft-six-mode-gate.sh [path/to/twebproxy-manager.sh]
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 MGR="${1:-$ROOT/twebproxy-manager.sh}"
+source "$ROOT/tests/lib/lab-gate.sh"
+lab_gate_or_exit tg1-real-nft
 SCOPE_IP=203.0.113.10
 MODES=(stock window1152 mss88 nfqws window1152_nfqws mss88_nfqws)
 

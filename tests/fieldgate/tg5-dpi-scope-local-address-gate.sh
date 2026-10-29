@@ -18,6 +18,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 MGR="${1:-$ROOT/twebproxy-manager.sh}"
+export TWEBPROXY_TEST_NFT_JSON_MODEL="$ROOT/tests/lib/nft-json-model.sh"
 pass=0; fail=0
 t_ok()  { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
 t_bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
@@ -32,6 +33,16 @@ cat > "$TMP/bin/nft" <<'MOCK'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 live="${MOCK_NFT_LIVE:?}"
+if [[ "${1:-}" == -j ]]; then
+  shift; [[ "${1:-}" != -n ]] || shift
+  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
+    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
+    else printf '%s\n' '{"nftables":[]}'; fi
+  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
+    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
+  else exit 2; fi
+  exit
+fi
 if [[ "${1:-}" == -c && "${2:-}" == -f ]]; then grep -q '^table ip twebproxy_dpi {' "$3"
 elif [[ "${1:-}" == -f ]]; then cp "$2" "$live"
 elif [[ "${1:-}" == list ]]; then [[ -s "$live" ]] || exit 1; cat "$live"

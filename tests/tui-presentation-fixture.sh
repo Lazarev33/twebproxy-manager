@@ -63,7 +63,14 @@ tcore_add_check anti_dpi.mode DISABLED info global configuration STOCK STOCK 'ST
 tcore_add_check evidence.redaction OK info global systemd configured configured 'Secret evidence is redacted' none '' "-S $FIXTURE_SECRET"
 tcore_finalize
 tui_render_dashboard > "$TMP/dashboard.txt"
-grep -q '^TWebProxy Manager v0.2.8-dpi-beta$' "$TMP/dashboard.txt"
+# The banner is checked against the authoritative release metadata, not against
+# the manager's own constant - the dashboard is rendered FROM that constant, so
+# comparing the two would be tautological and could never fail.
+# shellcheck source=/dev/null
+source "$ROOT/tests/lib/release-metadata.sh"
+release_metadata_load "$ROOT"
+release_metadata_consistent
+grep -q "^TWebProxy Manager v$RELEASE_LABEL\$" "$TMP/dashboard.txt"
 grep -q '^Language$' "$TMP/dashboard.txt"; grep -q '^  English$' "$TMP/dashboard.txt"
 grep -q '^fixture.example' "$TMP/dashboard.txt"; grep -q '\[ERROR\]' "$TMP/dashboard.txt"
 ! grep -q 'Anti-DPI' "$TMP/dashboard.txt"
