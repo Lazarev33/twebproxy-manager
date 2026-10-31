@@ -1,10 +1,10 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-29. This document tracks **planned work**, not production release status.
+Updated: 2026-10-31. This documents actual development checkpoints and remaining RC gates.
 
-## Repository publication update
+## Repository publication and evidence
 
-> **Repository publication update — 2026-10-29:** The `main` source now targets **v0.2.22-beta Stage H** (development only). The independent Pre-RC campaign found blocking P1 defects in firewall lifecycle, offline-rollback truthfulness and local MTProxy secret exposure. This is not a production release. The older per-stage notes below are historical and may describe earlier GitHub publication status.
+GitHub `main` now contains **v0.2.25-beta** with `bridge/`, `sites/` and the Bridge TUI refusal correction; it is development source, not a stable Release. The focused v0.2.24 backend isolation/procfs P1 fixes were accepted independently for their scope; v0.2.23 was rejected. Bridge Gate 1 was CONDITIONAL GO, Gate 2 CONDITIONAL ACCEPTANCE (17 PASS / 0 FAIL / 8 NOT_EXECUTED). Gate 3 includes a public test site/TLS and operator-reported iOS 13.1.2 connection with server-side corroboration, not independent end-to-end file integrity proof or full client acceptance.
 
 ## Product goal
 
@@ -18,28 +18,19 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 
 ## Current checkpoints and release status
 
-| Checkpoint | Status | Notes |
+| Stage | Status | Remaining limitations |
 | --- | --- | --- |
-| v0.2.9 (`main`) | Published code baseline | Still the source shown on `main`; not the latest accepted development checkpoint |
-| v0.2.10 Stage A | Development completed | DPI state/isolation model improvements |
-| v0.2.11 Stage A.1 | Development checkpoint | Real nft and ENOSPC gates remain |
-| v0.2.12 Stage B | Superseded by B.1 | Backend firewall and isolated test corrections |
-| v0.2.13 Stage B.1 | Development checkpoint | Permission/test safety corrections; privileged gates outstanding |
-| v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | State, profile and port integrity |
-| v0.2.15 Stage C1.1 | Superseded by C1.2 | Backend stop and orphan-repair corrections |
-| v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
-| v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
-| v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
-| v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
-| v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
-| v0.2.21 Stage G | **Codex ACCEPTED_WITH_BACKLOG (real Linux)** | RED Stage F 6 expected failures; Stage G oracle 18/18 PASS; real update/rollback/flock/SIGKILL/ENOSPC, Nginx & limited systemd PASS; 2 reproducible P1 in backlog, no confirmed P0; source ZIP/Git bundle not yet published to a branch |
-| v0.2.22 Stage H | **DEVELOPMENT_ACCEPTED (model checks)** | Independent 98/98 Stage H UX PASS, 687/687 Git tree, RU/EN, guided setup and safer network-mode explanations; still untested real TLS/clients; GitHub source branch not yet published |
-| v0.2.23 pre-RC corrections | **Development complete (awaits independent acceptance)** | Owned nftables guard held by twebproxy-firewall (survives nftables.service flush; no stop cascade), RESTORE_PARTIAL/exit 3, procfs hidepid policy, truthful DPI failure + kernel consistency, bounded Caddy certificate wait, clean core-uninstall; RED on v0.2.22 / GREEN on real Linux; not an RC |
-| Pre-RC integration | **NEXT — tests and two P1 fixes required** | Disposable real Linux, nft/systemd, Caddy/Nginx/ACME, genuine clients, source publication, signed artifact provenance and readiness criteria |
+| v0.2.9–v0.2.22 / A–H | Historical development | Stage H 98/98 model UX checks |
+| v0.2.23 | REJECTED | Two reproduced P1 issues |
+| v0.2.24 | FOCUSED ACCEPTANCE | Both P1 corrections, not full RC |
+| Bridge Gate 1 | CONDITIONAL GO | Two-VPS WG/TCP and server protocol |
+| Bridge Gate 2 | CONDITIONAL ACCEPTANCE | 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
+| Gate 3 / v0.2.25 | DEVELOPMENT SOURCE IN MAIN | Default site, Bridge and operator-reported iOS test |
+| Bridge menu fix | LOCAL REGRESSION PASS | Not confirmed deployed on RU Entry |
+| Smart Defaults / TUI | NEXT TASK | Automated safe choices and presets; not in 0.2.25 |
+| RC / stable Release | NOT AUTHORIZED | Platform/client matrix, cold boot, security, verified distribution |
 
-**Current activity: RC integration / pre-release validation.** Stage H has been independently accepted as a development checkpoint, not a production release. The previous Codex Stage G findings P1-G-01 and P1-INHERITED-01 remain open before RC.
-
-All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+Current tasks: complete Gate 3 acceptance, implement guided UI without breaking local/Bridge modes, and separately validate release readiness. See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
 
 ## Non-negotiable engineering constraints
 
@@ -53,21 +44,15 @@ All development checkpoints are **not authorized for production deployment**. Th
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: integrated pre-RC validation
+## Immediate work: Bridge Gate 3, TUI and RC
 
-**Stage H v0.2.22-beta DEVELOPMENT_ACCEPTED** after independently rerunning the Stage H suite: 98/98 model UX assertions, 0 failures, static heredoc guard PASS, RU/EN catalog PASS, exact Git source tree 687/687 and unchanged updater/protected function hashes. First-run/quick/advanced workflows, DNS refusal, cancel/EOF, site/TLS choices, client help, status hints, main-menu routing and Anti-DPI risk explanations are implemented.
+Actual Bridge route: RU HTTPS front end → tproxy-server → loopback TCP forwarder → WireGuard → private stock MTProxy on Foreign Exit → Telegram DC. The website and one client link remain on RU Entry. The local single-VPS mode is retained.
 
-**Scope is complete for A/B/C/D/E/F/G/H development, not yet proven for production.** Real Telegram clients and a production-like public HTTPS site have not been tested. Current quick setup can use a temporary placeholder, supplied static directory or local upstream; it does not implement a website builder.
+Next: verify clean installs, two-host cold boot, safe recovery and removal, TLS/renewal, external backend exposure, supported clients including Desktop and non-tested OS/CPU combinations. Keep synthetic protocol evidence distinct from genuine application tests and operator reports.
 
-**Confirmed P1 gates before production RC:**
-- `P1-G-01`: offline restore may return `RESTORE_SUCCESS` / exit 0 despite failure to replace `global.env` version metadata.
-- `P1-INHERITED-01`: stock MTProxy uses a `-S` secret in argv; local users may read `/proc/<pid>/cmdline` on permissive procfs.
+Smart Defaults is a separate future stage: inventory technical TUI prompts, replace avoidable input with safe defaults/presets, retain Advanced mode and explicit security/destructive approvals. Do not change the existing six DPI modes or automatically select aggressive modes.
 
-**Development incident note:** During Stage H creation, unquoted heredoc help text containing backticks caused several noninteractive calls to the host's installed manager, leaving 18 log files. Host canary found no service/configuration changes. The final help text no longer executes commands and a static guard and dynamic sentinel tripwire check cover this.
-
-**RC acceptance plan:** privileged disposable VM tests for nftables and systemd; genuine Caddy/Nginx with ACME and a public site over 80/443; end-to-end Telegram Desktop and mobile client connections; stock and targeted Anti-DPI behavior checks across controlled networks; trust bootstrap and an actually signed release; failure/recovery behavior and closure or explicitly approved mitigations of both P1. Record exact real vs model coverage, failures and NOT_EXECUTED truthfully. A failed test does not automatically require a new development stage unless it exposes a material blocker.
-
-**GitHub source publication remains incomplete.** The verified history.bundle includes Stage D–H, but `main` remains v0.2.9 and no remote accepted source branches have been verified. Publish exact approved source commits to separate dev branches before release readiness; do not claim that README/roadmap changes published code, do not push to `main`, force-push or create a release.
+Do not conflate a GitHub development source commit with a stable signed Release or trusted automatic update. Prior accepted P1 corrections need a new reproducer before reopening.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
@@ -109,20 +94,11 @@ Create an evidence-backed **research / design gate before implementation**. Do n
 
 Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
 
-## Public website / Decoy Site Manager — dedicated future stage
+## Website: bundled default and future Site Manager
 
-Bring the original product idea back: a real, maintainable HTTPS website on the same hostname as the WEB bridge rather than the current generic “Gateway / The service is online” page.
+**Implemented:** `sites/podmoskovye/` provides the fixed default «Культурные маршруты Подмосковья»; Quick Setup uses it, and repair preserves edited deployed sites. Custom directories and loopback upstream sites remain available. [DEFAULT-SITE.md](bridge-gate3/DEFAULT-SITE.md).
 
-Candidate supported modes:
-1. **Generated real site:** user-selected title, purpose, pages, content, assets, favicon, styling and basic accessibility; sensible template defaults, not an identical fingerprinted placeholder across hosts.
-2. **Upload owned site:** HTML/CSS/JS/assets with path, ownership, symlink and content checks; publish transactionally.
-3. **Use existing website:** explicit reverse proxy to user-managed `public_upstream` without disrupting routes or TLS.
-4. **Authorized snapshot:** import only the operator's own website or content with permission; avoid deceptive copying of third-party branding.
-5. **Redirect:** secondary/manual mode only; warn that it is not an equivalent public site and may impair bridge behavior.
-
-Technical requirements: never expose relay secrets or local ports, validate/candidate-publish web configuration, keep a working site when edits fail, preserve user-managed files and Caddy/Nginx blocks, keep WEB transport paths compatible, and test base-path routing separately. The site's existence alone does not guarantee censorship resistance or transport indistinguishability.
-
-UI: website creation and maintenance belong in quick setup and per-site management, with preview, certificate/status view, undo and clear failure messages.
+**Future:** templates, upload/edit, backup and per-site lifecycle beyond the fixed bundle. HTML does not hide IP, SNI or TLS characteristics or guarantee DPI bypass.
 
 ## Release candidate and v1.0 gates
 
