@@ -1,121 +1,95 @@
-# Bridge Gate3 development checkpoint — 0.2.25-beta
-
-Continue from accepted Gate2 commit `3375c4a9d5057bab453ce3fdc41b688a06b6ab77`.
-Use the complete verified distribution, including `bridge/` and `sites/`.
-The normal default site is now «Культурные маршруты Подмосковья».
-See [Gate3 operations](docs/bridge-gate3/OPERATIONS.md),
-[default website](docs/bridge-gate3/DEFAULT-SITE.md), and
-[client validation](docs/bridge-gate3/CLIENT-VALIDATION.md).
-No GitHub main push or release is authorized by this checkpoint.
-
-The historical base documentation follows.
-
-<div align="center">
-
 # TWebProxy Manager
 
-**Telegram WEB Proxy на своём сервере. Настоящий HTTPS, понятное управление.**
+Telegram WEB Proxy Manager for Debian/Ubuntu: HTTPS, обычный сайт и управляемый прокси на одном домене. **GitHub `main` — v0.2.25-beta (development, не stable Release / production).**
 
-Самостоятельное размещение · Несколько доменов и профилей · Caddy / Nginx · RU / EN
+[Архитектура](#как-это-работает) · [Установка](#начало-работы) · [Команды](#управление) · [Bridge](docs/bridge-gate3/OPERATIONS.md) · [Статус](#статус-и-известные-риски)
 
-![Platform](https://img.shields.io/badge/platform-Debian%20%7C%20Ubuntu-252a34?style=flat-square)
-![Shell](https://img.shields.io/badge/Bash-Linux-353b48?style=flat-square)
-![Version](https://img.shields.io/badge/latest%20checkpoint-v0.2.22--beta-3673ba?style=flat-square)
-![Status](https://img.shields.io/badge/status-pre--RC%20testing-e7a53b?style=flat-square)
+В исходники входят `bridge/` и `sites/`; не устанавливайте один отдельно скачанный Bash-файл. Исправления P1 версии 0.2.24 прошли отдельную целевую проверку, а не полную RC-приёмку.
 
-[Возможности](#возможности) · [Как работает](#как-это-работает) · [Начало работы](#начало-работы) · [Команды](#управление) · [FAQ](#faq--частые-вопросы-и-ошибки) · [Статус разработки](#статус-и-известные-риски)
+## Зачем нужен
 
-</div>
+TWebProxy использует официальный `tproxy-server` и stock MTProxy, Caddy/Nginx, systemd и nftables. Это **Telegram WEB Proxy**, не VPN общего назначения и не VLESS/Xray.
 
----
-
-> [!WARNING]
-> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В `main` теперь опубликован **v0.2.22-beta (Stage H)**. Публикация исходников не означает исправления подтверждённых P1 и не является production-релизом. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с `nftables.service`. Не используйте эту версию как подтверждённый безопасный production-релиз.
-
-## Зачем нужен TWebProxy
-
-TWebProxy Manager — Bash-менеджер для собственного **Telegram WEB Proxy** на Debian/Ubuntu. Он объединяет веб-фронтенд с обычным HTTPS, Telegram relay, штатный MTProxy, сертификаты, профили, firewall и диагностику.
-
-**Это именно WEB Proxy**, а не VLESS/Xray, VPN-туннель или замена Telegram-клиента. Основа — [официальный tproxy-server](https://github.com/telegramdesktop/tproxy-server) и [stock MTProxy](https://github.com/TelegramMessenger/MTProxy).
-
-### Возможности
-
-| 🌐 HTTPS и сайт | 🔑 Пользователи и профили |
-| :--- | :--- |
-| Caddy или Nginx; Let's Encrypt или собственный сертификат; обычный сайт на том же hostname | Несколько инстансов, независимые профили и secret, ротация доступа |
-| **🛡️ Изоляция и диагностика** | **🧰 Обслуживание** |
-| nftables, проверка портов и служб, диагностика TLS, безопасные отчёты | Проверяемое обновление, локальный backup, откат, управление службами |
-
-В **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками.
+Два режима: **локальный** (один VPS с MTProxy) и **Bridge** (RU Entry принимает HTTPS, Foreign Exit выполняет MTProxy через WireGuard). Пользователь подключается только к RU-домену. Стандартный сайт — встроенные **«Культурные маршруты Подмосковья»** из `sites/podmoskovye/`. Пользовательские статические сайты и локальные приложения поддерживаются.
 
 ## Как это работает
 
+### Bridge: RU Entry → Foreign Exit
+
 ```mermaid
 flowchart TB
-    A["Telegram · WEB Proxy"] -->|"HTTPS / WebSocket :443"| B["Caddy / Nginx"]
-    U["Обычный браузер"] -->|"HTTPS :443"| B
-    B -->|"Сайт / приложение"| W["Публичный сайт"]
-    B -->|"WEB Proxy endpoint"| R["tproxy-server · loopback"]
-    R --> M["MTProxy · stock"]
-    M --> T["Telegram network"]
-
-    classDef public fill:#e9f3ff,stroke:#528ed1,color:#19395c;
-    classDef internal fill:#f2f4f7,stroke:#a5aeba,color:#252a32;
-    class A,U,B public;
-    class W,R,M,T internal;
+    TG["Telegram · WEB Proxy"] -->|"HTTPS / WebSocket :443"| CADDY
+    BROWSER["Обычный браузер"] -->|"HTTPS :443"| CADDY
+    subgraph RU["RU Entry VPS"]
+        CADDY["Caddy / Nginx"]
+        SITE["Обычный сайт"]
+        RELAY["tproxy-server"]
+        FWD["TCP forwarder · loopback"]
+        WGR["WireGuard · Entry peer"]
+        CADDY -->|"Сайт"| SITE
+        CADDY -->|"WEB Proxy route"| RELAY
+        RELAY -->|"Локальный TCP"| FWD
+        FWD --> WGR
+    end
+    subgraph EXIT["Foreign Exit VPS"]
+        WGE["WireGuard · Exit peer"]
+        MT["stock MTProxy · private"]
+        WGE --> MT
+    end
+    WGR <-->|"Зашифрованный туннель"| WGE
+    MT --> DC["Telegram DC"]
 ```
 
-Запросы к сайту обслуживаются как обычный HTTPS. WEB Proxy проходит через отдельный маршрут к relay и MTProxy. Backend не должен быть доступен напрямую из интернета — именно поэтому проверка firewall входит в обязательные предрелизные испытания.
+Клиент получает **одну секретную ссылку на RU-домен**. Зарубежная нода не является вторым публичным endpoint. Менеджер устанавливает и обслуживает Bridge через проверенный SSH. Для присоединённого инстанса локальный MTProxy выключается после безопасного переключения, остальные инстансы остаются локальными.
+
+### Один VPS — обычный режим
+
+```text
+Telegram WEB client ──HTTPS/WSS :443──> Caddy/Nginx
+                                       ├── / → сайт
+                                       └── WEB route → tproxy-server
+                                                        → stock MTProxy (локально)
+                                                        → Telegram DC
+```
+
+В односерверном режиме нет WireGuard и зарубежного VPS. Подробности: [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Начало работы
 
-**Требования:** Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, доменное имя с правильной DNS `A`-записью. Для HTTPS нужен TCP 443, для автоматических сертификатов обычно также TCP 80.
+Базовые требования: Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, DNS `A`, TCP 443 и обычно TCP 80 для ACME. **Bridge реально проверялся только** на Ubuntu 26.04 x86_64 (RU Entry) и Ubuntu 24.04 x86_64 (Exit).
 
-Для **отдельной тестовой VM**:
+На отдельной тестовой VM:
 
 ```bash
 git clone https://github.com/Lazarev33/twebproxy-manager.git
 cd twebproxy-manager
-chmod +x twebproxy-manager.sh
-sudo ./twebproxy-manager.sh
+sha256sum -c SHA256SUMS
+sudo ./twebproxy-manager.sh menu
 ```
 
-> [!IMPORTANT]
-> Эта команда получает опубликованный **v0.2.22-beta из `main`**. Это всё ещё тестовая версия с известными P1; проверяйте `VERSION`, Git-коммит и результаты тестов до установки. Не запускайте на production VPS.
-
-### Рекомендуемый сценарий в v0.2.22-beta
-
-```text
-1. Выбрать язык → RU / EN
-2. Быстрая настройка → hostname
-3. Выбрать сайт → временная страница, static или local app
-4. HTTPS → Caddy (рекомендуется)
-5. Сетевой режим → STOCK
-6. Проверить план → подтвердить
-7. Получить Telegram WEB Proxy ссылки
-```
-
-Реальный сайт на том же hostname можно подключить из статического каталога или локального приложения. **Конструктора сайтов пока нет.**
+Выберите язык, домен, встроенный сайт, TLS/Caddy, проверьте план и подтвердите. Для Bridge откройте **Foreign Nodes → Add Foreign Node**, укажите зарубежный VPS и SSH-доступ, **независимо проверьте отпечаток ED25519 host key** и подтвердите установку. В текущем MVP — одна зарубежная нода и один профиль Bridge-инстанса. Не публикуйте секреты подключения.
 
 ## Управление
 
-Основные команды для checkpoint v0.2.22 (после установки менеджера в систему):
-
 ```bash
-sudo twebproxy                   # Интерактивное меню
-sudo twebproxy add               # Создать инстанс
-sudo twebproxy list              # Список инстансов
-sudo twebproxy show HOST         # Ссылки для Telegram (содержат secret)
-sudo twebproxy status HOST       # Краткое состояние
-sudo twebproxy diagnose HOST     # Диагностика
-sudo twebproxy audit HOST        # Проверка конфигурации и изоляции
-sudo twebproxy repair HOST       # Восстановление конфигурации
-sudo twebproxy cert-status HOST  # Проверка сертификата
-sudo twebproxy profile-list HOST # Профили
-sudo twebproxy dpi list-methods  # Сетевые режимы
+sudo twebproxy                                # Меню
+sudo twebproxy add                            # Создать инстанс
+sudo twebproxy list                           # Список
+sudo twebproxy status HOST                    # Статус
+sudo twebproxy diagnose HOST                  # Диагностика
+sudo twebproxy audit HOST                     # Проверка изоляции
+sudo twebproxy repair HOST                    # Ремонт
+sudo twebproxy show HOST                      # Профили (возможен вывод secrets)
+sudo twebproxy connection-link HOST default   # Одна tg://webproxy ссылка (secret)
+sudo twebproxy foreign-node add               # Автоматически добавить Exit
+sudo twebproxy foreign-node status            # Статус Bridge
+sudo twebproxy foreign-node diagnose          # Диагностика Bridge
+sudo twebproxy foreign-node repair            # Восстановление Bridge
+sudo twebproxy foreign-node remove            # Удаление / возврат локального MTProxy
+sudo twebproxy dpi list-methods               # Режимы сети
 ```
 
-Для машинного вывода есть `--json` и `--raw`; для отключения цветовых последовательностей — `--no-color`. Ссылки WEB Proxy и secret не публикуйте в логах, issue и скриншотах.
+Обновления Manager и операции изменения профилей ограничены, пока Bridge подключён. [Инструкции Gate 3](docs/bridge-gate3/OPERATIONS.md).
 
 ## Совместимость сети / Anti-DPI
 
@@ -151,7 +125,7 @@ curl -fsSL https://raw.githubusercontent.com/Lazarev33/twebproxy-manager/main/SH
 
 Должна быть одна строка с 64-символьным SHA-256 и именем **без** `./`. Если CDN ещё возвращает старый файл, проверьте его снова позднее; не отключайте проверку хеша. Другая ошибка, `SHA-256 manager candidate не совпал с SHA256SUMS`, означает именно несоответствие содержимого — не устанавливайте такой файл.
 
-> Примечание: v0.2.22-beta в `main` — **не стабильный подписанный релиз**. Корректная контрольная сумма сама по себе не делает эту версию безопасной для production.
+> Примечание: v0.2.25-beta в `main` — **не стабильный подписанный релиз**. Корректная контрольная сумма сама по себе не делает эту версию безопасной для production.
 
 </details>
 
@@ -211,39 +185,36 @@ sha256sum /usr/local/sbin/twebproxy \
 
 `main` — ветка разработки, а не GitHub Release. Начиная с Stage F, новый updater принимает только подходящий опубликованный стабильный Release и требует доверенную подпись либо независимо полученный оператором SHA-256. Старый v0.2.9 использует другой механизм проверки `SHA256SUMS`. Эти два механизма не следует смешивать.
 
-На данный момент **v0.2.22-beta опубликована как код для разработки**, а не как безопасный автоматический production-update. Подробности — [UPDATES.md](docs/UPDATES.md).
+На данный момент **v0.2.25-beta опубликована как код для разработки**, а не как безопасный автоматический production-update. Подробности — [UPDATES.md](docs/UPDATES.md).
 
 </details>
 
 ## Статус и известные риски
 
 | Этап | Состояние |
-| :--- | :--- |
-| Stage A–H | Разработка завершена; Stage H независимо проверен как development checkpoint |
-| Linux-интеграция | Проверялись реальные обновления, откаты, systemd, nftables, Nginx и Caddy/ACME |
-| Предрелизная готовность | **BLOCKED** — подтверждённые дефекты ещё не исправлены |
-| Production release | **Не опубликован** |
+| --- | --- |
+| Stage H / v0.2.22 | Исторический принятый UX checkpoint |
+| v0.2.23 | Отклонён: два воспроизведённых P1 |
+| v0.2.24 | Оба P1 исправлены, целевая приёмка пройдена; ещё не RC |
+| Gate 1 | CONDITIONAL GO: два VPS, WireGuard, MTProxy, server-side protocol |
+| Gate 2 | CONDITIONAL ACCEPTANCE: 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
+| v0.2.25 / Gate 3 | Источники опубликованы в `main`, HTTPS/сайт/Bridge испытаны на тестовых VPS |
+| Bridge TUI correction | Повторное добавление ноды не должно закрывать всё меню; локальные регрессии PASS, развёртывание коррекции на RU Entry не подтверждено |
+| Smart Defaults / UI | Следующий этап, не входит в v0.2.25 |
+| Stable Release / полный RC | Не выпущен |
 
-**Открытые проблемы перед RC:**
+Оператор сообщил об успешной работе **Telegram для iOS 13.1.2** через RU-домен: сообщения, фото, видеосообщения, крупный файл, восстановление после потери сети и Wi-Fi/LTE. Серверные счётчики подтверждают активность, но не было независимой проверки содержимого файла по хешу. **Telegram Desktop и другие клиенты — NOT_EXECUTED** в этом испытании. Подробности — [CLIENT-VALIDATION.md](docs/bridge-gate3/CLIENT-VALIDATION.md).
 
-1. **Firewall / P1:** операции с `nftables.service` могут удалять правила изоляции backend или останавливать обе ноды.
-2. **Rollback / P1:** при отказе записи `global.env` возможно ложное сообщение об успешном восстановлении.
-3. **Локальные секреты / P1:** stock MTProxy передаёт `-S` в аргументах процесса, видимых некоторым локальным пользователям.
-4. **DPI / P2:** после ENOSPC сохранённое состояние и реальная таблица ядра могут расходиться.
-
-**Корректирующий checkpoint v0.2.23-beta (разработка, ожидает независимой проверки)** закрывает пункты 1–4 в коде: таблица-guard с флагом `owner`, которую держит служба `twebproxy-firewall` (её не удаляет `flush ruleset` из `nftables.service`; остановка nftables больше не останавливает прокси), `RESTORE_PARTIAL` с кодом 3 вместо ложного успеха, политика procfs `hidepid=invisible` (команда `twebproxy proc-hardening`), правдивые сообщения DPI и сверка с ядром в `dpi status`. Проверено на реальном тестовом Linux (RED на v0.2.22 → GREEN); это не RC и не production-релиз.
-
-**Корректирующий checkpoint v0.2.24-beta (разработка, ожидает независимой проверки)** закрывает два P1 из отклонённой приёмки v0.2.23: изоляция backend MTProxy теперь держится cgroup-фильтром сокетов PID 1 (`IPAddressDeny=any` + разрешены только loopback и сети DC Telegram), который не зависит от процесса-владельца nftables guard и порядка переходов systemd; backend не запускается и останавливается, если эффективный `/proc` раскрывает командные строки, а оператор явно не принял риск (`twebproxy proc-hardening disable`). Это не RC и не production-релиз.
-
-Сценарии с реальными клиентами Telegram и подписанным GitHub-релизом также ещё требуют отдельной проверки. **Не воспринимайте успешные модельные тесты как доказательство production-ready.**
-
-Полная история и план исправлений — в [ROADMAP](docs/ROADMAP.md).
+Холодная перезагрузка двух серверов, более широкая совместимость, безопасность и полная приёмка RC остаются открытыми. Ни работа сайта, ни эти тесты не гарантируют обход DPI.
 
 ## Документация
 
 | Документ | Для чего |
 | :--- | :--- |
-| [Architecture](docs/ARCHITECTURE.md) | Компоненты, маршруты и разделение ответственности |
+| [Architecture](docs/ARCHITECTURE.md) | Локальная и двухсерверная схемы, процессы и границы доверия |
+| [Bridge Gate 3](docs/bridge-gate3/OPERATIONS.md) | Установка, управление и диагностика ноды |
+| [Client validation](docs/bridge-gate3/CLIENT-VALIDATION.md) | Реальная проверка Telegram и её ограничения |
+| [Default website](docs/bridge-gate3/DEFAULT-SITE.md) | Встроенный сайт и сохранение правок |
 | [Roadmap](docs/ROADMAP.md) | Этапы, статус и условия RC |
 | [Security](docs/SECURITY.md) | Секреты, права и границы безопасности |
 | [Testing](docs/TESTING.md) | Лабораторные наборы и пределы тестового покрытия |
@@ -255,11 +226,7 @@ sha256sum /usr/local/sbin/twebproxy \
 <details>
 <summary><strong>English — short overview</strong></summary>
 
-**TWebProxy Manager** is a self-hosted Telegram WEB Proxy manager for Debian/Ubuntu. It combines Caddy/Nginx HTTPS, a real public website, the official `tproxy-server`, stock MTProxy, multiple instances/profiles, nftables isolation, diagnostics and verified update workflows.
-
-The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The `main` branch now contains the **v0.2.22-beta** development code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
-
-See the roadmap and security documentation above before experimenting on a disposable VPS.
+TWebProxy Manager **v0.2.25-beta** is a development checkpoint. It supports single-VPS local MTProxy and managed **RU Entry → WireGuard → Foreign Exit** mode with one RU-facing Telegram WEB Proxy link. A static default website ships with the source. Gate 3 includes operator-reported iOS tests but not full platform/client/RC acceptance. GitHub main is not a stable Release.
 
 </details>
 
