@@ -7,8 +7,9 @@ Updated: 2026-10-31. This document tracks **development checkpoints, active work
 - **GitHub `main` source remains v0.2.22-beta Stage H** as of this roadmap revision. Documentation updates do not publish later implementation code.
 - **v0.2.24-beta** is an independently **ACCEPTED focused correction** for the two reproduced v0.2.23 P1 security defects (nftables/guard loss backend exposure; MTProxy argv/procfs protection on failure). Accepted *for this correction scope*, **not RC- or production-ready**. Exact handoff commit: `83e001ed49bfe210dc4d79aaccd15d72e406045d`. Its source is in verified handoff artifacts, not `main`.
 - **Bridge Gate 1: CONDITIONAL GO.** A genuine two-disposable-VPS lab passed WireGuard/TCP transport, a 4 MiB integrity transfer, stock MTProxy protocol/authentication, a server-side Telegram DC response and recovery checks. **A genuine WEB-capable Telegram client has not yet been tested**; neither censorship resistance nor user-facing operation is established by synthetic probes.
-- **Bridge Gate 2: IN PROGRESS with Codex.** Automated SSH provisioning and Manager integration are under implementation and real-host debugging. Observed individual deployment, repair and removal runs are *not* a final independent Gate 2 acceptance; wait for the final self-contained ZIP and evidence before declaring completion.
-- Keep production/live VPS isolated. Work on explicitly authorized disposable systems; do not automatically merge, install, release, or replace the original single-VPS mode.
+- **Bridge Gate 2: CONDITIONAL ACCEPTANCE.** The complete Gate 2 handoff records 17 PASS, 0 FAIL, 8 NOT_EXECUTED for automated SSH provisioning and managed Bridge lifecycle. Genuine Telegram-client operation and full clean-install acceptance remain unverified. The implementation is not in GitHub `main`.
+- **Bridge Gate 3: IN PROGRESS.** A separate v0.2.25-beta was observed on the authorized Russian Entry test VPS. Real TLS/site and server-side probes do not establish genuine end-user Telegram operation. A reproduced interactive Bridge duplicate-add error (return to shell instead of the menu) is under targeted correction. Gate 3 is not finally accepted.
+- Keep production/live VPS isolated. Work on explicitly authorized test systems; do not automatically merge, install, release, or replace the original single-VPS mode.
 
 ## Product goal
 
@@ -41,11 +42,11 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.23 pre-RC | **REJECTED — superseded** | Focused independent testing reproduced two security P1 defects; do not use as accepted baseline |
 | v0.2.24 pre-RC correction | **FOCUSED P1 ACCEPTED** | Independent disposable-Linux acceptance of both corrections; other release/client/platform checks remain pending; code not published to `main` |
 | Bridge Gate 1 — network PoC | **CONDITIONAL GO** | Real two-VPS transport and MTProxy protocol proven; genuine Telegram WEB client NOT_EXECUTED |
-| Bridge Gate 2 — automated provisioning | **IN PROGRESS** | Remote SSH setup, entry/exit orchestration, integration, repair/removal and failure tests underway; not accepted yet |
-| Client-validation stage after Gate 2 | **PLANNED** | One RU-facing client link, real Telegram test, valid ACME TLS and small static RU website |
+| Bridge Gate 2 — automated provisioning | **CONDITIONAL ACCEPTANCE** | 17 PASS / 0 FAIL / 8 NOT_EXECUTED; automatic SSH provisioning and lifecycle tested on two VPSs; not in `main` |
+| Bridge Gate 3 — client/site/TLS validation | **IN PROGRESS** | Single RU-facing link, actual Telegram client, ACME TLS, default static website and TUI recovery still require complete acceptance |
 | Full RC integration | **PENDING** | Real clients, cross-platform, ACME/site, hardening, upgrade/rollback, provenance and release approval are separate gates |
 
-**Current activity: Bridge Gate 2 automated provisioning, while full RC readiness remains pending.** The historical Stage G/Pre-RC defects must not be presented as still-open blockers after their focused v0.2.24 acceptance. The correction does not establish full release readiness.
+**Current activity: Bridge Gate 3 and focused TUI corrections, while full RC readiness remains pending.** The historical Stage G/Pre-RC defects must not be presented as still-open blockers after their focused v0.2.24 acceptance. The correction does not establish full release readiness.
 
 Development handoffs and Bridge lab artifacts are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
@@ -66,21 +67,23 @@ Development handoffs and Bridge lab artifacts are **not authorized for productio
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Bridge Gate 2 → controlled real-client trial → RC preparation
+## Immediate work: Gate 3 validation → targeted fixes → RC preparation
 
-The core A/B/C/D/E/F/G/H history below remains historical. Current `main` publishes v0.2.22, whereas the independently accepted **v0.2.24 P1-corrected baseline** is a separate artifact. Do not promote a ZIP to GitHub `main` or a production release merely because its targeted checks pass.
+The A/B/C/D/E/F/G/H history below remains historical. GitHub `main` still publishes v0.2.22-beta. The independently accepted focused v0.2.24 corrections and subsequent Bridge development have not been promoted to the published source tree.
 
-**v0.2.24 focused closure:** prior independent v0.2.23 testing reproduced (1) backend-port exposure after loss of an nftables guard and (2) MTProxy `-S` secret exposure if procfs protection failed. The corrective implementation uses additional per-service systemd network restrictions and fail-closed procfs pre-start checks. Both received independent focused acceptance on real disposable Linux. Limitations and untested OS/real-client coverage remain documented for RC; do not reopen the same defects without a real reproducer.
+**v0.2.24 focused closure:** the two previously reproduced security P1 failures (backend-port exposure after nftables guard loss; MTProxy secret exposure when procfs protection failed) passed their scoped independent correction acceptance. This does not establish full RC or production readiness.
 
-**Bridge Gate 1 — completed, CONDITIONAL GO:** real two-host WireGuard/TCP forwarding, binary data integrity, MTProxy protocol/server response and recovery were demonstrated, distinct from earlier namespace simulations. The results do **not** include successful end-user Telegram client sessions or proof that Russian-network censorship can be bypassed.
+**Bridge Gate 1 — CONDITIONAL GO:** real two-host WireGuard/TCP forwarding, binary data integrity, MTProxy server responses and recovery were demonstrated. End-user Telegram operation was NOT_EXECUTED.
 
-**Bridge Gate 2 — current active engineering:** finish automated install and Manager `foreign-node` integration on the two authorized disposable VPSs. Verify SSH bootstrap and key handoff, foreign-only MTProxy binding, constrained `IPAddressAllow`, existing-site/profile preservation, AppArmor-compatible WireGuard credentials, accurate status, repair, uninstall, rollback and failure paths. The observed Ubuntu 26.04 `wg` AppArmor key-path issue was addressed during active development; await packaged evidence, regression tests and verdict before marking it accepted. Preserve the pre-existing local profile on failure and clean up only owned resources.
+**Bridge Gate 2 — CONDITIONAL ACCEPTANCE:** full all-in-one handoff available; 17 PASS, 0 FAIL, 8 NOT_EXECUTED. Automatic SSH onboarding, Manager orchestration and lifecycle were tested, but clean-install and genuine Telegram-client evidence remain incomplete. Do not count Gate 2 as RC or as published `main` functionality.
 
-**Next, only after the Gate 2 ZIP has been reviewed:** run a **separate client-validation task** with the operator; publish a single public RU endpoint over correct DNS/ACME TLS, a real static informational landing page and a genuine supported Telegram WEB client link. Capture consented, sanitized diagnostics on both servers; prove connect, messaging, media, reconnect and failure cases. Do not substitute synthetic MTProxy probes for successful real-client use.
+**Bridge Gate 3 — IN PROGRESS:** test the intended clean installation, HTTPS/static site, single RU-entry link, actual compatible Telegram client, messaging/media/reconnect and safe lifecycle recovery. A separate test deployment presented v0.2.25-beta and a manually reproduced menu defect when an existing Bridge node prevented a duplicate Add: the refusal should return to the Bridge menu without terminating the manager. Apply the smallest targeted correction and verify interactive and CLI behavior. Distinguish server-side MTProto probes from real user-client acceptance.
 
-**Separate later gates:** finalize release-candidate validation on authorized disposable systems; test actual Telegram clients, TLS renewals, OS compatibility, upgrade/rollback and provenance. Publish an exact accepted source branch before any merge/release. No changes to the production VPS.
+**UX follow-up:** simplify repeated technical prompts with safe defaults and numbered presets, especially Anti-DPI. Never infer a working censorship-bypass method without evidence; preserve STOCK and rollback, and retain security/destructive confirmations.
 
-**Historical issue note:** the Stage H unquoted-heredoc incident and earlier Stage G findings motivated bounded safeguards; these are not grounds for indefinite repeat audits. An unavailable test is NOT_EXECUTED, not PASS.
+**Later RC gate:** independently validate compatible clients, certificates, OS matrix, upgrade/rollback, provenance and release process. Do not automatically publish new versioned source to `main` from a lab snapshot. No unapproved production changes.
+
+**Historical note:** prior Stage G/Pre-RC fixes should not be reopened without a new reproducer. Report PASS, FAIL and NOT_EXECUTED separately and keep P2/P3 out of stage-blocking loops.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
@@ -166,18 +169,18 @@ Prefer an **SSH/agentless management workflow** without a new publicly reachable
 | Gate | Objective | Current status |
 | --- | --- | --- |
 | **Gate 1 — Network PoC** | Two disposable VPSs, WG, binary TCP, stock MTProxy protocol, failure/recovery, real evidence | **CONDITIONAL GO**: server path proven; real Telegram WEB client NOT_EXECUTED |
-| **Gate 2 — Auto Provisioning MVP** | Existing Manager TUI/CLI, SSH bootstrap, remote + local deployment, status, repair, rollback and removal | **IN PROGRESS**; judge only the final complete ZIP and targeted real-host tests |
-| **Gate 3 — Real-client validation + site/TLS** | One RU public endpoint, valid cert, static website, compatible client link, real client messaging/media/reconnect logs | **PLANNED** after Gate 2 handoff review |
+| **Gate 2 — Auto Provisioning MVP** | Existing Manager TUI/CLI, SSH bootstrap, remote + local deployment, status, repair, rollback and removal | **CONDITIONAL ACCEPTANCE**: 17 PASS, 0 FAIL, 8 NOT_EXECUTED; not published in `main` |
+| **Gate 3 — Real-client validation + site/TLS** | One RU public endpoint, valid cert, default static website, compatible client link, real client messaging/media/reconnect logs | **IN PROGRESS** on authorized test hosts; client acceptance pending |
 | **Later operational hardening** | Compatibility matrix, multiple optional foreign nodes if justified, updates/key rotation, broader RC tests | **BACKLOG**; not Gate 2 blockers absent reproduced impact |
 
-**Gate 3 lab example (not deployed by this roadmap):**
+**Gate 3 test layout (not part of published `main`):**
 - RU entry: `martins.ortositi.ru` — sole public TLS/WEB proxy hostname; existing lab RU test VPS.
 - Foreign exit: existing authorized nonproduction test VPS; reachable through WireGuard, private backend only. `codex.ortositi.ru` is not a second client endpoint.
 - ACME: verify RU DNS, ports 80/443, existing web-server conflicts and obtain a valid certificate using the **operator-supplied ACME contact address** in the private run-time configuration (do not commit personal addresses).
 - Static website on `/`: **«Культурные маршруты Подмосковья»** — a substantive Russian-language informational landing page about Kolomna, Sergiev Posad, Zaraysk, architecture and crafts; accessible mobile-first design, licensed locally served assets, no trackers or false official affiliation.
 - Preserve WEB transport routes and WebSocket Upgrade semantics next to the site. Do not invent a `wss://` or `tg://` link: derive **one real connection link** from the actually supported WEB-capable client protocol and live configuration.
 - Operator runs a real Telegram session on their device. Collect timestamps, handshake and connection outcomes, message/media/reconnect timings and sanitized system logs from entry and exit; **never** log chat content, tokens, passwords, or private keys. Report PASS/FAIL/NOT_EXECUTED separately for supported clients.
-- Do **not** begin Gate 3, ACME issuance, or website deployment until the owner supplies/reviews the Gate 2 report and explicitly starts the new task.
+- Gate 3 has been authorized separately; continue only its defined acceptance work. Do not treat isolated TLS/server-side successes as proof of a working Telegram client.
 
 **Success principle:** a person installs Manager on the RU VPS, supplies foreign SSH details, approves the plan and gets a functioning RU-facing WEB proxy without manually assembling the tunnel. Verify actual client functionality and measurable network benefit before broader rollout; if there is no benefit, remain with the normal single-VPS mode.
 
