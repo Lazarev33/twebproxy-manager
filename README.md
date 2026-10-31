@@ -2,7 +2,7 @@
 
 Менеджер Telegram WEB Proxy для Debian и Ubuntu. Работает с [tproxy-server](https://github.com/telegramdesktop/tproxy-server), [MTProxy](https://github.com/TelegramMessenger/MTProxy), Caddy/Nginx, systemd и nftables.
 
-**В `main` — v0.2.22-beta.** Версия предназначена для тестовых серверов. Исправления v0.2.24 и Bridge в эту ветку ещё не включены.
+**В `main` — v0.2.22-beta (только для тестирования).** Исправления безопасности v0.2.24 и разработка Bridge/Gate 3, включая тестовую v0.2.25-beta, пока не опубликованы в этой ветке. `main` не является подтверждённым RC или production-релизом.
 
 [Установка](#начало-работы) · [Команды](#управление) · [Сетевые режимы](#совместимость-сети--anti-dpi) · [Bridge](#bridge--зарубежная-нода-в-разработке) · [Ошибки обновления](#faq--частые-вопросы-и-ошибки) · [Статус](#статус-разработки)
 
@@ -53,15 +53,15 @@ Telegram WEB-клиент
 
 **Ссылка подключения одна — на российский сервер.** Зарубежная нода не выдаёт отдельную ссылку клиентам. Обычная установка на одном VPS останется доступной.
 
-В планах — добавление ноды, проверка состояния, восстановление настроек и удаление с возвратом прежнего профиля. Пароли и приватные ключи не должны попадать в репозиторий или диагностические архивы.
+В отдельной разработке Gate 2 реализованы установка, статус, диагностика, восстановление и удаление ноды; проверка этого кода не означает, что функции доступны в опубликованной `main`. Пароли и приватные ключи не должны попадать в репозиторий или диагностические архивы.
 
 | Этап | Состояние |
 | --- | --- |
 | Gate 1 — сетевая проверка | WireGuard, TCP, MTProxy и ответ Telegram DC проверены между двумя VPS; реальный клиент не тестировался |
-| Gate 2 — автоматическая установка | Разработка и испытания продолжаются, итоговый архив ещё не принят |
-| Gate 3 — клиентская проверка | Запланированы TLS, одна ссылка на RU-сервер, сообщения, медиа и переподключения |
+| Gate 2 — автоматическая установка | **CONDITIONAL ACCEPTANCE** по отчёту Gate 2: 17 PASS, 0 FAIL, 8 NOT_EXECUTED; это не разрешение на RC |
+| Gate 3 — клиентская проверка | **В работе** на отдельных тестовых серверах: HTTPS, сайт, одна ссылка на RU-сервер и проверка настоящим Telegram-клиентом; полный результат пока не принят |
 
-Для Gate 3 выбран домен `martins.ortositi.ru`. На нём планируется статический сайт «Культурные маршруты Подмосковья». Это ещё не развёрнутый сервис.
+В испытаниях Gate 3 используется RU-домен `martins.ortositi.ru` и сайт «Культурные маршруты Подмосковья». Развёртывание в лабораторной среде и отдельные серверные проверки не подтверждают успешную полноценную клиентскую сессию. Сайт должен войти в будущую стандартную поставку, но его нет в текущей `main`.
 
 Подробности — в [ROADMAP](docs/ROADMAP.md). **В опубликованной v0.2.22 Bridge отсутствует.**
 
@@ -220,13 +220,13 @@ sha256sum /usr/local/sbin/twebproxy \
 | v0.2.23 | Отклонена после выявления двух P1 |
 | v0.2.24 | Оба P1 исправлены и прошли отдельную проверку; в `main` не опубликована |
 | Bridge Gate 1 | Сетевая схема проверена на двух VPS, без реального Telegram-клиента |
-| Bridge Gate 2 | Разработка и испытания продолжаются |
-| Bridge Gate 3 | Запланирована проверка с клиентом |
+| Bridge Gate 2 | Условная приёмка: 17 PASS / 0 FAIL / 8 NOT_EXECUTED; не включён в `main` |
+| Bridge Gate 3 | В работе на отдельной тестовой v0.2.25-beta; полная приёмка, включая реального клиента, не подтверждена |
 | RC / стабильный выпуск | Не выпущен |
 
 В v0.2.23 обнаружили два серьёзных дефекта: открытие backend-портов при потере nftables-защиты и возможность чтения MTProxy-секрета через параметры процесса при отказе защиты `/proc`. Исправления v0.2.24 прошли целевую независимую проверку. **Это не исправляет v0.2.22, опубликованную в `main`.**
 
-Проверки других версий ОС и реальных клиентов Telegram ещё не завершены. Подробности — в [ROADMAP](docs/ROADMAP.md).
+При ручном тестировании Bridge-меню v0.2.25-beta обнаружен отказ добавления второй ноды, приводивший к завершению всего интерактивного менеджера. Целевое исправление и регрессионные тесты выполняются отдельно; это не дефект опубликованной в `main` версии без Bridge. Полная проверка реального Telegram-клиента и других версий ОС не завершена. Подробности — в [ROADMAP](docs/ROADMAP.md).
 
 ## Документация
 
@@ -245,4 +245,4 @@ sha256sum /usr/local/sbin/twebproxy \
 
 TWebProxy Manager is a Bash-based Telegram WEB Proxy manager for Debian and Ubuntu. It configures Caddy/Nginx, tproxy-server, stock MTProxy, certificates, profiles and services.
 
-`main` contains v0.2.22-beta for testing. The v0.2.24 security corrections are not yet in `main`. Optional two-server Bridge is in development. Its network path was tested, but automatic installation and real Telegram client connections have not yet received final acceptance. See [ROADMAP](docs/ROADMAP.md).
+`main` contains v0.2.22-beta for testing only. The accepted focused v0.2.24 security corrections and later Bridge implementation are not yet published here. Bridge Gate 2 has conditional acceptance (17 PASS, 0 FAIL, 8 NOT_EXECUTED). Gate 3 is being tested on separate hosts; genuine end-user Telegram client acceptance and RC readiness remain unconfirmed. See [ROADMAP](docs/ROADMAP.md).
