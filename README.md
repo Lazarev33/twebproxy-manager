@@ -18,7 +18,7 @@
 ---
 
 > [!WARNING]
-> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В GitHub `main` пока опубликован **старый код v0.2.9**, а полный исходный коммит Stage H хранится в проверенном Git bundle. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с `nftables.service`. Не используйте эту версию как подтверждённый безопасный production-релиз.
+> **Пока не production-ready.** Последний проверенный checkpoint — **v0.2.22-beta (Stage H)**. В `main` теперь опубликован **v0.2.22-beta (Stage H)**. Публикация исходников не означает исправления подтверждённых P1 и не является production-релизом. Предрелизные испытания выявили открытые P1, включая потерю изоляции backend после отдельных операций с `nftables.service`. Не используйте эту версию как подтверждённый безопасный production-релиз.
 
 ## Зачем нужен TWebProxy
 
@@ -34,7 +34,7 @@ TWebProxy Manager — Bash-менеджер для собственного **Te
 | **🛡️ Изоляция и диагностика** | **🧰 Обслуживание** |
 | nftables, проверка портов и служб, диагностика TLS, безопасные отчёты | Проверяемое обновление, локальный backup, откат, управление службами |
 
-В checkpoint **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками. Важно: эти новые функции ещё **не соответствуют коду, опубликованному в `main`**.
+В **v0.2.22-beta** также реализованы пошаговый мастер настройки, первое включение RU/EN, короткие сводки, подсказки к ошибкам и помощь с Telegram-ссылками.
 
 ## Как это работает
 
@@ -69,7 +69,7 @@ sudo ./twebproxy-manager.sh
 ```
 
 > [!IMPORTANT]
-> Эта команда пока получает **v0.2.9 из `main`**, а не checkpoint v0.2.22. Мы не предлагаем `curl | bash` и не выдаём старую ветку за актуальный релиз. После публикации проверенного исходного дерева эта секция будет переключена на конкретный тег и контрольную сумму.
+> Эта команда получает опубликованный **v0.2.22-beta из `main`**. Это всё ещё тестовая версия с известными P1; проверяйте `VERSION`, Git-коммит и результаты тестов до установки. Не запускайте на production VPS.
 
 ### Рекомендуемый сценарий в v0.2.22-beta
 
@@ -159,7 +159,7 @@ sudo twebproxy dpi list-methods  # Сетевые режимы
 
 **TWebProxy Manager** is a self-hosted Telegram WEB Proxy manager for Debian/Ubuntu. It combines Caddy/Nginx HTTPS, a real public website, the official `tproxy-server`, stock MTProxy, multiple instances/profiles, nftables isolation, diagnostics and verified update workflows.
 
-The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The `main` branch currently still contains the older **v0.2.9** code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
+The latest independently checked development checkpoint is **v0.2.22-beta (Stage H)**. Its guided RU/EN setup recommends **Caddy + HTTPS + STOCK**. The `main` branch now contains the **v0.2.22-beta** development code. Known P1 defects block a production Release Candidate. **Do not deploy as production-ready software.**
 
 See the roadmap and security documentation above before experimenting on a disposable VPS.
 

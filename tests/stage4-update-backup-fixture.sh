@@ -27,6 +27,7 @@ make_fake_manager() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 MANAGER_VERSION="$version"
+MANAGER_RELEASE_VERSION="$version-beta"
 [[ -z $(printf '%q' "$marker") ]] || : > $(printf '%q' "$marker")
 if [[ "\${1:-}" == "--help" ]]; then
   printf 'TWebProxy Manager v%s\\n' "\$MANAGER_VERSION"
@@ -100,6 +101,8 @@ mock_update_network() {
     else
       cp -- "$CANDIDATE" "$out"
     fi
+    # Stage F: the updater reads the transfer status line (-w).
+    for arg in "$@"; do [[ "$arg" != -w ]] || { printf '200 0 %s' "$url"; break; }; done
   }
   set_global_manager_version() { printf '%s\n' "$1" > "$CASE_DIR/global-version-written"; }
 }
@@ -107,7 +110,9 @@ mock_update_network() {
 run_update_capture() {
   local out_file="$1"
   set +e
-  ( manager_update_cmd --force ) > "$out_file" 2>&1
+  # Stage F trust policy: no release-signing key is pinned, so the update needs
+  # the operator-pinned SHA-256 of the candidate.
+  ( manager_update_cmd --force --sha256 "$(sha256sum "$CANDIDATE" | awk '{print $1}')" ) > "$out_file" 2>&1
   UPDATE_RC=$?
   set -e
 }

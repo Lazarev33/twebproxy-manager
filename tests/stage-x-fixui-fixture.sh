@@ -117,13 +117,14 @@ if LC_ALL=C grep -Eq '(^|[^A-Za-z])(live|legacy|lifecycle|Audit|renewal|Offline|
   fail 'ordinary English prose leaked into Russian compact UI'
 fi
 
-# Main navigation has six task groups, explicit zero Exit, no Anti-DPI action.
+# Main navigation: the six task groups plus (Stage H) Connect Telegram first and
+# advanced network compatibility, explicit zero Exit, no menu_anti_dpi action.
 body="$(declare -f menu)"
 for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings; do
   [[ "$body" == *"$fn"* ]] || fail "main route missing: $fn"
 done
 [[ "$body" != *menu_anti_dpi* ]]
-for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings menu_logs menu_certificates menu_update_recovery; do
+for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings menu_logs menu_certificates menu_update_recovery menu_network_compatibility; do
   fn_body="$(declare -f "$fn")"
   [[ "$fn_body" == *'0)'* && "$fn_body" == *return* ]] || fail "$fn lacks consistent zero Back"
 done
@@ -135,8 +136,8 @@ grep -q 'Enter a number' "$TMP/menu-choice.err"
 # Execute each visible main-menu route and then Exit. Stubs make the test
 # read-only while proving the case mapping, one-level return and zero semantics.
 for route in \
-  '1:menu_web_proxy' '2:menu_profiles' '3:menu_status_statistics' \
-  '4:menu_maintenance' '5:menu_diagnostics' '6:menu_settings'; do
+  '1:menu_connect' '2:menu_status_statistics' '3:menu_web_proxy' '4:menu_profiles' \
+  '5:menu_diagnostics' '6:menu_maintenance' '7:menu_network_compatibility' '8:menu_settings'; do
   number="${route%%:*}"; function_name="${route#*:}"
   (
     need_root() { :; }; need_systemd() { :; }; core_installed() { return 0; }; clear() { :; }
@@ -147,6 +148,8 @@ for route in \
     menu_maintenance() { echo ROUTE:menu_maintenance; }
     menu_diagnostics() { echo ROUTE:menu_diagnostics; }
     menu_settings() { echo ROUTE:menu_settings; }
+    menu_connect() { echo ROUTE:menu_connect; }
+    menu_network_compatibility() { echo ROUTE:menu_network_compatibility; }
     export TWEBPROXY_UI_LANGUAGE=en
     printf '%s\n0\n' "$number" | menu
   ) > "$TMP/route-$number.txt" 2>&1

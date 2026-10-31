@@ -56,7 +56,8 @@ Caddy — автоматический сертификат	Caddy|automatic cert
 MTProxy backend alpha/default не стал ready.	MTProxy backend|alpha/default|did not become ready
 Инстанс alpha.example создан и прошёл isolation audit.	alpha.example|created|isolation audit
 Профиль default добавлен.	Profile|default|added
-Не удалось проверить обновление manager на https://example.test/releases	Failed|Manager update|https://example.test/releases
+Не удалось получить последний стабильный релиз TWebProxy Manager с https://example.test/releases: релиз не опубликован, ответ некорректен или сеть недоступна.	Could not obtain|latest stable TWebProxy Manager release|https://example.test/releases
+Откат не подтверждён. Восстанови TWebProxy Manager без сети: /usr/local/libexec/twebproxy/restore-update-backup restore update-20260825T120000Z-abcdef123456 (или restore-latest; список: /usr/local/libexec/twebproxy/restore-update-backup list).	Rollback was not confirmed|offline|/usr/local/libexec/twebproxy/restore-update-backup restore update-20260825T120000Z-abcdef123456|restore-latest
 Установка или bounded health-check не завершились. Выполняю один exact rollback: update-20260825T120000Z-abcdef123456	bounded health check|exact rollback|update-20260825T120000Z-abcdef123456
 Offline rollback helper отсутствует или небезопасен: /usr/local/libexec/twebproxy/restore-update-backup	offline rollback helper|unsafe|/usr/local/libexec/twebproxy/restore-update-backup
 Сертификат не читается: /etc/ssl/example/fullchain.pem	Certificate|not readable|/etc/ssl/example/fullchain.pem

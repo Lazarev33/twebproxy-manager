@@ -22,18 +22,18 @@ declare -a NAMES=(
   "DF-3 DPI cleanup + stage diagnostics:df3-dpi-cleanup-stage-diagnostics.sh:600"
   "DF-3b nfqws cleanup failure propagation:df3b-nfqws-cleanup-propagation.sh:300"
 )
-rc=0
+# 0=all executed/PASS; 1=FAIL; 77=INCOMPLETE. TG-1 and TG-3 touch the kernel
+# or real mount points and run only on a disposable lab host (tests/LAB.md).
+source "$ROOT/tests/lib/stage-a-results.sh"
 for entry in "${NAMES[@]}"; do
   label="${entry%%:*}"; rest="${entry#*:}"; script="${rest%%:*}"; tmo="${rest##*:}"
   printf '\n===== %s =====\n' "$label"
-  if timeout "$tmo" bash "$TESTS/$script" "$MGR"; then
-    printf '%s: PASS\n' "$label"
-  else
-    status=$?
-    if (( status == 124 )); then printf '%s: FAIL (timed out after %ss)\n' "$label" "$tmo" >&2
-    else printf '%s: FAIL (exit %s)\n' "$label" "$status" >&2; fi
-    rc=1
-  fi
+  stage_a_run_case "$label" "$TESTS/$script" "$tmo" "$MGR"
 done
-printf '\nfieldgate-suite: %s\n' "$( ((rc==0)) && echo 'PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1, DF-3, DF-3b)' || echo FAIL )"
+rc=0; stage_a_result || rc=$?
+case "$rc" in
+  0) printf '\nfieldgate-suite: PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1, DF-3, DF-3b)\n';;
+  77) printf '\nfieldgate-suite: INCOMPLETE (lab-only checks NOT_EXECUTED)\n';;
+  *) printf '\nfieldgate-suite: FAIL\n';;
+esac
 exit "$rc"

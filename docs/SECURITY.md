@@ -38,7 +38,10 @@ Managed Caddy/Nginx access logs are disabled for the WEB hostname. Do not add ra
 For Manual mode, forward the complete hostname to `tproxy-server`; splitting special locations around the relay changes the public surface and is unsupported by this manager.
 ## Manager self-update
 
-`manager-update` downloads only over HTTPS from the configured GitHub repository, requires a SHA-256 entry from `SHA256SUMS`, validates Bash syntax and checks that the embedded manager version matches the remote release metadata before installation. The previous installed manager is retained as `/opt/twebproxy-manager/twebproxy-manager.previous.sh`.
+`manager-update` considers only the latest stable GitHub Release (never a development branch) and installs it only when its signed release manifest verifies against an Ed25519 key pinned in the manager, or, while no key is pinned, when the operator passes the expected SHA-256 from an independent channel (`--sha256`). A `SHA256SUMS` file from the same source is not authentication. No release-signing key exists yet, so this build pins none and automatic updates fail closed. Downloads are HTTPS-only, size-bounded, and redirects are refused except from GitHub release downloads to GitHub asset hosts; the artifact's SHA-256, Bash syntax and embedded version identity are checked before a verified backup is taken and before the candidate ever runs.
 
-The checksum protects against transfer/caching corruption; it does not protect against compromise of the GitHub repository itself.
+Installation replaces both manager copies atomically under the update lock, with signals deferred until a verified outcome: success, unchanged, or rollback to the verified backup (also restorable offline with `/usr/local/libexec/twebproxy/restore-update-backup`). Policy, result lines and the release-publishing requirements: [UPDATES.md](UPDATES.md).
 
+Stage G: health probes are bounded even when a candidate leaves a process holding stdout (file capture, process-group cleanup), and the update lock is held only by the updater (and by the offline helper during a rollback), so a killed updater never leaves it with a surviving `curl`. Mutating commands that take a hostname (`restart`, `cert-renew`, `dpi set|disable`, `field-report`) validate it before it reaches any path.
+
+Known limitation (stock MTProxy): the client secret is passed to `mtproto-proxy` with `-S` and is therefore visible in `/proc/<pid>/cmdline` to local users of the host. Run the proxy on a host without untrusted local accounts, or mount `/proc` with `hidepid=2`.

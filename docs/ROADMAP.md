@@ -2,6 +2,10 @@
 
 Updated: 2026-10-29. This document tracks **planned work**, not production release status.
 
+## Repository publication update
+
+> **Repository publication update — 2026-10-29:** The `main` source now targets **v0.2.22-beta Stage H** (development only). The independent Pre-RC campaign found blocking P1 defects in firewall lifecycle, offline-rollback truthfulness and local MTProxy secret exposure. This is not a production release. The older per-stage notes below are historical and may describe earlier GitHub publication status.
+
 ## Product goal
 
 A dependable, easy-to-operate manager for Telegram native WEB Proxy: official `telegramdesktop/tproxy-server` + stock MTProxy, HTTPS/WebSocket transports, Caddy/Nginx, a real public website on the same hostname, optional carefully scoped anti-DPI methods, secure updates and meaningful diagnostics.

@@ -5,8 +5,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT="$ROOT/twebproxy-manager.sh"
 
 bash -n "$SCRIPT"
-grep -q 'MANAGER_VERSION="0.2.8"' "$SCRIPT"
-grep -q 'MANAGER_RELEASE_VERSION="0.2.8-dpi-beta"' "$SCRIPT"
+# Release identity is checked against the single authoritative source (the
+# VERSION file), never a literal, so a semver bump needs no edit here.
+# shellcheck source=/dev/null
+source "$ROOT/tests/lib/release-metadata.sh"
+release_metadata_load "$ROOT"
+release_metadata_consistent
+grep -q "MANAGER_VERSION=\"$RELEASE_MACHINE_VERSION\"" "$SCRIPT"
+grep -q "MANAGER_RELEASE_VERSION=\"$RELEASE_LABEL\"" "$SCRIPT"
 grep -q 'MANAGER_REPO_SLUG="Lazarev33/twebproxy-manager"' "$SCRIPT"
 grep -q 'TPROXY_INSTALL_COMMIT="2873a08806d6e4d84830b9b5c4b0ec0f46af91f8"' "$SCRIPT"
 grep -q 'sync_tproxy_upstream latest' "$SCRIPT"
@@ -37,7 +43,6 @@ grep -q -- '-S\[\[:space:\]\]' "$SCRIPT"
 count="$(grep -c '^RestrictAddressFamilies=AF_INET AF_INET6$' "$SCRIPT")"
 [[ "$count" -ge 1 ]]
 
-[[ "$(tr -d '[:space:]' < "$ROOT/VERSION")" == "0.2.8" ]]
 grep -q 'DPI_NFQWS_RELEASE_ARCHIVE_URL="https://github.com/bol-van/zapret/releases/download/v72.13/zapret-v72.13.tar.gz"' "$SCRIPT"
 grep -q 'DPI_NFQWS_BINARY_BYTES=125760' "$SCRIPT"
 

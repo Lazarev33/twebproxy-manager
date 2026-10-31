@@ -17,12 +17,20 @@ trap - ERR
 disable_colors
 
 make_fake_manager() {
-  local path="$1"
+  # This payload stands in for the CURRENTLY INSTALLED manager, and
+  # stage4_create_backup records source_manager_version="$MANAGER_VERSION".
+  # The restore helper verifies that the backed-up payload's embedded version
+  # matches that, so hard-coding it here was only ever correct while the release
+  # happened to be 0.2.8: from 0.2.9 on, every backup in this fixture failed
+  # verification and cases U-V could not run at all. Default to the release
+  # under test; an explicit version may still be passed for a different manager.
+  local path="$1" version="${2:-$MANAGER_VERSION}"
   install -d -o root -g root -m 0700 "$(dirname -- "$path")"
-  cat > "$path" <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-MANAGER_VERSION="0.2.8"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -Eeuo pipefail\n'
+    printf 'MANAGER_VERSION="%s"\n' "$version"
+    cat <<'EOF'
 if [[ "${1:-}" == "--help" ]]; then
   printf 'TWebProxy Manager v%s\n' "$MANAGER_VERSION"
   exit 0
@@ -33,6 +41,7 @@ if [[ "${1:-}" == "--json" && "${2:-}" == "overview" ]]; then
 fi
 exit 2
 EOF
+  } > "$path"
   chmod 0755 "$path"
   chown root:root "$path"
   bash -n "$path"

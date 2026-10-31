@@ -58,4 +58,3 @@ https://github.com/Lazarev33/twebproxy-manager
 ```
 
 `check-update` prefers the latest stable GitHub Release and falls back to the repository `VERSION` file. `manager-update` requires a matching `SHA256SUMS` entry for `twebproxy-manager.sh` before replacing the installed manager.
-
