@@ -1,7 +1,6 @@
 # Настройка TWebProxy Manager / Setting up TWebProxy Manager
 
-Руководство относится к v0.2.23 (корректирующий pre-RC checkpoint). Это development-checkpoint, а не
-релиз: не ставьте его на рабочий VPS до предрелизных испытаний.
+Руководство актуализировано для опубликованной v0.2.25-beta (development, не стабильный Release). Полная установка включает `bridge/` и `sites/`; production не авторизован.
 The English version follows the Russian one.
 
 ---
@@ -47,7 +46,7 @@ secret, carrier, workers и лимит соединений. `sudo twebproxy add
 
 | Вариант | Что делает |
 |---|---|
-| Временная страница-заглушка | Генерирует простую страницу. Подходит, чтобы проверить HTTPS; позже замените её настоящим сайтом. |
+| Встроенный сайт по умолчанию | Разворачивает «Культурные маршруты Подмосковья» из `sites/podmoskovye/`. |
 | Мой статический сайт | Копирует указанный каталог с `index.html`. |
 | Моё веб-приложение | Проксирует адрес на loopback (например, `http://127.0.0.1:3000`). |
 
@@ -74,9 +73,17 @@ secret, carrier, workers и лимит соединений. `sudo twebproxy add
 3. Выдавайте разным пользователям отдельные профили (`twebproxy profile-add`),
    чтобы менять или отзывать доступ по отдельности.
 
-Нужен клиент Telegram с поддержкой WEB Proxy. Manager не проверяет версии
-клиентов; работа настоящих клиентов на компьютере и телефоне проверяется на
-предрелизных испытаниях.
+Нужен клиент Telegram с поддержкой WEB Proxy. Gate 3 содержит отчёт оператора об успешной работе Telegram для iOS 13.1.2; Desktop runtime и остальные клиенты — NOT_EXECUTED. [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
+
+### Управляемый Bridge
+
+Откройте **Foreign Nodes → Add Foreign Node**. Введите зарубежный VPS и SSH-доступ,
+независимо проверьте ED25519 fingerprint удалённого хоста и подтвердите план.
+Менеджер настраивает WireGuard, локальный forwarder на RU Entry и stock MTProxy
+на Foreign Exit. Клиентская ссылка остаётся на RU-домене. Exit должен быть
+доверенным: его root-оператор может получить secret. MVP — одна нода/профиль.
+Для работы: `sudo twebproxy foreign-node status|diagnose|repair|remove`.
+[OPERATIONS.md](bridge-gate3/OPERATIONS.md).
 
 ### Совместимость сети / Anti-DPI
 
@@ -107,25 +114,13 @@ secret, carrier, workers и лимит соединений. `sudo twebproxy add
 - Частые причины: запись `A` указывает не на этот сервер; порт 80 или 443 занят
   другим веб-сервером; закрыт межсетевой экран провайдера.
 
-### Безопасность хоста (v0.2.23)
+### Безопасность хоста (v0.2.25)
 
-- **Изоляция backend.** Порты MTProxy закрыты снаружи таблицей `inet twebproxy_guard`
-  с флагом `owner`, которую держит служба `twebproxy-firewall`. Команда
-  `flush ruleset` из `nftables.service` (start, reload, restart, stop) её не
-  удаляет, поэтому порты не открываются; обычная таблица `twebproxy_backend`
-  восстанавливается автоматически. Остановка `nftables.service` больше не
-  останавливает прокси. Если остановить саму `twebproxy-firewall`, backend
-  останавливаются (защита в закрытую сторону); её запуск возвращает их.
-- **Secret MTProxy и `/proc`.** Штатный MTProxy получает secret клиента в
-  командной строке. `core-install`, `add` и `repair` монтируют `/proc` с
-  `hidepid=invisible` (запись в `/etc/fstab`; группа-исключение
-  `twebproxy-procview` для мониторинга). Проверка: `twebproxy proc-hardening status`.
-  Отказ — `twebproxy proc-hardening disable` (аудит покажет принятый риск).
-  `core-uninstall` политику не снимает.
-- **Офлайн-откат.** Если исполняемые файлы восстановлены, а `global.env` обновить
-  не удалось, выводится `RESTORE_PARTIAL … metadata=stale` и код 3; сделайте файл
-  записываемым (например, `chattr -i /etc/twebproxy/global.env`) и выполните
-  `twebproxy repair <hostname>`.
+В v0.2.24 исправлены и целево проверены P1 по backend-изоляции и fail-closed
+procfs. В дополнение к nftables используется systemd IP socket policy, а при
+неработающей обязательной защите /proc небезопасный MTProxy не запускается.
+Bridge использует точные WireGuard peer/interface/route ограничения.
+Не публикуйте process argv, приватные ссылки и секреты. [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -169,7 +164,7 @@ The hostname also serves an ordinary website. Three options exist today:
 
 | Option | What it does |
 |---|---|
-| Temporary placeholder page | Generates a simple page. Good for checking HTTPS; replace it with a real site later. |
+| Bundled default website | Deploys «Культурные маршруты Подмосковья» from `sites/podmoskovye/`. |
 | My static website | Copies a directory with `index.html`. |
 | My web application | Reverse-proxies a loopback URL (for example `http://127.0.0.1:3000`). |
 
@@ -200,6 +195,14 @@ A Telegram client with WEB Proxy support is required. The manager does not
 check client versions; real desktop and mobile clients are verified during
 pre-release testing.
 
+### Managed foreign Bridge
+
+Open **Foreign Nodes → Add Foreign Node**, supply foreign SSH details,
+independently verify the ED25519 host fingerprint, and approve the plan.
+The Manager provisions WireGuard, Entry loopback forwarder and private stock
+MTProxy on trusted Exit. The client link remains on RU Entry only.
+Gate 2/3 MVP: one node/profile. [OPERATIONS.md](bridge-gate3/OPERATIONS.md).
+
 ### Network compatibility / Anti-DPI
 
 The default is `STOCK`, which leaves traffic unchanged. Start there. The five
@@ -229,22 +232,9 @@ with a real client.
 - Common causes: the `A` record points elsewhere; another web server holds
   port 80 or 443; the provider's firewall blocks them.
 
-### Host security (v0.2.23)
+### Host security (v0.2.25)
 
-- **Backend isolation.** The MTProxy ports are closed to the outside by
-  `inet twebproxy_guard`, a table with the `owner` flag held by the
-  `twebproxy-firewall` service. The `flush ruleset` that `nftables.service`
-  runs (start, reload, restart, stop) cannot remove it, so the ports never open;
-  the ordinary `twebproxy_backend` table is re-applied automatically. Stopping
-  `nftables.service` no longer stops the proxies. Stopping `twebproxy-firewall`
-  itself stops the backends (fail-closed); starting it brings them back.
-- **MTProxy secret and `/proc`.** Stock MTProxy receives the client secret on its
-  command line. `core-install`, `add` and `repair` mount `/proc` with
-  `hidepid=invisible` (persisted in `/etc/fstab`; exempt group
-  `twebproxy-procview` for monitoring tools). Check with
-  `twebproxy proc-hardening status`; opt out with `twebproxy proc-hardening disable`
-  (the audit then reports an accepted risk). `core-uninstall` keeps the policy.
-- **Offline rollback.** When the executables are restored but `global.env`
-  cannot be updated, the outcome is `RESTORE_PARTIAL … metadata=stale` with
-  status 3. Make the file writable (e.g. `chattr -i /etc/twebproxy/global.env`)
-  and run `twebproxy repair <hostname>`.
+Focused v0.2.24 P1 acceptance covered backend systemd socket isolation and
+procfs fail-closed startup. Bridge adds exact WireGuard peer/interface/route
+restrictions. Do not publish process argv, private links or secrets.
+[SECURITY.md](SECURITY.md).
