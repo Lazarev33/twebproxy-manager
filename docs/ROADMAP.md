@@ -1,8 +1,11 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-31. This documents actual development checkpoints and remaining RC gates.
+Updated: 2026-10-31. Restored to the pre-Gemini release roadmap; nonessential architectural experiments are parked.
 
 ## Repository publication and evidence
+
+**Stable-first decision:** preserve the existing Gate 3 topology and security invariants. No live-server experiments or route/backend rewrites are authorized by this document. Experimental topics are postponed to [roadmap-test.md](../roadmap-test.md).
+
 
 GitHub `main` now contains **v0.2.25-beta** with `bridge/`, `sites/` and the Bridge TUI refusal correction; it is development source, not a stable Release. The focused v0.2.24 backend isolation/procfs P1 fixes were accepted independently for their scope; v0.2.23 was rejected. Bridge Gate 1 was CONDITIONAL GO, Gate 2 CONDITIONAL ACCEPTANCE (17 PASS / 0 FAIL / 8 NOT_EXECUTED). Gate 3 includes a public test site/TLS and operator-reported iOS 13.1.2 connection with server-side corroboration, not independent end-to-end file integrity proof or full client acceptance.
 
@@ -27,11 +30,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | Bridge Gate 2 | CONDITIONAL ACCEPTANCE | 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
 | Gate 3 / v0.2.25 | DEVELOPMENT SOURCE IN MAIN | Default site, Bridge and operator-reported iOS test |
 | Bridge menu fix | LOCAL REGRESSION PASS | Not confirmed deployed on RU Entry |
-| CLI/TUI correction + Smart Defaults | PRIORITY; NOT YET ACCEPTED | Confirmed discrepancies, then safe defaults and preset UX; not shipped in 0.2.25 |
-| Lightweight Foreign Exit investigation | RESEARCH ONLY | Design and disposable-host GO/NO-GO required before Multi-Profile implementation |
+| Smart Defaults / TUI | NEXT TASK | Automated safe choices and presets; not in 0.2.25 |
 | RC / stable Release | NOT AUTHORIZED | Platform/client matrix, cold boot, security, verified distribution |
 
-Current priorities: finish CLI/TUI correction and Smart Defaults, **then evaluate Lightweight Foreign Exit before implementing Multi-Profile**, choose the topology using real evidence, implement compatibility and Multi-Profile for the selected topology, and later add site choices. Multi-Exit remains separate research. A roadmap decision does not mean software has shipped. See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
+Current tasks: finish focused CLI/TUI fixes, Smart Defaults and Gate 3 acceptance on the **existing** data path; then validate and publish a stable release. Defer structural changes to [roadmap-test.md](../roadmap-test.md). See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
 
 ## Non-negotiable engineering constraints
 
@@ -44,8 +46,7 @@ Current priorities: finish CLI/TUI correction and Smart Defaults, **then evaluat
 - Any production manager code change bumps machine-readable `VERSION`, `MANAGER_VERSION` and release label coherently; refresh SHA manifests and relevant fixtures.
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
-- Retain security fail-closed requirements (procfs, systemd IP policy, SSH host verification, explicit destructive approval). A compatibility failure is not evidence that a security refusal should be disabled.
-- Never weaken verified manager-update trust to make an automatic update appear to work; development `main` is not a stable, signed update channel.
+- **Release-first freeze:** do not move MTProxy between Entry/Exit, change WireGuard paths, add policy routing/NAT, change backend/firewall/procfs/SSH trust model, add Multi-Profile or Multi-Exit, or replace transports before the first accepted stable release. Experimental designs: [roadmap-test.md](../roadmap-test.md).
 
 ## Immediate work: Bridge Gate 3, TUI and RC
 
@@ -53,108 +54,24 @@ Actual Bridge route: RU HTTPS front end → tproxy-server → loopback TCP forwa
 
 Next: verify clean installs, two-host cold boot, safe recovery and removal, TLS/renewal, external backend exposure, supported clients including Desktop and non-tested OS/CPU combinations. Keep synthetic protocol evidence distinct from genuine application tests and operator reports.
 
-Smart Defaults follows focused CLI/TUI correction. The lightweight Exit study must not interrupt active Codex TUI work or replace the running Gate 3 Bridge. Retain Advanced/manual paths, security approvals, all six DPI modes and STOCK by default; do not automatically enable aggressive DPI methods.
+Smart Defaults is a separate future stage: inventory technical TUI prompts, replace avoidable input with safe defaults/presets, retain Advanced mode and explicit security/destructive approvals. Do not change the existing six DPI modes or automatically select aggressive modes.
 
 Do not conflate a GitHub development source commit with a stable signed Release or trusted automatic update. Prior accepted P1 corrections need a new reproducer before reopening.
 
-## Prioritized post-Gate 3 development — findings of 31 October 2026
+## Immediate low-risk corrections — no network architecture changes
 
-**This is a plan, not an acceptance report.** The authoritative published baseline is v0.2.25-beta in GitHub `main`. Work already delegated to Codex must be reconciled before editing; do not overwrite in-progress UI changes. Do not preassign a new version number or silently promote a development checkpoint to RC.
+Only focused work that preserves the existing RU Entry → loopback TCP forwarder → WireGuard → stock MTProxy on Foreign Exit path, as well as local single-VPS mode, may be implemented before stable release:
 
-### Priority 0: focused CLI/TUI correction before approving Smart Defaults
+- Align explicit `yes`/`да` confirmation handling without changing safe default-no and EOF behavior.
+- Fix user-facing RU/EN localization errors and require `tests/localization-static-audit.sh` PASS.
+- Eliminate the reproduced `pop_var_context` CLI error-trap noise without changing real exit codes, structured outputs or the tested Bridge menu recovery.
+- Make Bridge menu tests reproducible from a clean source checkout with isolated, verified dependencies or narrowly scoped test doubles; do not require global `pip install`.
+- Correct misleading manager-update guidance, while retaining signing/key/SHA verification requirements.
+- Complete authorized **TUI & Smart Defaults**: fewer unnecessary inputs, safe presets, preserved Advanced path, explicit SSH host-key verification, approval and STOCK/default-no behavior.
+- Improve **read-only compatibility preflight** messages for Python ABI, active swap, systemd/BPF/procfs, DNS/TLS and occupied ports. Do not relax security, switch off swap, install new backend stacks or silently broaden OS support.
+- Finish existing real-client, TLS, reboot, site preservation and backend-exposure acceptance on isolated approved hosts. Report PASS/FAIL/NOT_EXECUTED exactly.
 
-The following are grounded in current code or reported local test evidence. Each implementation change still needs a bounded RED/GREEN reproduction against the exact source commit.
-
-| Finding | Evidence / source | Required correction |
-| --- | --- | --- |
-| RU/EN confirmations inconsistent | Bash `yesno()` and `stage4_confirm_restore()` accept only one character `[YyДд]`; Bridge Python `confirmed()` accepts `yes` and `да` | Accept explicit RU/EN answers consistently. Preserve each existing default; destructive/restore operations remain default-no; EOF never means approval |
-| Localization regression | Direct English `die` strings in `bridge_internal_cmd` and Bridge CLI. `tests/localization-static-audit.sh` reported FAIL | Move user-visible errors through the catalog/translation path; test complete RU/EN output, including failures |
-| Standalone Bridge test lacks isolated dependencies | `tests/bridge-gate3/test_bridge_menu.py` imports `controller.py` directly; its `import paramiko` fails with bare Python, though launcher has verified offline wheels | Provide a clean reproducible test environment using the verified bundle or scoped test doubles; no global pip installation |
-| Bash error-trap context on noninteractive `foreign-node` failure | Reported `pop_var_context` messages with ERR trap during failed CLI calls; interactive menu already has a focused correction | Reproduce actual error control flow, fix only the failing path, retain nonzero exit code and clean machine-readable output |
-| Misleading update hint | `manager-update` can reject when signature trust anchors are unset and independently verified `--sha256` has not been provided | Explain the trust prerequisite in help/TUI; **never** bypass verification or silently trust unsigned updates |
-
-**Acceptance:** `bash -n`, bilingual static localization audit PASS; all Bridge-menu/CLI tests PASS from an isolated fresh environment; correct RU/EN confirmation, negative/EOF behavior, exact CLI exit codes, no `pop_var_context`, no state mutation after refusal; updated error/hint documentation. Only label a defect a release **BLOCKER** when it demonstrably affects security, state integrity, availability or a required workflow; keep P2/P3 cosmetic findings outside the critical path.
-
-### Priority 1: complete TUI Usability & Smart Defaults
-
-Audit every interactive prompt in first run, quick/advanced setup, profiles, Anti-DPI, Bridge, diagnostics, TLS, updates and maintenance. Produce a source-located inventory with four classifications: `AUTOMATIC`, `PRESET`, `REQUIRED`, `CONFIRMATION`.
-
-- Automatically generate secrets, pick verified free internal ports, reuse unambiguous existing profiles/instances, select the bundled default site and suitable documented TLS defaults; do not re-ask known values.
-- Replace avoidable raw numerical/text parameters with numbered descriptive presets. Keep Advanced/manual access and existing noninteractive CLI semantics.
-- Anti-DPI: preserve all **six** IDs, `STOCK` default, explicit shared-IPv4 scope approval, real diagnostics and rollback. Never claim the VPS can determine an ISP's client-side DPI method without evidence.
-- Bridge: request only essential foreign SSH information and independent host-key verification; display a plan before provisioning. Normal operational refusal must return to TUI, not exit the whole manager.
-- **Read-only preflight before mutation:** effective Python ABI/architecture, offline wheel availability, swap status, cgroup-BPF/systemd IP filtering, procfs policy, DNS/TLS/ports. Show exact unsupported conditions and the next safe action without turning off safeguards.
-
-**Acceptance:** visibly reduced normal-flow manual inputs; complete input inventory; TUI RU/EN and 40/80/120-column test coverage; clean local and Bridge setup fixtures; cancel/EOF, conflicts, missing credentials and failing security preflight; regression of current CLI and Gate 3 Bridge menu behavior. Produce one self-contained ZIP with tests/evidence and SHA-256 manifest. This priority does not assert that the work is already shipped.
-
-### Priority 2: Lightweight Foreign Exit — independent architecture research and GO/NO-GO
-
-**Status: RESEARCH ONLY, NOT APPROVED FOR IMPLEMENTATION.** Investigate the Gemini Argon proposal before extending the current one-profile Bridge. Do not change current Gate 3 servers, installed route, secrets, README architecture diagrams or code during this research.
-
-**Proven current topology:** Telegram WEB client → RU HTTPS/Caddy/Nginx → `tproxy-server` → loopback `systemd-socket-proxyd` → WireGuard → stock MTProxy on Foreign Exit → Telegram DC. Gate 3 has an operator-reported real Telegram iOS test; do not discard that baseline.
-
-**Candidate topology:** Telegram WEB client → RU HTTPS/Caddy/Nginx → `tproxy-server` → **local stock MTProxy on RU Entry** → narrowly marked outbound Telegram DC connections over WireGuard → **Foreign Exit with restricted NAT/routing, no MTProxy or client-secret storage** → Telegram DC. The client keeps exactly one RU-facing link. This is a technical hypothesis, not an established superior implementation.
-
-**Concrete motivations confirmed in v0.2.25:**
-- Foreign `bridge/agent.py` builds MTProxy from pinned source, provisions an SSH management user/sshd Match/sudo rule, requires procfs secret hardening and runs multiple owned services. A lighter Exit could reduce required packages and the blast radius of foreign-root access, but must retain secure management and rollback.
-- `bridge/controller.py` currently fixes foreign WireGuard/client/stats ports at 51990/24990/29990. Existing preflight refuses collisions; automatic safe port allocation is a separate usability improvement, not a security failure.
-- `bridge/agent.py` contains `forward(config)` without a discovered runtime caller; Entry actually uses `systemd-socket-proxyd`. Confirm dead-code status with tests before removal.
-- Foreign official Telegram material refresh currently restarts MTProxy on successful update. Measure its real client-session impact before claiming all sessions always drop.
-- Current Bridge requires one attached profile/node, x86_64 Python 3.12/3.14 launcher and only tested Ubuntu 24.04/26.04 on the agent. A new route topology might simplify restrictions but does not automatically support every distribution or unlimited profiles.
-
-**Research a single preferred candidate:** stock WireGuard with **process-scoped policy routing** and constrained Exit NAT; do not simultaneously implement an unreviewed custom Go/mTLS/Noise transport.
-
-**Required prototype and comparison on isolated disposable RU/Foreign VPSs:**
-1. Independently verify MTProxy outbound packet behavior, Telegram DC address discovery/refresh, IPv4 **and IPv6**, connection types and DNS handling. A static subset of DC CIDRs is not proof of complete routing.
-2. Model and test route ownership and isolation: nftables marks or cgroup/UID-bound rules, dedicated routing table, WireGuard allowed-ips, NAT/conntrack, firewall, systemd IPAddressDeny/Allow compatibility, local instances, SSH/front-end traffic and reverse-path behavior.
-3. **Fail closed:** when WireGuard, Exit, route or DNS fails, the intended MTProxy egress must not escape directly via RU public IPv4/IPv6. Verify with actual packet captures, external probes and failure injection. No automatic fallback to direct egress without separately approved risk acceptance.
-4. Demonstrate that the Exit does **not** store MTProxy client secrets, but keeps its own WG/private management credentials safely; independently verify SSH host identity, protect management permissions and evaluate system-wide NAT/sysctl side effects. The Exit is not truly stateless: conntrack/NAT has connection state.
-5. Test **two distinct profiles through one candidate Exit**, preserving per-user secrets, exact links, isolation, metrics, revoke/rotate and rollback, with genuine Telegram application text/media/reconnect checks.
-6. Compare against the **existing Gate 3 Bridge**, on similar real hosts: install/repair/removal time, dependencies/builds, CPU/RAM, throughput, latency, service count, MTProxy material refresh, session interruption, cold boot, recovery and partial cleanup.
-7. Treat **2–5 second installation**, **80% less code**, **zero dependencies**, **any Linux**, **1-second failover** and **seamless migration of TCP connections** as unverified competitor claims, not targets already met. Changing Exit IP or NAT state normally interrupts established TCP; measure actual client recovery.
-8. Produce a reversible migration design for existing Bridge owners: preserve hostname, website/TLS, profiles/secrets, existing local backend, old Exit state, firewall/route rules, interrupted operations and cleanup debt. **Do not migrate live Gate 3 Entry/Exit during the experiment.**
-
-**GO:** real application traffic and multiple profiles work, no direct-route leaks, security boundaries meet or exceed baseline, operation is measurably simpler, repairs and rollback are reliable. **NO-GO:** retain remote MTProxy Bridge and fix selected problems such as fixed ports, refresh restart and profile support. **CONDITIONAL:** list precise blockers and remaining tests, do not deploy. Deliver actual PASS/FAIL/NOT_EXECUTED evidence, topology comparison, one self-contained handoff ZIP and a documented security/operational decision. The owner must separately authorize implementation after the research verdict.
-
-### Priority 3: Bridge compatibility and Multi-Profile — after architecture decision
-
-**Hard dependency: finish Priority 2 first.** Develop multiple profiles and broader OS support for **the selected topology**, not for both indefinitely. No Bridge rewrite follows automatically from an interesting design.
-
-
-
-**Architecture decision first; compatibility support depends on it.** The **current** Bridge launcher admits only x86_64 Python 3.12/3.14, and its agent only Ubuntu 24.04/26.04. The core/local Manager has a different support matrix. If remote MTProxy remains the chosen design, extend and test its dependencies. If the lightweight Exit is accepted, validate the new controller/agent and OS support from scratch. Neither choice implies unrestricted Debian, Alpine, ARM or container support.
-
-- For the **retained remote-MTProxy topology**, add/test complete offline dependencies for Python 3.10 (Ubuntu 22.04) and 3.11 (Debian 12) where feasible; a single `cffi` wheel is not enough. For an **accepted lightweight-Exit topology**, measure its actual bootstrap/runtime dependencies and test an independent matrix. ARM64 and container/Alpine support are separate optional gates.
-- Review the **active-swap refusal** as a documented security tradeoff, not an arbitrary crash. Keep fail-closed handling until a tested threat model supports an alternative. `mlock` applied to one Python buffer is not proof every copy of a password/key is swap-safe; never disable user swap automatically.
-- Preserve effective systemd per-unit IP filtering, nftables isolation and procfs protection. Unsupported LXC/OpenVZ or kernels without effective enforcement remain explicit limitations unless equivalent safety is demonstrated and independently tested.
-- Support **at least two independent profiles on one bridged instance and one foreign Exit** in the **selected topology**, including separate secrets, link generation, add/rotate/revoke, backend routing, status, repair, rollback and removal. If lightweight Exit is chosen, MTProxy/secrets stay on RU Entry and only eligible egress is routed through Exit; if existing Bridge is retained, design the required protected remote profile-to-backend mappings. Preserve other local instances and safe recovery.
-- **Do not add a second foreign node in this milestone.** One Exit with multiple profiles and Multi-Exit failover are different product changes.
-
-**Acceptance:** supported OS/Python matrix with real results (PASS/FAIL/NOT_EXECUTED), safe rejection of unsupported hosts before any mutation, two-or-more-profile tests, isolation checks, simulated failure and remote cleanup, no lost credentials or accidentally public backend port. Document any unsupported versions rather than implying universal Debian/Ubuntu compatibility.
-
-### Priority 4: a small site catalogue (without DPI folklore)
-
-Keep `sites/podmoskovye/` as the existing default and `placeholder` compatibility for older instances. Add several substantial, user-selectable static websites with previews and deterministic integrity manifests. Preserve existing operator site edits during repair/upgrade and support custom static directories/loopback applications.
-
-Distinct pages may avoid identical **content under active inspection**, but passive observers cannot ordinarily read HTTPS HTML/CSS as plaintext; changing markup is **not** a proven way to hide public IP, SNI or TLS fingerprints. Do not claim camouflage, guaranteed censorship bypass, or automatically generated uniqueness without measurements.
-
-**Acceptance:** a bounded site library with verified assets/licensing, no runtime analytics/CDN dependencies by default, mobile usability, integrity and safe-path checks, repairs that preserve custom content, deterministic tests for legacy `placeholder`, existing sites and explicit deletion. A full website generator/editor is separate optional work.
-
-### Later research gate: Multi-Exit, failover, modularity and packaging (after single-Exit topology decision)
-
-Compare two or more foreign Exit nodes **only after the selected single-Exit architecture and multi-profile lifecycle are proven**. Use [mtproto.zig](https://github.com/sleep3r/mtproto.zig) as a research reference, not a drop-in design. Examine route/conntrack ownership, per-Exit trust, health beyond WireGuard handshakes, different foreign source IPs, failover flapping, inevitable TCP interruptions, fail-closed leak prevention, cleanup and rollback. No seamless failover claims without actual client evidence.
-
-Separately evaluate signed/prebuilt artifacts, smaller dependencies and modular Bash/Python boundaries. The current 10k+ line Bash manager imposes maintenance cost, but **a full Go/Zig rewrite, new backend, Docker or container support is not authorized by this comparison**. Require a measured benefit and a migration path retaining CLI/state/security invariants.
-
-**Deliver research first:** comparable alternatives, threat model, measurable performance, disposable-host PoC, failure injection, client reconnection evidence and explicit GO/NO-GO. Do not automatically enable Multi-Exit or describe it as delivered.
-
-### Discipline and release gates for every priority
-
-1. Freeze the current source hash and reconcile active Codex work. **Do not preempt the authorized TUI/Smart Defaults implementation with the architecture study**, or alter existing live Bridge deployments. Avoid destructive resets, force-pushes, unnecessary full-project audits and unapproved production changes.
-2. Prove each material defect with focused reproduction and targeted regression. Distinguish BLOCKER, P2/P3 and compatibility/research items. Do not reopen independently accepted v0.2.24 P1 fixes without new evidence.
-3. Keep exact files, automated tests, actual PASS/FAIL/NOT_EXECUTED evidence and **one all-in-one ZIP + SHA-256 manifest**. Validate a fresh extraction.
-4. Test real kernel/network/client effects on explicitly authorized isolated hosts; synthetic tests alone do not establish client support or censorship resistance.
-5. Update README, SETUP, SECURITY, ARCHITECTURE, compatibility information and CHANGELOG **only as behavior changes**. README diagrams must continue showing the **actual published Gate 3 architecture**, not the experimental lightweight Exit proposal. Promote new implementation to GitHub `main` only from a completed, verified development checkpoint without rewriting history.
+**Acceptance:** bounded RED/GREEN regressions, no changed runtime topology, no lost profiles or settings, no changed firewall/routing/daemon policy, one complete tested source ZIP and SHA-256 manifests. Cosmetics do not block the release. An actual new safety/state regression requires reproduction before correction.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
@@ -168,7 +85,7 @@ Use a separate sacrificial Linux VM/host with an isolated firewall/network, root
 
 Record commands, pre/post states, exit codes and exact environment. An unavailable test is NOT_EXECUTED, not PASS. Real-kernel validation may run while later development proceeds in isolation, but it is a hard release gate.
 
-## Core implementation stages (after B.1)
+## Historical core implementation stages (from the earlier B.1 plan)
 
 | Stage | Scope | Acceptance principle |
 | --- | --- | --- |
@@ -180,27 +97,19 @@ Record commands, pre/post states, exit codes and exact environment. An unavailab
 | **G — hardening** | Privilege boundaries, config validation, ownership, bounded resources, remaining confirmed audit backlog | Safe defaults and predictable degradation |
 | **H — user experience** | Main-menu Anti-DPI, guided quick setup, advanced controls, actionable statuses, RU/EN, desktop/mobile guidance | Novice usability without bypassing safety gates |
 
-Stage identifiers are fixed planning names; exact `0.2.x` version numbers after B.1 are **TBD** and must be assigned sequentially at implementation time. Keep work bounded; do not turn each stage into a full release audit.
+Historical stage IDs and acceptance criteria are retained as reference, not authorization to reopen completed stages. Only reproducible new blockers justify further changes before stable.
 
-## WEB transport, compatibility and anti-DPI research
+## Existing WEB transport and Anti-DPI acceptance
 
-Create an evidence-backed **research / design gate before implementation**. Do not blend it into B.1 or the core reliability corrections.
+Validate **existing** `https`, `https-lanes`, `websocket`, `websocket-lanes` and the six shipped Anti-DPI modes without replacing their code or defaults. STOCK remains default and shared-IP consent remains mandatory. Run real Telegram Desktop/Android/iOS connection, media, sleep/reconnect and failure-path tests. Distinguish systemd/TLS/relay readiness from genuine client success; mark unexecuted cases NOT_EXECUTED.
 
-- Re-evaluate pinned official `tproxy-server` versus the current upstream commit/protocol and the third-party `tgwebproxy` implementation. Review license, support, session token signing and `token_key_file` migration, config compatibility, release pinning and client requirements.
-- Compare `https`, `https-lanes`, `websocket`, `websocket-lanes` under consistent network conditions, with throughput, connection survival, background/resume behavior, large media and actual Telegram handshakes. WebSocket is a candidate, **not** a proven universal default.
-- Research official `base_path` capability and routing behind a genuine existing website; it requires matching client capability, frontend rules and safe migration.
-- Compare existing STOCK/Window1152/MSS88/nfqws combinations with current zapret/zapret2 (`nfqws2`) server modes. Assess directionality, nft scope, side effects, overhead and reproducible benefit. Research is not authorization to install or change the pinned anti-DPI binary.
-- Assess CDN only against actual WebView, long-poll and WebSocket behavior; JS challenges and origin routing can break the bridge.
-- Maintain an explicit Desktop / Android / iOS client-version matrix including foreground, background, network switching, reconnect and media tests. Avoid claiming client compatibility from `/readyz` alone.
-- Separate `systemd running`, `TLS valid`, `relay ready`, `WEB handshake proven` and `Telegram client confirmed` in the product status model.
-
-Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
+New carrier/protocol experiments, alternate backends, `base_path`, CDN changes, nfqws2 and aggressive DPI redesign are archived in [roadmap-test.md](../roadmap-test.md) until after stable release and a separate authorization.
 
 ## Website: bundled default and future Site Manager
 
 **Implemented:** `sites/podmoskovye/` provides the fixed default «Культурные маршруты Подмосковья»; Quick Setup uses it, and repair preserves edited deployed sites. Custom directories and loopback upstream sites remain available. [DEFAULT-SITE.md](bridge-gate3/DEFAULT-SITE.md).
 
-**Priority 4:** a selectable set of useful, maintained static site templates with previews and preservation of custom site edits. Retain legacy `placeholder` state for compatibility. A full site generator, upload/editor, and site backups require separate acceptance. HTML does not hide IP, SNI or TLS characteristics or guarantee DPI bypass.
+**Before stable:** preserve the installed bundled site, custom sites and existing edits; only low-risk UI/docs corrections. New templates, upload/edit/generator and broader site lifecycle are deferred to [roadmap-test.md](../roadmap-test.md). HTML does not hide IP, SNI or TLS characteristics or guarantee DPI bypass.
 
 ## Release candidate and v1.0 gates
 
