@@ -66,3 +66,14 @@ Share the generated bundle from:
 ## External isolation check
 
 From a different host, verify that only intended public services are reachable. Backend/stats ports chosen by the manager must not be externally reachable even though stock MTProxy may show wildcard listeners locally.
+
+## Bridge Gate 2/3 coverage and outstanding checks
+
+Gate 2: conditional acceptance, 17 PASS / 0 FAIL / 8 NOT_EXECUTED. Gate 3
+has an authorized real RU Entry/Foreign Exit deployment, public TLS/site
+and operator-reported Telegram for iOS 13.1.2 messaging/media/reconnect.
+Server counters corroborate traffic but do not establish independent file
+integrity. Telegram Desktop runtime, other clients, dual-server cold boot
+and broader OS matrix remain unverified. Do not label synthetic MTProto
+responses or operator reports as independent client PASS. See
+[CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
