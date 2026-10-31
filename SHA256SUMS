@@ -121,4 +121,4 @@ dcf1ad452b5ed3bd1eee5c64b514abbc76bbd5c61fafe0134ebe939aa57c34a8  ./tests/stageh
 c8f4c8e258bdb34d81c13e1c348ca8d1994642f883c2997666d050aad6cde3b4  ./tests/stageh/ux-harness.sh
 d8bfc0967cfca8a137cae1be5f4ab196dde1bbc70ee7f20f79ff8ff7e7b07791  ./tests/static-smoke.sh
 8ec562da234328d836b2378101b2a59e47588da0d8c0562841c41428120a4e08  ./tests/tui-presentation-fixture.sh
-faa54d9a202f4f2a7486ed81269dd8ab6a099e4d9c416b838b067317211476de  ./twebproxy-manager.sh
+faa54d9a202f4f2a7486ed81269dd8ab6a099e4d9c416b838b067317211476de  twebproxy-manager.sh
