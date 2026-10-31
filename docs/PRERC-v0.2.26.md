@@ -15,7 +15,8 @@ On an actual isolated Ubuntu24.04 installation, published v0.2.25's unchanged
 script-only updater installs the exact v0.2.26 script and reports UPDATE_SUCCESS.
 Local profile status works, but installed `foreign-node status` returns1 because
 the newly pinned Bridge bundle is absent. Only the old component directory exists.
-Baseline Bridge status0 → update success → Bridge status1 was reproduced twice.
+The failure was observed twice; the second isolated reproduction explicitly
+records baseline Bridge status0 before update success → Bridge status1.
 
 CLI rollback restores v0.2.25. Running `repair HOST` from the **complete verified
 v0.2.26 distribution** installs its verified auxiliary bundle and restores
