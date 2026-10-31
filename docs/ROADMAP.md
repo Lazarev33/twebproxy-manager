@@ -1,6 +1,6 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-29. This document tracks **planned work**, not production release status.
+Updated: 2026-10-31. This document tracks **planned work**, not production release status.
 
 ## Repository publication update
 
@@ -107,6 +107,34 @@ Create an evidence-backed **research / design gate before implementation**. Do n
 - Separate `systemd running`, `TLS valid`, `relay ready`, `WEB handshake proven` and `Telegram client confirmed` in the product status model.
 
 Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
+
+## Post-RC: RU entry → foreign exit bridge (proposed, not authorized)
+
+**Idea recorded 2026-10-31.** Offer an optional two-VPS deployment for networks where a client can reliably reach a Russian-hosted entry point but cannot reach the foreign proxy host directly. Keep this independent from the current Pre-RC P1 corrections, the six anti-DPI modes and the existing single-VPS default. **Design/research only until separately approved; not a v0.2.24 scope item or RC prerequisite.**
+
+**Candidate data path:**
+
+```text
+Telegram WEB-capable client
+  -> RU VPS public hostname:443 / Caddy or Nginx (HTTPS, WSS, genuine website)
+  -> local tproxy-server relay (unchanged client protocol)
+  -> 127.0.0.1 TCP forwarder / socket-proxyd
+  -> authenticated encrypted inter-VPS tunnel (WireGuard candidate)
+  -> foreign VPS stock MTProxy on private tunnel address only
+  -> Telegram DC
+```
+
+The client sees the RU-facing hostname/IP; the foreign backend is not directly exposed to clients. Preserve `tproxy-server`'s loopback-backend restriction: **do not patch it to accept arbitrary Internet backend addresses**. Verify the precise relay-to-MTProxy protocol and TCP forwarding compatibility in a standalone proof of concept; do not infer it from an architecture diagram. WireGuard and systemd socket proxying are candidates, not mandated dependencies.
+
+**Research and design gate before implementation:**
+- Compare a simple TCP bridge over a private authenticated tunnel against a foreign full-relay topology. Prefer one small, understandable deployment mode after measuring actual behavior; avoid new generic routing frameworks.
+- Define distinct `entry` and `exit` roles, secure provisioning/peer enrollment and rotation, loopback listeners, least-privilege systemd units, allowlisted tunnel-only MTProxy access, rollback and removal. Preserve existing Nginx/Caddy websites, certificates, secrets and profiles.
+- Fail closed on tunnel, forwarding, foreign-backend or firewall faults: no public MTProxy listener or accidental direct backend bypass; errors must be observable, not false-green. Check failures and restoration without relying only on process-active indicators.
+- Collect representative real-client results: connection establishment, Telegram messages and media, reconnect/network switch, latency, throughput, MTProxy availability, TLS/ACME renewals and cross-VPS outage behavior. Test externally reachable ports on both VPSs.
+- Measure the client→RU and RU→foreign links separately. A Russian IP is **not** automatically whitelisted, and blocks on the inter-VPS path, SNI, hosting ASN or client fingerprint can still prevent connectivity. Account for two-server cost, traffic and added latency.
+- Deliver a reproducible proof-of-concept report, security/operational threat model, failure matrix, migration and rollback plan and an explicit GO/NO-GO based on measured benefit. Test only on authorized disposable hosts; no production migrations or silent network changes.
+
+**Acceptance principle:** demonstrably better client connectivity in at least one representative constrained network **without** regressions in single-VPS operation, firewall isolation, public site/ACME, recovery or profile secrecy. If it provides no measurable benefit, do not add it to the manager.
 
 ## Public website / Decoy Site Manager — dedicated future stage
 
