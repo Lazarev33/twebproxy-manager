@@ -77,3 +77,14 @@ integrity. Telegram Desktop runtime, other clients, dual-server cold boot
 and broader OS matrix remain unverified. Do not label synthetic MTProto
 responses or operator reports as independent client PASS. See
 [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
+
+## v0.2.26 bounded integration
+
+See [pre-RC fixtures](../tests/prerc-v026/README.md) and the all-in-one handoff's
+REPORT/RESULTS/RC matrix. Actual KVM and trusted loopback-TLS updater measurements
+are separate from models and genuine Telegram application tests. An observed
+script-only auxiliary-bundle upgrade defect remains PRERC-UPDATE-01; do not count
+state preservation or recovery as closure. Public/client/two-VPS/cold-boot gates
+are not inferred from local success. The historical overview model accepts
+TWEBPROXY_GATE2_BASELINE pointing to verified old source when rewritten Git
+history lacks commit3375c4a; absence is NOT_EXECUTED77, not a product failure.

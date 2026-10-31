@@ -161,6 +161,15 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
 
 ## Limitations
 
+- **v0.2.26 pre-RC / PRERC-UPDATE-01:** the script-only updater does not deliver
+  a changed optional Bridge bundle. A real v0.2.25 → v0.2.26 test preserved local
+  profiles but left installed foreign-node commands without their newly pinned
+  bundle. Complete verified distribution + repair restored it; script rollback
+  restored v0.2.25. This workaround does not close the release blocker. Existing
+  active/pending Bridge update refusals remain mandatory. No updater redesign,
+  unverified download or legacy-bundle fallback is introduced. See
+  [bounded pre-RC](PRERC-v0.2.26.md).
+
 - No protection against freeze or replay of an older signed "latest" release
   (no timestamp service); `--force` can deliberately reinstall an older signed
   release.

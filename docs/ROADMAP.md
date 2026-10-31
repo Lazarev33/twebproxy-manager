@@ -30,7 +30,7 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | Bridge Gate 2 | CONDITIONAL ACCEPTANCE | 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
 | Gate 3 / v0.2.25 | DEVELOPMENT SOURCE IN MAIN | Default site, Bridge and operator-reported iOS test |
 | Bridge menu fix | LOCAL REGRESSION PASS | Not confirmed deployed on RU Entry |
-| Smart Defaults / TUI | NEXT TASK | Automated safe choices and presets; not in 0.2.25 |
+| Smart Defaults / TUI | UNPUBLISHED v0.2.26-beta CANDIDATE | Safe defaults/presets implemented; focused confirmation/localization/ERR corrections; no live deployment |
 | RC / stable Release | NOT AUTHORIZED | Platform/client matrix, cold boot, security, verified distribution |
 
 Current tasks: finish focused CLI/TUI fixes, Smart Defaults and Gate 3 acceptance on the **existing** data path; then validate and publish a stable release. Defer structural changes to [roadmap-test.md](../roadmap-test.md). See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
@@ -54,9 +54,19 @@ Actual Bridge route: RU HTTPS front end → tproxy-server → loopback TCP forwa
 
 Next: verify clean installs, two-host cold boot, safe recovery and removal, TLS/renewal, external backend exposure, supported clients including Desktop and non-tested OS/CPU combinations. Keep synthetic protocol evidence distinct from genuine application tests and operator reports.
 
-Smart Defaults is a separate future stage: inventory technical TUI prompts, replace avoidable input with safe defaults/presets, retain Advanced mode and explicit security/destructive approvals. Do not change the existing six DPI modes or automatically select aggressive modes.
+Smart Defaults is implemented in the unpublished v0.2.26-beta candidate: input inventory, safe defaults/presets, Advanced mode and explicit security/destructive approvals. The focused correction pass fixes restore affirmatives, localization audit, CLI ERR handling and standalone test dependencies. Existing six DPI methods/defaults and the working network path are unchanged. Public Quick TLS, a new two-VPS deployment and application tests are not claimed for this candidate.
 
 Do not conflate a GitHub development source commit with a stable signed Release or trusted automatic update. Prior accepted P1 corrections need a new reproducer before reopening.
+
+## v0.2.26 bounded integration result
+
+The corrected Smart Defaults candidate is integrated for review; it is not in
+main or a stable Release. Actual isolated Linux validation reproduced open
+PRERC-UPDATE-01: script-only self-update leaves the newly pinned Bridge bundle
+absent. Complete-distribution repair recovers it but does not close the updater
+compatibility blocker. No runtime/update redesign is introduced; merge/release
+readiness is withheld. See [pre-RC evidence scope](PRERC-v0.2.26.md). The release-first
+network/security freeze and deferred roadmap-test remain unchanged.
 
 ## Immediate low-risk corrections — no network architecture changes
 

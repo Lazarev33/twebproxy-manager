@@ -3,7 +3,15 @@ import subprocess,tempfile,json,os
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory() as d:
- baseline=Path(d)/'gate2.sh';baseline.write_bytes(subprocess.check_output(['git','show','3375c4a9d5057bab453ce3fdc41b688a06b6ab77:twebproxy-manager.sh'],cwd=ROOT))
+ baseline=Path(d)/'gate2.sh'
+ if os.environ.get('TWEBPROXY_GATE2_BASELINE'):
+  baseline.write_bytes(Path(os.environ['TWEBPROXY_GATE2_BASELINE']).read_bytes())
+ else:
+  old=subprocess.run(['git','show','3375c4a9d5057bab453ce3fdc41b688a06b6ab77:twebproxy-manager.sh'],cwd=ROOT,capture_output=True)
+  if old.returncode:
+   print('NOT_EXECUTED: historical Gate2 commit unavailable; set TWEBPROXY_GATE2_BASELINE to the verified historical source')
+   raise SystemExit(77)
+  baseline.write_bytes(old.stdout)
  results={}
  code='''source "$1"; trap - ERR
 list_hosts_array(){ echo example.invalid; }; count_profiles(){ echo 1; }
