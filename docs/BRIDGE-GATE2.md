@@ -1,7 +1,10 @@
 # Bridge Gate 2 MVP
 
-This development candidate extends accepted v0.2.24 commit
-83e001ed49bfe210dc4d79aaccd15d72e406045d. It is not a release.
+This historical Gate 2 MVP extends accepted v0.2.24 commit
+83e001ed49bfe210dc4d79aaccd15d72e406045d. It received CONDITIONAL
+ACCEPTANCE (17 PASS, 0 FAIL, 8 NOT_EXECUTED). The Gate 3 v0.2.25-beta source
+is now in GitHub main, but no stable Release exists.
+See [architecture](ARCHITECTURE.md) and [Gate 3 operations](bridge-gate3/OPERATIONS.md).
 One entry, one trusted foreign node, one existing hostname with exactly one
 profile. This whole instance becomes a Bridge. Other instances remain local.
 The exit operator/root can recover the canonical MTProxy secret. Enroll only
@@ -93,4 +96,4 @@ certificate. An initial clean core install hit a Telegram material download
 timeout; complete from-zero novice installation is not a demonstrated PASS.
 Manager executable update/rollback and profile add/delete/rotation are
 blocked while a Bridge is attached. Remove the node before these operations.
-Fleet upgrades, rotations, multiple nodes/balancing and Gate 3 are excluded.
+Fleet upgrades, rotations and multiple nodes/balancing were excluded from Gate 2. Gate 3 was developed separately; see its operations and client evidence.
