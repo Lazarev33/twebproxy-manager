@@ -1,5 +1,20 @@
 # Bounded pre-RC fixtures
 
+## Focused PRERC-UPDATE-01 stop record
+
+`update01-installed.py` is a deliberately RED installed-host reproducer, not a
+correction or a GREEN release gate. It requires a fresh `update01-lab` Ubuntu24.04
+KVM guest, the machine-id ownership marker, complete main4049 baseline installation
+and the exact c592c71 accepted v026 script at `/root/candidate26`. Install the
+baseline/profile using the guest1 commands below; the test itself verifies its
+runtime prerequisites before mutation. Run `python3 update01-installed.py` only
+inside that disposable guest. Expected final exit1 records the open component
+gap; intermediate refusal/rollback/preservation checks can pass independently.
+It adds actual failed-download, SIGTERM, active/pending refusal and original
+component/service preservation observations. Raw output stays root-only in the
+guest and must be sanitized before export. Its active/pending state fixtures do
+not provision a real tunnel. [Stop/design record](../../docs/PRERC-UPDATE01-STOP.md).
+
 Local: `bash tests/tui-smart-defaults/run-local.sh`. See the handoff REPRODUCE.md
 for the exact commands and separate model/process/kernel/application results.
 
