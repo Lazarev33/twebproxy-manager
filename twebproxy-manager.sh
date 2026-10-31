@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 umask 077
 
-# TWebProxy Manager v0.2.25-beta (Bridge Gate3 development)
+# TWebProxy Manager v0.2.26-beta (TUI smart defaults development)
 # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
 # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
 
 APP="twebproxy"
-MANAGER_VERSION="0.2.25"
-MANAGER_RELEASE_VERSION="0.2.25-beta"
+MANAGER_VERSION="0.2.26"
+MANAGER_RELEASE_VERSION="0.2.26-beta"
 TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
 TPROXY_BRANCH="master"
 # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
@@ -121,6 +121,8 @@ MANAGER_UPDATE_HINT_ATTEMPTED=0
 OUTPUT_MODE="human"
 OUTPUT_NO_COLOR=0
 UI_LANGUAGE="ru"
+TUI_ACTIVE=0
+TUI_SETUP_KIND=""
 # Upper bound (seconds) for one read-only diagnostic probe (systemctl, nft,
 # journalctl, dig, ...); see diag_run.
 DIAG_TIMEOUT="${TWEBPROXY_DIAG_TIMEOUT:-10}"
@@ -146,6 +148,48 @@ choice	Choice	Выбор
 foreign_nodes	Foreign Nodes / Bridge	Зарубежные узлы / Мост
 foreign_add	Add Foreign Node	Добавить зарубежный узел
 foreign_operation_failed	Bridge operation did not complete (code %s). See the details above; inspect node status before retrying.	Операция с мостом не завершена (код %s). Подробности приведены выше; перед повтором проверьте состояние узла.
+smart_advanced	Advanced / manual settings	Расширенные / ручные настройки
+smart_quick	Standard setup (recommended)	Стандартная настройка (рекомендуется)
+smart_failure	Operation did not complete (code %s). Details are above; use Diagnostics before retrying.	Операция не завершена (код %s). Подробности выше; перед повтором откройте диагностику.
+smart_cancelled	Cancelled; no further action was taken.	Отменено; дальнейшие действия не выполнялись.
+smart_apply	Apply this plan?	Применить этот план?
+smart_impact	Affected: %s. Connections may be interrupted. Canonical state is retained; use Diagnostics/Repair if recovery is needed. Automatic rollback applies only to the existing transactional steps.	Затронуты: %s. Соединения могут прерваться. Каноническое состояние сохраняется; при сбое используйте диагностику/восстановление. Автооткат действует только для существующих транзакционных шагов.
+smart_auto_plan	Automatic: free internal ports (rechecked under lock), HTTPS carrier, generated secret, one worker, 4096 connections, STOCK; bundled site or preserved existing files. No secret is included in this preview.	Автоматически: свободные внутренние порты (повторная проверка под блокировкой), HTTPS carrier, новый секрет, один worker, 4096 соединений, STOCK; встроенный сайт или сохранённые существующие файлы. Секрет в плане не показывается.
+smart_install_impact	Install/reuse verified dependencies, enforce procfs/backend isolation, configure the selected frontend and start the new profile. Existing frontend sites are preserved. Partial failures require Diagnostics/Repair; full installation rollback is not promised.	Установка/повторное использование проверенных зависимостей, защита procfs/backend, настройка выбранного веб-сервера и запуск нового профиля. Существующие сайты сохраняются. При частичном сбое нужна диагностика/восстановление; полный откат установки не обещается.
+smart_frontend_blocked	Standard TLS cannot safely use the existing listeners/configuration. Nothing was changed. Use Advanced setup with the existing frontend.	Стандартный TLS нельзя безопасно совместить с текущими слушателями/конфигурацией. Изменений нет. Используйте расширенную настройку с существующим веб-сервером.
+smart_probe_missing	Cannot inspect the environment safely: required command %s is unavailable. Use core installation or install the inspection tool, then retry.	Нельзя безопасно проверить окружение: отсутствует команда %s. Установите основу или инструмент проверки и повторите.
+smart_dns_blocked	DNS ownership could not be confirmed. Point the public A record to this server, check DNS/network access and retry. No installation was started.	Принадлежность DNS не подтверждена. Направьте публичную A-запись на этот сервер, проверьте DNS/доступ к сети и повторите. Установка не начата.
+smart_contact_missing	Existing Nginx has no reusable managed ACME contact. Use Advanced setup to supply the required contact/certificate.	Для существующего Nginx нет управляемого ACME-контакта. В расширенной настройке укажите контакт или сертификат.
+smart_profile_preset	Profile configuration	Настройка профиля
+smart_profile_plan	Profile %s: carrier %s; workers=%s, connections=%s. Ports are checked under lock. Relay will restart; existing profiles remain. No secret is shown.	Профиль %s: carrier %s; workers=%s, connections=%s. Порты проверяются под блокировкой. Relay перезапустится; существующие профили сохраняются. Секрет не показывается.
+smart_rotate_preset	New access key	Новый ключ доступа
+smart_rotate_auto	Generate securely (recommended)	Сгенерировать безопасно (рекомендуется)
+smart_rotate_manual	Enter my own secret (advanced)	Ввести свой секрет (расширенная настройка)
+smart_rotate_warning	The old key will stop working. Backend/relay may restart and clients must import the new link. Continue?	Старый ключ перестанет работать. Backend/relay могут перезапуститься; клиентам понадобится новая ссылка. Продолжить?
+smart_unchanged	Already selected; nothing changed.	Уже выбран этот вариант; изменений нет.
+smart_carrier_change	Change carrier %s to %s? Relay will restart; clients may need a new link.	Сменить carrier %s на %s? Relay перезапустится; клиентам может понадобиться новая ссылка.
+smart_bridge_active	A managed node exists. Use status, diagnostics, repair or removal; Add is unavailable.	Управляемый узел уже есть. Доступны статус, диагностика, восстановление и удаление; добавление недоступно.
+smart_bridge_pending	An interrupted/unknown node state exists. Identity is retained. Inspect status and use repair; Add is blocked.	Есть прерванное/неизвестное состояние узла. Идентичность сохранена. Проверьте статус и выполните восстановление; добавление заблокировано.
+smart_dpi_guided	Guided compatibility test	Проверка совместимости по шагам
+smart_dpi_stock	Return to STOCK (no traffic modification)	Вернуть STOCK (без изменения трафика)
+smart_dpi_limits	The server cannot identify client-side DPI from these probes. Start with STOCK. Experimental choices require a real client comparison; none is an automatic recommendation.	Сервер не определяет клиентский DPI по этим проверкам. Начинайте со STOCK. Экспериментальные варианты требуют сравнения настоящим клиентом; автоматической рекомендации нет.
+smart_dpi_keep	Keep current settings	Оставить текущие настройки
+smart_stock_scope	Return to STOCK for %s. Stored IPv4 scopes (including old DNS addresses) are listed below.	Вернуть STOCK для %s. Ниже показаны сохранённые области IPv4, включая прежние адреса DNS.
+smart_dpi_window	Try TCP window compatibility (Window 1152)	Проверить совместимость TCP-окна (Window 1152)
+smart_dpi_mss	Try smaller TCP segments (MSS 88)	Проверить меньшие TCP-сегменты (MSS 88)
+smart_dpi_nfqws	Try packet processing (nfqws, experimental)	Проверить обработку пакетов (nfqws, экспериментально)
+smart_full_report	The full report can contain proxy secrets. Keep it private. Create it?	Полный отчёт может содержать секреты прокси. Храните его закрыто. Создать?
+smart_core_confirm	Install the core and its dependencies, firewall and procfs protection? Existing services must be preserved.	Установить основу, зависимости, защиту firewall и procfs? Существующие службы должны сохраниться.
+smart_limits_one	One worker / 4096 connections (standard)	Один процесс / 4096 подключений (стандарт)
+smart_limits_two	Two workers / 4096 connections each	Два процесса / по 4096 подключений
+smart_carrier_title	Client transport (check client support before changing)	Транспорт клиента (перед изменением проверьте поддержку)
+smart_carrier_https	https — standard (recommended)	https — стандартный (рекомендуется)
+smart_carrier_lanes	https-lanes — separate HTTP/2 streams	https-lanes — отдельные потоки HTTP/2
+smart_carrier_ws	websocket — WSS; client validation required	websocket — WSS; нужна проверка клиента
+smart_carrier_ws_lanes	websocket-lanes — separate WSS streams; client validation required	websocket-lanes — отдельные WSS-потоки; нужна проверка клиента
+smart_target	Selected target: %s / %s	Выбранный объект: %s / %s
+smart_quick_plan	Public HTTPS for %s; frontend %s; bundled/preserved static website; profile default.	Публичный HTTPS для %s; веб-сервер %s; встроенный/сохранённый сайт; профиль default.
+smart_profile_name_blocked	Automatic profile names are reserved by existing/pending records. Use Advanced for another name or inspect/repair the retained state.	Автоматические имена заняты существующими/остаточными записями. Выберите другое имя в расширенной настройке или проверьте/восстановите сохранённое состояние.
 main_menu	Main menu	Главное меню
 instances	Proxies / Instances	Прокси / Инстансы
 profiles	Profiles	Профили
@@ -455,6 +499,22 @@ dpi_kernel_match	match the recorded mode	совпадают с записанн�
 dpi_kernel_diverged	DO NOT match the recorded mode; run: twebproxy repair %s	НЕ совпадают с записанным режимом; выполните: twebproxy repair %s
 rollback_not_performed_eof	Input closed (EOF): nothing was restored.	Ввод закрыт (EOF): ничего не восстановлено.
 rollback_not_performed_declined	Cancelled: nothing was restored.	Отменено: ничего не восстановлено.
+bridge_bundle_missing	Bridge bundle missing; use the complete verified distribution.	Пакет Bridge отсутствует; используйте полный проверенный дистрибутив.
+bridge_launcher_mismatch	Bridge launcher digest mismatch; restore the verified distribution before retrying.	Хеш запускающего модуля Bridge не совпал; восстановите проверенный дистрибутив перед повтором.
+bridge_update_busy	Manager update/restore currently running; Bridge preparation blocked. Retry after it finishes.	Уже выполняется обновление или восстановление Manager; подготовка моста заблокирована. Повторите после завершения.
+bridge_restore_guard_failed	Offline restore compatibility guard installation failed; Bridge preparation stopped. Check the restore helper and retry.	Не удалось установить защиту совместимости автономного восстановления; подготовка моста остановлена. Проверьте модуль восстановления и повторите.
+bridge_ports_busy	Port allocator busy; retry after the other operation finishes.	Порты выделяет другая операция; повторите после её завершения.
+bridge_instance_busy	Instance mutation busy; retry after the other operation finishes.	Инстанс изменяет другая операция; повторите после её завершения.
+bridge_invalid_forward	Invalid forward port; specify a TCP port from 1 to 65535.	Недопустимый порт перенаправления; укажите TCP-порт от 1 до 65535.
+bridge_commit_failed	Bridge profile commit failed; inspect status before retrying.	Не удалось сохранить профиль моста; перед повтором проверьте статус.
+bridge_backend_stop_failed	Previous local backend could not be stopped; inspect its service before retrying.	Не удалось остановить прежний локальный сервер; перед повтором проверьте его службу.
+bridge_invalid_prior_port	Invalid prior local port; inspect the retained Bridge state.	Недопустимый прежний локальный порт; проверьте сохранённое состояние моста.
+bridge_local_not_ready	Local recovery backend not ready; mapping retained. Inspect its service before retrying.	Восстанавливаемый локальный сервер не готов; сопоставление сохранено. Перед повтором проверьте его службу.
+bridge_local_validation_failed	Local restore validation failed; inspect the retained configuration before retrying.	Проверка локальной конфигурации при восстановлении не пройдена; проверьте сохранённую конфигурацию перед повтором.
+bridge_unknown_internal	Unknown Bridge internal operation; use a documented Manager command.	Неизвестная внутренняя операция моста; используйте документированную команду Manager.
+bridge_profile_attached	Bridge MVP: detach via 'twebproxy foreign-node remove' before adding/deleting/rotating profiles.	Профиль подключён к мосту. Перед добавлением, удалением или ротацией выполните «twebproxy foreign-node remove».
+bridge_link_usage	Usage: twebproxy connection-link HOST [PROFILE]	Использование: twebproxy connection-link HOST [PROFILE]
+bridge_json_verbs	foreign-node --json supports status/diagnose only.	foreign-node --json поддерживает только status/diagnose.
 restore_partial_hint	The executables were restored, but %s was not updated (read-only, immutable or full?). Make it writable, e.g. "chattr -i %s", then run "twebproxy repair HOSTNAME".	Исполняемые файлы восстановлены, но %s не обновлён (только для чтения, immutable или нет места?). Сделайте файл записываемым, например «chattr -i %s», затем выполните «twebproxy repair HOSTNAME».
 global_env_write_failed	Could not write %s (read-only, immutable or full?); nothing in it was changed. Make it writable, e.g. "chattr -i %s", and repeat.	Не удалось записать %s (только для чтения, immutable или нет места?); файл не изменён. Сделайте его записываемым, например «chattr -i %s», и повторите.
 proc_status_hidden	Process list of other users is hidden (procfs %s): MTProxy client secrets are not readable by unprivileged local accounts.	Процессы других пользователей скрыты (procfs %s): secrets клиентов MTProxy недоступны непривилегированным локальным учётным записям.
@@ -1216,7 +1276,9 @@ on_error() {
     set -e
     trap 'rc=$?; on_error "$rc" "$LINENO" "$BASH_COMMAND"' ERR
   fi
-  return "$rc"
+  # Returning a failure from ERR through nested function unwinding corrupts
+  # Bash 5.2's variable-context stack (pop_var_context). This handler is fatal.
+  exit "$rc"
 }
 
 trap 'rc=$?; on_error "$rc" "$LINENO" "$BASH_COMMAND"' ERR
@@ -1232,7 +1294,8 @@ need_systemd() { command -v systemctl >/dev/null 2>&1 || die "Нужен systemd
 # End of input (Ctrl-D, closed or exhausted stdin) never confirms or selects
 # anything: a yes/no prompt answers NO, a value or selection prompt cancels the
 # command with status 130 (on_error exits quietly on it), a menu goes back. A
-# last line without a newline still counts as an answer.
+# last value/selection line without a newline still counts as an answer;
+# security/destructive confirmations require a complete line.
 ui_input_closed() { printf '\n' >&2; warn "Ввод закрыт (EOF); операция отменена." >&2; }
 
 # A menu number: 1-4 decimal digits (leading zeros are decimal, never octal) in $2..$3.
@@ -1259,14 +1322,14 @@ yesno() {
   local prompt="$1" default="${2:-y}" reply="" hint="[y/N]"
   prompt="$(ui_localize_legacy "$prompt")"
   [[ "$default" == "y" ]] && hint="[Y/n]"
-  if ! read -r -p "$prompt $hint: " reply && [[ -z "$reply" ]]; then
+  if [[ "$UI_LANGUAGE" == ru ]]; then
+    hint="[д/Н]"; [[ "$default" != y ]] || hint="[Д/н]"
+  fi
+  if ! read -r -p "$prompt $hint: " reply; then
     printf '\n' >&2; warn "Ввод закрыт (EOF); ответ: нет." >&2; return 1
   fi
-  if [[ "$default" == "y" ]]; then
-    [[ -z "$reply" || "$reply" =~ ^[YyДд]$ ]]
-  else
-    [[ "$reply" =~ ^[YyДд]$ ]]
-  fi
+  [[ -n "$reply" || "$default" != y ]] || return 0
+  case "$reply" in y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0;; *) return 1;; esac
 }
 
 choose() {
@@ -1295,6 +1358,13 @@ menu_choose() {
     n="$(ui_number_in_range "$choice" 0 "${#options[@]}")" || { warn "$(ui_msg unknown_option)" >&2; continue; }
     printf '%s' "$n"; return 0
   done
+}
+
+tui_preset_choose() {
+  local selected
+  selected="$(menu_choose "$1" "$(ui_msg back)" "${@:2}")"
+  [[ "$selected" != 0 ]] || return 130
+  printf '%s' "$selected"
 }
 
 pause() { read -r -p "$(ui_msg press_enter)" _ || true; }
@@ -4828,13 +4898,13 @@ manager_restore_backup_cmd() {
 # ROLLBACK_NOT_PERFORMED with status 1 (declined) or 130 (input closed).
 stage4_confirm_restore() {
   local reply=""
-  if ! read -r -p "$(ui_localize_legacy "$1") [y/N]: " reply && [[ -z "$reply" ]]; then
+  if ! read -r -p "$(ui_localize_legacy "$1") [y/N]: " reply; then
     printf '\n' >&2
     warn "$(ui_msg rollback_not_performed_eof)"
     printf 'ROLLBACK_NOT_PERFORMED reason=eof\n'
     return 130
   fi
-  [[ "$reply" =~ ^[YyДд]$ ]] && return 0
+  case "$reply" in y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0;; esac
   log "$(ui_msg rollback_not_performed_declined)"
   printf 'ROLLBACK_NOT_PERFORMED reason=declined\n'
   return 1
@@ -5403,12 +5473,11 @@ check_dns_for_host() {
 }
 
 carrier_choose() {
-  local cm
-  cm="$(choose 'Carrier mode:' \
-    'https — консервативный baseline' \
-    'https-lanes — отдельные HTTP/2 lanes' \
-    'websocket — один мультиплексированный WSS' \
-    'websocket-lanes — отдельный WSS на поток')" || return $?
+  local cm chooser=choose
+  (( ! TUI_ACTIVE )) || chooser=tui_preset_choose
+  cm="$("$chooser" "$(ui_msg smart_carrier_title)" \
+    "$(ui_msg smart_carrier_https)" "$(ui_msg smart_carrier_lanes)" \
+    "$(ui_msg smart_carrier_ws)" "$(ui_msg smart_carrier_ws_lanes)")" || return $?
   case "$cm" in 1) printf https;; 2) printf https-lanes;; 3) printf websocket;; 4) printf websocket-lanes;; esac
 }
 
@@ -6503,9 +6572,67 @@ remove_reverse_proxy_for_instance() {
 }
 
 configure_ufw() {
+  local approval_default=y
   command -v ufw >/dev/null 2>&1 || return 0
   ufw status 2>/dev/null | grep -q '^Status: active' || return 0
-  if yesno "UFW активен. Разрешить TCP 80 и 443?" y; then ufw allow 80/tcp; ufw allow 443/tcp; fi
+  (( ! TUI_ACTIVE )) || approval_default=n
+  if yesno "UFW активен. Разрешить TCP 80 и 443?" "$approval_default"; then ufw allow 80/tcp; ufw allow 443/tcp; fi
+}
+
+smart_dns_ready() {
+  # Read DNS, not /etc/hosts. An unavailable public-IP probe is not success.
+  local host="$1" answers local_ips public_ip=""
+  if command -v dig >/dev/null 2>&1; then
+    answers="$(dig +time=3 +tries=1 +short A "$host")" || return 1
+  else
+    answers="$(getent -s dns ahostsv4 "$host" | awk '{print $1}')" || return 1
+  fi
+  local_ips="$(ip -4 -o addr show scope global | awk '{split($4,a,"/");print a[1]}')" || return 1
+  if command -v curl >/dev/null 2>&1; then
+    public_ip="$(curl -4fsS --proto '=https' --connect-timeout 3 --max-time 6 https://api.ipify.org 2>/dev/null)" || public_ip=""
+  fi
+  python3 - "$answers" "$local_ips" "$public_ip" <<'PY_DNS'
+import ipaddress,sys
+def public(values):
+ out=set()
+ for v in values.split():
+  try:
+   a=ipaddress.IPv4Address(v)
+   if a.is_global:out.add(str(a))
+  except ValueError:pass
+ return out
+sys.exit(0 if public(sys.argv[1]) & (public(sys.argv[2]) | public(sys.argv[3])) else 1)
+PY_DNS
+}
+
+smart_frontend_settings() {
+  local family listeners h contact="" tool
+  for tool in ss ip getent python3 openssl; do
+    command -v "$tool" >/dev/null 2>&1 || die "$(ui_msgf smart_probe_missing "$tool")"
+  done
+  family="$(managed_frontend_family)"
+  listeners="$(ss -H -ltnp '( sport = :80 or sport = :443 )')" || die "$(ui_msg smart_frontend_blocked)"
+  # Do not adopt an unknown web server, even when its binary is familiar.
+  [[ "$family" != mixed && ( -n "$family" || -z "$listeners" ) ]] || die "$(ui_msg smart_frontend_blocked)"
+  TLS_MODE=caddy
+  [[ "$family" != nginx ]] || TLS_MODE=nginx-le
+  if [[ -n "$listeners" ]]; then
+    while IFS= read -r h; do
+      [[ -z "$h" || "$h" == *"\"${family}\""* ]] || die "$(ui_msg smart_frontend_blocked)"
+    done <<< "$listeners"
+  fi
+  # Reuse only a validated contact from a compatible managed record.
+  while IFS= read -r h; do
+    [[ -n "$h" ]] || continue
+    contact="$( (load_instance "$h"; [[ "$TLS_MODE" == caddy || "$TLS_MODE" == nginx-le ]] && printf '%s' "${ACME_EMAIL:-}") )" || contact=""
+    [[ "$contact" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] && break
+    contact=""
+  done < <(list_hosts_array)
+  ACME_EMAIL="$contact"; NGINX_CERT=""; NGINX_KEY=""
+  [[ "$TLS_MODE" != nginx-le || -n "$ACME_EMAIL" ]] || die "$(ui_msg smart_contact_missing)"
+  SITE_MODE=default; SITE_UPSTREAM=""; SOURCE_SITE_DIR=""
+  default_site_action verify >/dev/null
+  check_frontend_compatibility "$TLS_MODE"
 }
 
 collect_instance_settings() {
@@ -6529,7 +6656,10 @@ collect_instance_settings() {
   # Quick setup keeps every safety check and only answers the advanced
   # questions (ports, profile, secret, carrier, MTProxy limits) with defaults.
   local st
-  st="$(choose "$(ui_msg setup_type)" "$(ui_msg setup_quick)" "$(ui_msg setup_advanced)")" || return $?
+  case "${TUI_SETUP_KIND:-}" in
+    quick) st=1;; advanced) st=2;;
+    *) st="$(choose "$(ui_msg setup_type)" "$(ui_msg setup_quick)" "$(ui_msg setup_advanced)")" || return $?;;
+  esac
   SETUP_MODE=quick; [[ "$st" == 1 ]] || SETUP_MODE=advanced
 
   echo
@@ -6549,6 +6679,13 @@ collect_instance_settings() {
     adef="$(next_free_port 18081 20999)"; ADMIN_PORT="$(ask_internal_port 'Admin/metrics port (loopback)' "$adef")"
   fi
   [[ "$RELAY_PORT" != "$ADMIN_PORT" ]] || die "Порты должны быть разными."
+
+  if [[ "${TUI_SETUP_KIND:-}" == quick ]]; then
+    smart_frontend_settings
+    smart_dns_ready "$HOSTNAME" || die "$(ui_msg smart_dns_blocked)"
+    CREATED_AT="$(date -Is)"
+    return 0
+  fi
 
   local sm
   echo; printf '%s\n' "$(ui_msg setup_site_intro)"
@@ -6598,7 +6735,7 @@ collect_profile_settings() {
   done
 
   if yesno "Сгенерировать новый 16-byte secret?" y; then SECRET="$(openssl rand -hex 16)"; else
-    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'Secret (32 hex or dd+32 hex): ' || printf 'Secret (32 hex либо dd+32 hex): ')" SECRET; echo
+    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'Secret (32 hex or dd+32 hex): ' || printf 'Secret (32 hex либо dd+32 hex): ')" SECRET || return 130; echo
     is_valid_secret "$SECRET" || die "Некорректный secret."
   fi
   CARRIER_MODE="$(carrier_choose)"
@@ -6614,20 +6751,38 @@ collect_profile_settings() {
   fi
   [[ "$BACKEND_PORT" != "$STATS_PORT" ]] || die "Backend и stats ports должны отличаться."
 
-  WORKERS="$(ask 'MTProxy workers' '1')"
-  MAX_CONNECTIONS="$(ask 'Max connections на worker' '4096')"
+  if (( TUI_ACTIVE )); then
+    local limits
+    limits="$(tui_preset_choose "$(ui_msg smart_profile_preset)" "$(ui_msg smart_limits_one)" "$(ui_msg smart_limits_two)" "$(ui_msg smart_advanced)")" || return $?
+    case "$limits" in
+      1) WORKERS=1; MAX_CONNECTIONS=4096;;
+      2) WORKERS=2; MAX_CONNECTIONS=4096;;
+      3) WORKERS="$(ask 'MTProxy workers' '1')"; MAX_CONNECTIONS="$(ask 'Max connections на worker' '4096')";;
+    esac
+  else
+    WORKERS="$(ask 'MTProxy workers' '1')"
+    MAX_CONNECTIONS="$(ask 'Max connections на worker' '4096')"
+  fi
   [[ "$WORKERS" =~ ^[1-9][0-9]*$ ]] && (( WORKERS <= 256 )) || die "workers: 1..256"
   [[ "$MAX_CONNECTIONS" =~ ^[1-9][0-9]*$ ]] || die "max connections должен быть > 0"
   PROFILE_CREATED_AT="$(date -Is)"
 }
 
-# Under the port lock, right before persistence: automatically chosen ports
-# are chosen again and manually entered ones must still be free, so two
-# concurrent operations never persist the same port.
+# Under the port lock: keep a still-free automatic proposal, otherwise select
+# again. An unknown listener/registry state always blocks allocation.
+preferred_free_port() {
+  local candidate="${1:-}" low="$2" high="$3" rc=0
+  if is_valid_port "$candidate" && (( 10#$candidate >= low && 10#$candidate <= high )); then
+    port_available "$candidate" || rc=$?
+    case "$rc" in 0) printf '%s' "$candidate"; return 0;; 2) return 2;; esac
+  fi
+  next_free_port "$low" "$high"
+}
+
 claim_instance_ports() {
   if [[ "${INSTANCE_PORTS_AUTO:-1}" == 1 ]]; then
-    RELAY_PORT="$(next_free_port 18080 19999)" || die "Нет свободного relay port."
-    ADMIN_PORT="$(next_free_port $((RELAY_PORT+1)) 20999)" || die "Нет свободного admin port."
+    RELAY_PORT="$(preferred_free_port "${RELAY_PORT:-}" 18080 19999)" || die "Нет свободного relay port."
+    ADMIN_PORT="$(preferred_free_port "${ADMIN_PORT:-}" $((RELAY_PORT+1)) 20999)" || die "Нет свободного admin port."
   else
     port_available "$RELAY_PORT" || die "Порт $RELAY_PORT уже занят или зарегистрирован TWebProxy."
     port_available "$ADMIN_PORT" || die "Порт $ADMIN_PORT уже занят или зарегистрирован TWebProxy."
@@ -6636,8 +6791,8 @@ claim_instance_ports() {
 
 claim_profile_ports() {
   if [[ "${PROFILE_PORTS_AUTO:-1}" == 1 ]]; then
-    BACKEND_PORT="$(next_free_port 23980 26999)" || die "Нет свободного backend port."
-    STATS_PORT="$(next_free_port 28980 31999)" || die "Нет свободного stats port."
+    BACKEND_PORT="$(preferred_free_port "${BACKEND_PORT:-}" 23980 26999)" || die "Нет свободного backend port."
+    STATS_PORT="$(preferred_free_port "${STATS_PORT:-}" 28980 31999)" || die "Нет свободного stats port."
   else
     port_available "$BACKEND_PORT" || die "Порт $BACKEND_PORT уже занят или зарегистрирован TWebProxy."
     port_available "$STATS_PORT" || die "Порт $STATS_PORT уже занят или зарегистрирован TWebProxy."
@@ -6666,7 +6821,8 @@ caddy_wait_certificate() { # $1=host
 }
 
 add_instance_cmd() {
-  need_root; need_systemd; check_platform; banner; ensure_core
+  need_root; need_systemd; check_platform; banner
+  (( TUI_ACTIVE )) || ensure_core
   collect_instance_settings
 
   echo
@@ -6677,7 +6833,9 @@ add_instance_cmd() {
   profile="$PROFILE_NAME"
 
   echo
-  if [[ "$UI_LANGUAGE" == en ]]; then cat <<EOF
+  if (( TUI_ACTIVE )) && [[ "${TUI_SETUP_KIND:-}" == quick ]]; then
+    tui_text "$(ui_msgf smart_quick_plan "$host" "$TLS_MODE")"
+  elif [[ "$UI_LANGUAGE" == en ]]; then cat <<EOF
 Plan:
   Hostname:       $host
   Public:         HTTPS/443
@@ -6708,11 +6866,22 @@ EOF
   Сетевой режим:  $(ui_msg plan_network_value)
 EOF
   fi
-  yesno "Создать?" y || exit 0
+  if (( TUI_ACTIVE )); then
+    [[ "${TUI_SETUP_KIND:-}" != quick ]] || tui_text "$(ui_msg smart_auto_plan)"
+    tui_text "$(ui_msg smart_install_impact)"
+    yesno "$(ui_msg smart_apply)" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+  else
+    yesno "Создать?" y || exit 0
+  fi
 
   if [[ "$TLS_MODE" != manual ]]; then
-    check_dns_for_host "$host" || yesno "DNS пока не совпадает. Продолжить?" n || exit 1
+    if [[ "${TUI_SETUP_KIND:-}" == quick ]]; then
+      smart_dns_ready "$host" || die "$(ui_msg smart_dns_blocked)"
+    else
+      check_dns_for_host "$host" || yesno "DNS пока не совпадает. Продолжить?" n || exit 1
+    fi
   fi
+  (( ! TUI_ACTIVE )) || ensure_core
 
   # procfs first (v0.2.24): with an unprotected /proc no backend may start, and
   # failing here leaves no half-created instance behind.
@@ -6802,13 +6971,40 @@ repair_instance_cmd() {
   show_instance_cmd "$host"
 }
 
+next_profile_name() {
+  local host="$1" n name id
+  for n in {1..33}; do
+    name="profile$n"; id="$(backend_id "$host" "$name")"
+    [[ ! -e "$(profile_env "$host" "$name")" && ! -L "$(profile_env "$host" "$name")" && ! -e "$BACKENDS_DIR/$id.env" && ! -L "$BACKENDS_DIR/$id.env" ]] || continue
+    backend_id_used_by_other "$host" "$name" && continue
+    printf '%s' "$name"; return 0
+  done
+  return 1
+}
+
 profile_add_cmd() {
-  need_root; ensure_core; banner
+  need_root; banner
+  (( TUI_ACTIVE )) || ensure_core
   local host="${1:-}" profile count orphan_id; [[ -n "$host" ]] || host="$(select_instance)"
   bridge_reject_profile_change "$host"
   require_instance "$host"
   count="$(count_profiles "$host")"; (( count < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
-  collect_profile_settings "$host" "profile$((count+1))"
+  if (( TUI_ACTIVE )); then
+    local preset suggested mode=quick
+    preset="$(tui_preset_choose "$(ui_msg smart_profile_preset)" "$(ui_msg smart_quick)" "$(ui_msg smart_advanced)")" || return $?
+    [[ "$preset" == 1 ]] || mode=advanced
+    if [[ "$mode" == quick ]]; then
+      suggested="$(next_profile_name "$host")" || die "$(ui_msg smart_profile_name_blocked)"
+    else
+      suggested="$(next_profile_name "$host")" || suggested=custom
+    fi
+    collect_profile_settings "$host" "$suggested" "$mode"
+    tui_text "$(ui_msgf smart_profile_plan "$PROFILE_NAME" "$CARRIER_MODE" "$WORKERS" "$MAX_CONNECTIONS")"
+    yesno "$(ui_msg smart_apply)" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+    ensure_core
+  else
+    collect_profile_settings "$host" "profile$((count+1))"
+  fi
   # From here on the target is this local name, whatever helpers do to globals.
   profile="$PROFILE_NAME"
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
@@ -6876,8 +7072,17 @@ profile_rotate_cmd() {
   require_instance "$host"
   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
   require_profile "$host" "$profile"
-  if yesno "Сгенерировать новый secret?" y; then new_secret="$(openssl rand -hex 16)"; else
-    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'New secret: ' || printf 'Новый secret: ')" new_secret; echo
+  local generate=1 preset
+  if (( TUI_ACTIVE )); then
+    tui_text "$(ui_msgf smart_target "$host" "$profile")"
+    preset="$(tui_preset_choose "$(ui_msg smart_rotate_preset)" "$(ui_msg smart_rotate_auto)" "$(ui_msg smart_rotate_manual)")" || return $?
+    [[ "$preset" == 1 ]] || generate=0
+    yesno "$(ui_msg smart_rotate_warning)" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+  else
+    yesno "Сгенерировать новый secret?" y || generate=0
+  fi
+  if (( generate )); then new_secret="$(openssl rand -hex 16)"; else
+    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'New secret: ' || printf 'Новый secret: ')" new_secret || return 130; echo
   fi
   is_valid_secret "$new_secret" || die "Некорректный secret."
   # Read-modify-write on the record as it is under the lock, not as it was
@@ -6898,13 +7103,19 @@ profile_rotate_cmd() {
 
 profile_carrier_cmd() {
   need_root; banner
-  local host="${1:-}" profile="${2:-}" carrier prev
+  local host="${1:-}" profile="${2:-}" carrier prev old_carrier
   [[ -n "$host" ]] || host="$(select_instance)"
   require_instance "$host"
   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
   require_profile "$host" "$profile"
-  carrier="$(carrier_choose)"
+  old_carrier="$CARRIER_MODE"
+  carrier="$(carrier_choose)" || return $?
   is_valid_carrier_mode "$carrier" || return 0
+  if (( TUI_ACTIVE )); then
+    [[ "$carrier" != "$old_carrier" ]] || { log "$(ui_msg smart_unchanged)"; return 0; }
+    tui_text "$(ui_msgf smart_target "$host" "$profile")"
+    yesno "$(ui_msgf smart_carrier_change "$old_carrier" "$carrier")" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+  fi
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
   require_profile "$host" "$profile"
   require_unshared_backends "$host"
@@ -9416,6 +9627,60 @@ tui_render_settings() {
   tui_text "$(ui_msg settings_note)"
 }
 
+# A fresh Bash process keeps errexit/ERR semantics inside service-changing
+# functions. Putting a whole Bash mutator in `if fn` would disable errexit in it.
+tui_run() {
+  local rc no_color="${NO_COLOR:-}"
+  [[ -n "$C_RESET" ]] || no_color=1
+  if TWEBPROXY_UI_LANGUAGE="$UI_LANGUAGE" TWEBPROXY_NO_LOG=1 \
+     NO_COLOR="$no_color" bash "${BASH_SOURCE[0]}" tui-internal "$@"; then return 0
+  else rc=$?; fi
+  if (( rc == 130 )); then warn "$(ui_msg smart_cancelled)" >&2
+  else warn "$(ui_msgf smart_failure "$rc")" >&2; fi
+  return 0
+}
+
+tui_internal_cmd() {
+  need_root; TUI_ACTIVE=1
+  [[ -z "${NO_COLOR:-}" ]] || disable_colors
+  export TWEBPROXY_ERROR_SNAPSHOT=1 TWEBPROXY_NO_LOG=1
+  trap 'exit $?' ERR
+  local action="${1:-}" label target="${2:-Manager}"; shift || return 64
+  case "$action" in
+    quick-add|advanced-add)
+      local TUI_SETUP_KIND=quick
+      [[ "$action" != advanced-add ]] || TUI_SETUP_KIND=advanced
+      add_instance_cmd; return;;
+    restart|repair|core-install|update|manager-update|cert-renew|report)
+      case "$action" in
+        restart) label="$(ui_msg restart_instance)";; repair) label="$(ui_msg repair_instance)";;
+        core-install) label="$(ui_msg smart_core_confirm)";; update) label="$(ui_msg relay_update)";;
+        manager-update) label="$(ui_msg manager_install_update)";; cert-renew) label="$(ui_msg cert_renew)";;
+        report) label="$(ui_msg smart_full_report)";;
+      esac
+      if [[ "$action" != cert-renew || "${2:-}" != --dry-run ]]; then
+        tui_text "$label"
+        [[ "$action" == report ]] || tui_text "$(ui_msgf smart_impact "$target")"
+        yesno "$(ui_msg smart_apply)" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+      fi;;
+    view-overview) collect_overview; tui_render_dashboard; return;;
+    view-profiles) collect_profiles_state "$target"; tui_render_profiles "$target"; return;;
+    view-tls) collect_audit "$target"; tui_render_tls "$target"; return;;
+    view-status) collect_status "$target"; tui_render_status "$target"; return;;
+    view-stats) collect_statistics_state "$target"; tui_render_statistics "$target"; return;;
+    view-updates) tui_render_update_recovery; return;;
+    dpi|show|manual-snippet|status|stats|audit|diagnose|cert-status|profile-list|profile-show|profile-add|profile-rotate|profile-carrier|profile-delete|delete|core-uninstall|check-update|manager-backup-list|manager-rollback|logs|logs-tail|logs-collect|logs-pack|field-report) ;;
+    *) return 64;;
+  esac
+  main "$action" "$@"
+}
+
+menu_add_instance() {
+  local choice
+  choice="$(menu_choose "$(ui_msg add_instance)" "$(ui_msg back)" "$(ui_msg smart_quick)" "$(ui_msg smart_advanced)")"
+  case "$choice" in 1) tui_run quick-add;; 2) tui_run advanced-add;; esac
+}
+
 menu_logs() {
   while true; do
     clear 2>/dev/null || true; tui_title "$(ui_msg logs_reports)"; tui_kv "Logs" "$LOG_DIR"; echo
@@ -9423,11 +9688,11 @@ menu_logs() {
       "$(ui_msg list_logs)" "$(ui_msg tail_log)" "$(ui_msg runtime_snapshot)" \
       "$(ui_msg safe_bundle)" "$(ui_msg full_report)")"
     case "$c" in
-      1) logs_list_cmd; pause;;
-      2) logs_tail_cmd 200; pause;;
-      3) logs_collect_cmd; pause;;
-      4) logs_pack_cmd; pause;;
-      5) report_cmd; pause;;
+      1) tui_run logs; pause;;
+      2) tui_run logs-tail 200; pause;;
+      3) tui_run logs-collect; pause;;
+      4) tui_run logs-pack; pause;;
+      5) tui_run report; pause;;
       0) return;;
     esac
   done
@@ -9437,16 +9702,16 @@ menu_profiles() {
   local host p; host="$(select_instance)" || return 0
   while true; do
     clear 2>/dev/null || true
-    collect_profiles_state "$host"; tui_render_profiles "$host"; echo
+    tui_run view-profiles "$host"; echo
     local c; c="$(menu_choose "$(ui_msg profiles):" "$(ui_msg back)" \
       "$(ui_msg add_profile)" "$(ui_msg show_profile)" "$(ui_msg rotate_profile)" \
       "$(ui_msg carrier_profile)" "$(ui_msg delete_profile)")"
     case "$c" in
-      1) profile_add_cmd "$host"; pause;;
-      2) p="$(select_profile "$host")" && { warn "$(ui_msg secret_warning)"; show_profile_cmd "$host" "$p"; }; pause;;
-      3) p="$(select_profile "$host")" && profile_rotate_cmd "$host" "$p"; pause;;
-      4) p="$(select_profile "$host")" && profile_carrier_cmd "$host" "$p"; pause;;
-      5) p="$(select_profile "$host")" && profile_delete_cmd "$host" "$p"; pause;;
+      1) tui_run profile-add "$host"; pause;;
+      2) p="$(select_profile "$host")" && { warn "$(ui_msg secret_warning)"; tui_run profile-show "$host" "$p"; }; pause;;
+      3) p="$(select_profile "$host")" && tui_run profile-rotate "$host" "$p"; pause;;
+      4) p="$(select_profile "$host")" && tui_run profile-carrier "$host" "$p"; pause;;
+      5) p="$(select_profile "$host")" && tui_run profile-delete "$host" "$p"; pause;;
       0) return;;
     esac
   done
@@ -9456,36 +9721,37 @@ menu_certificates() {
   local host; host="$(select_instance)" || return 0
   while true; do
     clear 2>/dev/null || true
-    collect_audit "$host"; tui_render_tls "$host"
+    tui_run view-tls "$host"
     echo
     local c; c="$(menu_choose "$(ui_msg tls_certificates):" "$(ui_msg back)" \
       "$(ui_msg cert_details)" "$(ui_msg cert_dry_run)" "$(ui_msg cert_renew)" "$(ui_msg cert_force)")"
     case "$c" in
-      1) cert_status_cmd "$host"; pause;;
-      2) cert_renew_cmd "$host" --dry-run; pause;;
-      3) cert_renew_cmd "$host"; pause;;
-      4) cert_renew_cmd "$host" --force; pause;;
+      1) tui_run cert-status "$host"; pause;;
+      2) tui_run cert-renew "$host" --dry-run; pause;;
+      3) tui_run cert-renew "$host"; pause;;
+      4) tui_run cert-renew "$host" --force; pause;;
       0) return;;
     esac
   done
 }
 
 menu_web_proxy() {
+  local host
   while true; do
     clear 2>/dev/null || true
-    collect_overview; tui_render_dashboard; echo
+    tui_run view-overview; echo
     local c; c="$(menu_choose "$(ui_msg instances):" "$(ui_msg back)" \
       "$(ui_msg add_instance)" "$(ui_msg show_connection)" "$(ui_msg manual_snippet)" \
       "$(ui_msg restart_instance)" "$(ui_msg repair_instance)" "$(ui_msg delete_instance)" \
       "$(ui_msg uninstall_core)")"
     case "$c" in
-      1) add_instance_cmd; pause;;
-      2) show_instance_cmd; pause;;
-      3) manual_snippet_cmd; pause;;
-      4) restart_cmd; pause;;
-      5) repair_instance_cmd; pause;;
-      6) delete_instance_cmd; pause;;
-      7) core_uninstall_cmd; pause;;
+      1) menu_add_instance; pause;;
+      2) host="$(select_instance)" && tui_run show "$host"; pause;;
+      3) host="$(select_instance)" && tui_run manual-snippet "$host"; pause;;
+      4) host="$(select_instance)" && tui_run restart "$host"; pause;;
+      5) host="$(select_instance)" && tui_run repair "$host"; pause;;
+      6) host="$(select_instance)" && tui_run delete "$host"; pause;;
+      7) tui_run core-uninstall; pause;;
       0) return;;
     esac
   done
@@ -9494,15 +9760,15 @@ menu_web_proxy() {
 menu_status_statistics() {
   local host; host="$(select_instance)" || return 0
   while true; do
-    clear 2>/dev/null || true; collect_status "$host"; tui_render_status "$host"; echo
+    clear 2>/dev/null || true; tui_run view-status "$host"; echo
     local c; c="$(menu_choose "$(ui_msg status_stats):" "$(ui_msg back)" \
       "$(ui_msg compact_status)" "$(ui_msg compact_statistics)" \
       "$(ui_msg detailed_status)" "$(ui_msg raw_statistics)")"
     case "$c" in
-      1) clear 2>/dev/null || true; collect_status "$host"; tui_render_status "$host"; pause;;
-      2) clear 2>/dev/null || true; collect_statistics_state "$host"; tui_render_statistics "$host"; pause;;
-      3) status_cmd "$host" --verbose; pause;;
-      4) stats_cmd "$host" --verbose; pause;;
+      1) clear 2>/dev/null || true; tui_run view-status "$host"; pause;;
+      2) clear 2>/dev/null || true; tui_run view-stats "$host"; pause;;
+      3) tui_run status "$host" --verbose; pause;;
+      4) tui_run stats "$host" --verbose; pause;;
       0) return;;
     esac
   done
@@ -9510,16 +9776,16 @@ menu_status_statistics() {
 
 menu_update_recovery() {
   while true; do
-    clear 2>/dev/null || true; tui_render_update_recovery; echo
+    clear 2>/dev/null || true; tui_run view-updates; echo
     local c; c="$(menu_choose "$(ui_msg update_recovery):" "$(ui_msg back)" \
       "$(ui_msg manager_check_update)" "$(ui_msg manager_install_update)" \
       "$(ui_msg backup_list)" "$(ui_msg rollback_latest)" "$(ui_msg relay_update)")"
     case "$c" in
-      1) manager_check_update_cmd; pause;;
-      2) manager_update_cmd; pause;;
-      3) manager_backup_list_cmd; pause;;
-      4) manager_restore_backup_cmd latest || true; pause;;
-      5) update_cmd; pause;;
+      1) tui_run check-update; pause;;
+      2) tui_run manager-update; pause;;
+      3) tui_run manager-backup-list; pause;;
+      4) tui_run manager-rollback latest; pause;;
+      5) tui_run update; pause;;
       0) return;;
     esac
   done
@@ -9535,19 +9801,21 @@ menu_maintenance() {
 }
 
 menu_diagnostics() {
-  local host c
+  local host="" c
   while true; do
     clear 2>/dev/null || true; tui_title "$(ui_msg diagnostics_logs)"; echo
     c="$(menu_choose "$(ui_msg diagnostics_logs):" "$(ui_msg back)" \
       "$(ui_msg full_diagnose)" "$(ui_msg isolation_audit)" "$(ui_msg typed_json)" \
-      "$(ui_msg typed_raw)" "$(ui_msg field_diagnostics)" "$(ui_msg logs_reports)")"
+      "$(ui_msg typed_raw)" "$(ui_msg field_diagnostics)" "$(ui_msg logs_reports)" "$(ui_msg select_hostname)")"
+    case "$c" in 1|2|3|4|5) [[ -n "$host" ]] || host="$(select_instance)" || continue;; esac
     case "$c" in
-      1) host="$(select_instance)" && { ( diagnose_cmd "$host" ) || true; }; pause;;
-      2) host="$(select_instance)" && { ( audit_cmd "$host" ) || true; }; pause;;
-      3) host="$(select_instance)" && { ( collect_audit "$host"; tcore_render_json ) || true; }; pause;;
-      4) host="$(select_instance)" && { ( collect_audit "$host"; tcore_render_raw ) || true; }; pause;;
-      5) host="$(select_instance)" && { ( field_report_cmd "$host" ) || true; }; pause;;
+      1) tui_run diagnose "$host"; pause;;
+      2) tui_run audit "$host"; pause;;
+      3) tui_run audit "$host" --json; pause;;
+      4) tui_run audit "$host" --raw; pause;;
+      5) tui_run field-report "$host"; pause;;
       6) menu_logs;;
+      7) host="$(select_instance)" || host="";;
       0) return;;
     esac
   done
@@ -9583,36 +9851,62 @@ dpi_tui_confirm_scope() {
   case "$reply" in y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0;; *) return 1;; esac
 }
 
+dpi_tui_stock_confirm() {
+  local host="$1" file
+  tui_text "$(ui_msgf smart_stock_scope "$host")"
+  # Show stored scopes as well: DNS may have moved since activation.
+  for file in "$DPI_STATE_DIR"/*.env; do
+    [[ -e "$file" || -L "$file" ]] || continue
+    dpi_load_scope_file "$file" || { warn "$(ui_msg dpi_tui_failed)"; return 1; }
+    [[ "$DPI_SCOPE_HOST" != "$host" ]] || printf '%s: %s (%s)\n' "$(ui_msg dpi_scope)" "$DPI_SCOPE_IPV4" "$DPI_SCOPE_MODE"
+  done
+  tui_text "$(ui_msg dpi_footer_scope)"
+  yesno "$(ui_msg dpi_confirm_scope)" n
+}
+
+dpi_tui_apply() {
+  local host="$1" method="$2"
+  dpi_mode_valid "$method" || return 1
+  if [[ "$method" == stock ]]; then
+    if dpi_tui_stock_confirm "$host"; then tui_run dpi disable "$host"
+    else log "$(ui_msg dpi_tui_cancelled)"; fi
+  elif dpi_tui_confirm_scope "$host"; then
+    tui_run dpi set "$host" "$method" --accept-shared-scope
+  else log "$(ui_msg dpi_tui_cancelled)"; fi
+}
+
+menu_dpi_guided() {
+  local host selected method
+  tui_text "$(ui_msg smart_dpi_limits)"
+  selected="$(dpi_tui_choose "$(ui_msg smart_dpi_guided)" "$(ui_msg back)" \
+    "$(ui_msg smart_dpi_keep)" "$(ui_msg smart_dpi_window)" "$(ui_msg smart_dpi_mss)" "$(ui_msg smart_dpi_nfqws)")" || return 0
+  case "$selected" in 0|1) return 0;; 2) method=window1152;; 3) method=mss88;; 4) method=nfqws;; esac
+  host="$(select_instance)" || return 0
+  dpi_tui_apply "$host" "$method"
+}
+
+menu_dpi_advanced() {
+  local host selected method
+  dpi_list_methods_cmd
+  selected="$(dpi_tui_choose "$(ui_msg smart_advanced)" "$(ui_msg back)" \
+    "$(ui_msg dpi_choice_window)" "$(ui_msg dpi_choice_mss)" "$(ui_msg dpi_choice_nfqws)" \
+    "$(ui_msg dpi_choice_window_nfqws)" "$(ui_msg dpi_choice_mss_nfqws)" "$(ui_msg smart_dpi_stock)")" || return 0
+  case "$selected" in 0) return 0;; 1) method=window1152;; 2) method=mss88;; 3) method=nfqws;; 4) method=window1152_nfqws;; 5) method=mss88_nfqws;; 6) method=stock;; esac
+  host="$(select_instance)" || return 0
+  dpi_tui_apply "$host" "$method"
+}
+
 menu_network_compatibility() {
-  local c host method selected
+  local c host
   while true; do
-    clear 2>/dev/null || true; tui_text "$(ui_msg dpi_intro)"; dpi_status_cmd; echo
+    clear 2>/dev/null || true; tui_text "$(ui_msg dpi_intro)"; tui_run dpi status; echo
     c="$(dpi_tui_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
-      "$(ui_msg dpi_status)" "$(ui_msg dpi_methods)" \
-      "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")" || return 0
+      "$(ui_msg dpi_status)" "$(ui_msg smart_dpi_guided)" "$(ui_msg smart_dpi_stock)" "$(ui_msg smart_advanced)")" || return 0
     case "$c" in
-      1) host="$(select_instance)" && { ( dpi_status_cmd "$host" ) || true; }; pause;;
-      2) dpi_list_methods_cmd; pause;;
-      3)
-        host="$(select_instance)" || continue
-        selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" "$(ui_msg dpi_choice_window)" \
-          "$(ui_msg dpi_choice_mss)" "$(ui_msg dpi_choice_nfqws)" "$(ui_msg dpi_choice_window_nfqws)" \
-          "$(ui_msg dpi_choice_mss_nfqws)")" || return 0
-        case "$selected" in
-          0) continue;;
-          1) method=window1152;; 2) method=mss88;; 3) method=nfqws;;
-          4) method=window1152_nfqws;; 5) method=mss88_nfqws;;
-        esac
-        if dpi_tui_confirm_scope "$host"; then
-          # Keep the core's CLI gate and validation unchanged. Its exit/die must
-          # not terminate the containing menu; never print success on failure.
-          if ( dpi_set_cmd "$host" "$method" --accept-shared-scope ); then printf '%s\n' "$(ui_msgf dpi_revert_tip "$host")"
-          else warn "$(ui_msg dpi_tui_failed)"; fi
-        else
-          log "$(ui_msg dpi_tui_cancelled)"
-        fi
-        pause;;
-      4) host="$(select_instance)" && dpi_disable_cmd "$host"; pause;;
+      1) host="$(select_instance)" && tui_run dpi status "$host"; pause;;
+      2) menu_dpi_guided; pause;;
+      3) host="$(select_instance)" && dpi_tui_apply "$host" stock; pause;;
+      4) menu_dpi_advanced; pause;;
       0) return;;
     esac
   done
@@ -9639,7 +9933,7 @@ menu_connect() {
   local host; host="$(select_instance)" || return 0
   clear 2>/dev/null || true
   warn "$(ui_msg secret_warning)"
-  show_instance_cmd "$host"
+  tui_run show "$host"
   pause
 }
 
@@ -9650,11 +9944,11 @@ first_run_prerequisites() {
 }
 
 menu() {
-  need_root; need_systemd; ui_language_load
+  need_root; need_systemd; ui_language_load; TUI_ACTIVE=1
   while true; do
     if core_installed; then
       clear 2>/dev/null || true
-      collect_overview; tui_render_dashboard; echo
+      tui_run view-overview; echo
       # Everyday tasks first; advanced network compatibility and settings last.
       local c; c="$(menu_choose "$(ui_msg main_menu):" "$(ui_msg exit)" \
         "$(ui_msg connect_telegram)" "$(ui_msg status_stats)" "$(ui_msg instances)" \
@@ -9677,8 +9971,8 @@ menu() {
       clear 2>/dev/null || true; banner; echo
       first_run_prerequisites
       local c; c="$(menu_choose "$(ui_msg first_action):" "$(ui_msg exit)" \
-        "$(ui_msg first_quick_setup)" "$(ui_msg first_core_only)" "$(ui_msg foreign_nodes)")"
-      case "$c" in 1) add_instance_cmd; pause;; 2) core_install_cmd; pause;; 3) menu_foreign_nodes;; 0) exit 0;; esac
+        "$(ui_msg first_quick_setup)" "$(ui_msg first_core_only)" "$(ui_msg foreign_nodes)" "$(ui_msg smart_advanced)")"
+      case "$c" in 1) tui_run quick-add; pause;; 2) tui_run core-install; pause;; 3) menu_foreign_nodes;; 4) tui_run advanced-add; pause;; 0) exit 0;; esac
     fi
   done
 }
@@ -9785,7 +10079,7 @@ TWebProxy Manager / основа:
                                полевой диагностический архив одной командой
 
 Интерактивный режим:
-  connection-link HOST [PROFILE]  print one private WEB connection link (terminal only)
+  connection-link HOST [PROFILE]  показать одну приватную WEB-ссылку (только в терминале)
   foreign-node add|status|diagnose|repair|remove
                                автоматическое управление одним зарубежным узлом
   menu                         двуязычный интерфейс по задачам
@@ -9798,7 +10092,7 @@ EOF
 }
 
 # Optional Bridge bundle: normal single-file/local installations do not import it.
-BRIDGE_MANIFEST_SHA256="a81f87e252d0682d2daf33b8c1570d20922765e36ccfbe63474429d122ef5148"
+BRIDGE_MANIFEST_SHA256="080fdbeedfbc65aa6a3b136a327dbd62ed7ab610c88ff8799eb160869d3bdc37"
 BRIDGE_LAUNCHER_SHA256="22b591b3312a8d62c9c30f1872a128bd45645563820c1f37889c61431c6bc30a"
 bridge_bundle_dir() {
   local adjacent="$(dirname "${BASH_SOURCE[0]}")/bridge" installed="$PROJECT_DIR/bridge-$BRIDGE_MANIFEST_SHA256"
@@ -9806,9 +10100,9 @@ bridge_bundle_dir() {
 }
 bridge_launcher() {
   local bundle; bundle="$(bridge_bundle_dir)"
-  [[ -f "$bundle/launcher.py" && ! -L "$bundle/launcher.py" ]] || die "Bridge release bundle missing; use the complete verified Gate2 release."
-  [[ "$(sha256sum "$bundle/launcher.py" | awk '{print $1}')" == "$BRIDGE_LAUNCHER_SHA256" ]] || die "Bridge launcher digest mismatch."
-  TWEBPROXY_BRIDGE_LANG="$UI_LANGUAGE" TWEBPROXY_MANAGER="${BASH_SOURCE[0]}" /usr/bin/python3 -I "$bundle/launcher.py" "$BRIDGE_MANIFEST_SHA256" "$@"
+  [[ -f "$bundle/launcher.py" && ! -L "$bundle/launcher.py" ]] || die "$(ui_msg bridge_bundle_missing)"
+  [[ "$(sha256sum "$bundle/launcher.py" | awk '{print $1}')" == "$BRIDGE_LAUNCHER_SHA256" ]] || die "$(ui_msg bridge_launcher_mismatch)"
+  TWEBPROXY_BRIDGE_LANG="$UI_LANGUAGE" TWEBPROXY_BRIDGE_INTERACTIVE="$TUI_ACTIVE" TWEBPROXY_MANAGER="${BASH_SOURCE[0]}" /usr/bin/python3 -I "$bundle/launcher.py" "$BRIDGE_MANIFEST_SHA256" "$@"
 }
 install_bridge_bundle() {
   local bundle; bundle="$(bridge_bundle_dir)"
@@ -9832,12 +10126,12 @@ assert s["schema"]=="twebproxy.bridge.instance.v1" and re.fullmatch("[0-9a-f]{32
 print("twb-"+i[:12]+"-forward.service")' "$(instance_dir "$1")/bridge.json"
 }
 bridge_reject_profile_change() {
-  bridge_managed "$1" && die "Bridge MVP: detach via 'twebproxy foreign-node remove' before adding/deleting/rotating profiles."; return 0
+  bridge_managed "$1" && die "$(ui_msg bridge_profile_attached)"; return 0
 }
 connection_link_cmd() {
   need_root
   local host="${1:-}" profile="${2:-default}"
-  [[ -n "$host" ]] || die "Usage: twebproxy connection-link HOST [PROFILE]"
+  [[ -n "$host" ]] || die "$(ui_msg bridge_link_usage)"
   require_instance "$host"; require_profile "$host" "$profile"; load_profile "$host" "$profile"
   printf 'tg://webproxy?server=%s&secret=%s\n' "$host" "$SECRET"
 }
@@ -9846,14 +10140,15 @@ bridge_internal_cmd() {
   need_root
   local action="${1:-}" host="${2:-}" profile="${3:-}" port="${4:-}" old unit i
   case "$action" in
+    quick-setup) local TUI_SETUP_KIND=quick; TUI_ACTIVE=1; add_instance_cmd;;
     prepare-runtime)
-      stage4_acquire_update_lock || die "Manager update/restore currently running; Bridge preparation blocked."
-      stage4_install_restore_helper refresh || die "Offline restore compatibility guard installation failed."
+      stage4_acquire_update_lock || die "$(ui_msg bridge_update_busy)"
+      stage4_install_restore_helper refresh || die "$(ui_msg bridge_restore_guard_failed)"
       install_manager_copy
       stage4_release_update_lock
       return;;
     allocate)
-      port_lock_acquire || die "Port allocator busy."
+      port_lock_acquire || die "$(ui_msg bridge_ports_busy)"
       next_free_port 24000 27999
       port_lock_release; return;;
     inspect)
@@ -9871,18 +10166,18 @@ bridge_internal_cmd() {
     show) show_instance_cmd "$host"; return;;
   esac
   require_instance "$host"
-  instance_lock_acquire "$host" || die "Instance mutation busy."
+  instance_lock_acquire "$host" || die "$(ui_msg bridge_instance_busy)"
   case "$action" in
     activate)
-      is_valid_port "$port" || die "Invalid forward port."
+      is_valid_port "$port" || die "$(ui_msg bridge_invalid_forward)"
       load_profile "$host" "$profile"
       old="$BACKEND_PORT"; BACKEND_PORT="$port"
-      save_profile "$host" "$profile" && rebuild_profiles_json "$host" && validate_instance "$host" || die "Bridge profile commit failed."
+      save_profile "$host" "$profile" && rebuild_profiles_json "$host" && validate_instance "$host" || die "$(ui_msg bridge_commit_failed)"
       restart_relay_wait_ready "$host"
-      stop_backend_unit "$(backend_id "$host" "$profile")" || die "Previous local backend could not be stopped."
+      stop_backend_unit "$(backend_id "$host" "$profile")" || die "$(ui_msg bridge_backend_stop_failed)"
       ;;
     detach)
-      is_valid_port "$port" || die "Invalid prior local port."
+      is_valid_port "$port" || die "$(ui_msg bridge_invalid_prior_port)"
       load_profile "$host" "$profile"
       if [[ "$BACKEND_PORT" == "$port" && ! -e "$(instance_dir "$host")/bridge.json" ]]; then
         rm -f "$(instance_dir "$host")/bridge.owner"
@@ -9892,15 +10187,15 @@ bridge_internal_cmd() {
       proc_secret_safe || proc_fail_closed
       systemctl enable --now "$unit" >/dev/null
       for i in {1..15}; do systemctl is-active --quiet "$unit" && port_listening "$port" && break; sleep 1; done
-      systemctl is-active --quiet "$unit" && port_listening "$port" || die "Local recovery backend not ready; mapping retained."
+      systemctl is-active --quiet "$unit" && port_listening "$port" || die "$(ui_msg bridge_local_not_ready)"
       BACKEND_PORT="$port"; save_profile "$host" "$profile"
-      rebuild_profiles_json "$host" && validate_instance "$host" || die "Local restore validation failed."
+      rebuild_profiles_json "$host" && validate_instance "$host" || die "$(ui_msg bridge_local_validation_failed)"
       restart_relay_wait_ready "$host"
       rm -f "$(instance_dir "$host")/bridge.json" "$(instance_dir "$host")/bridge.owner"
       instance_derive_state "$host"; rebuild_firewall
       ;;
     refresh) rebuild_profiles_json "$host" && validate_instance "$host"; restart_relay_wait_ready "$host";;
-    *) die "Unknown Bridge internal operation.";;
+    *) die "$(ui_msg bridge_unknown_internal)";;
   esac
   instance_lock_release
 }
@@ -9909,6 +10204,10 @@ foreign_node_menu_run() {
   # status visible; CLI foreign-node continues to propagate it to the caller.
   # Isolate explicit die/exit in launcher preflight from the containing menu.
   local rc
+  if [[ "${1:-}" == repair ]]; then
+    tui_text "$(ui_msgf smart_impact "$(ui_msg foreign_nodes)")"
+    yesno "$(ui_msg smart_apply)" n || { log "$(ui_msg smart_cancelled)"; return 0; }
+  fi
   if ( foreign_node_cmd "$@" ); then
     return 0
   else
@@ -9918,18 +10217,38 @@ foreign_node_menu_run() {
   return 0
 }
 
+bridge_menu_state() {
+  local state="$BASE_DIR/bridge/node.json" marker
+  if [[ ! -e "$state" && ! -L "$state" ]]; then
+    for marker in "$INSTANCES_DIR"/*/bridge.owner "$INSTANCES_DIR"/*/bridge.json; do
+      [[ ! -e "$marker" && ! -L "$marker" ]] || { printf pending; return 0; }
+    done
+    printf none; return 0
+  fi
+  python3 - "$state" <<'PY_MENU_STATE'
+import json,pathlib,sys
+try:
+ p=pathlib.Path(sys.argv[1]);s=json.loads(p.read_text()) if not p.is_symlink() else {}
+ print('active' if s.get('schema')==1 and s.get('phase')=='active' and not s.get('cleanup_debt') else 'pending')
+except Exception:print('pending')
+PY_MENU_STATE
+}
+
 menu_foreign_nodes() {
-  local c
+  local c state; TUI_ACTIVE=1
   while true; do
-    c="$(menu_choose "$(ui_msg foreign_nodes)" "$(ui_msg back)" "$(ui_msg foreign_add)" "$(ui_msg status)" "$(ui_msg diagnostics_logs)" "$(ui_msg repair)" "$(ui_msg delete)")"
-    case "$c" in
-      1) foreign_node_menu_run add; pause;;
-      2) foreign_node_menu_run status; pause;;
-      3) foreign_node_menu_run diagnose; pause;;
-      4) foreign_node_menu_run repair; pause;;
-      5) foreign_node_menu_run remove; pause;;
-      0) return;;
-    esac
+    state="$(bridge_menu_state)" || state=pending
+    if [[ "$state" == none ]]; then
+      c="$(menu_choose "$(ui_msg foreign_nodes)" "$(ui_msg back)" "$(ui_msg foreign_add)")"
+      case "$c" in 1) foreign_node_menu_run add; pause;; 0) return;; esac
+    else
+      [[ "$state" != active ]] && tui_text "$(ui_msg smart_bridge_pending)" || tui_text "$(ui_msg smart_bridge_active)"
+      c="$(menu_choose "$(ui_msg foreign_nodes)" "$(ui_msg back)" "$(ui_msg status)" "$(ui_msg diagnostics_logs)" "$(ui_msg repair)" "$(ui_msg delete)")"
+      case "$c" in
+        1) foreign_node_menu_run status; pause;; 2) foreign_node_menu_run diagnose; pause;;
+        3) foreign_node_menu_run repair; pause;; 4) foreign_node_menu_run remove; pause;; 0) return;;
+      esac
+    fi
   done
 }
 
@@ -9958,7 +10277,7 @@ main() {
   cmd="${1:-menu}"; shift || true
 
   if [[ "$OUTPUT_MODE" != human ]]; then
-    case "$cmd" in overview|status|audit|stats|profile-list) ;; foreign-node) case "${1:-}" in status|diagnose) ;; *) die "foreign-node --json supports status/diagnose only.";; esac;; *) die "$cmd пока не поддерживает --$OUTPUT_MODE.";; esac
+    case "$cmd" in overview|status|audit|stats|profile-list) ;; foreign-node) case "${1:-}" in status|diagnose) ;; *) die "$(ui_msg bridge_json_verbs)";; esac;; *) die "$cmd пока не поддерживает --$OUTPUT_MODE.";; esac
     # Machine-readable stdout must contain only the selected renderer payload.
     export TWEBPROXY_NO_LOG=1
     disable_colors
@@ -10014,5 +10333,9 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main "$@"
+  if [[ "${1:-}" == tui-internal ]]; then
+    shift; ui_language_load; tui_internal_cmd "$@"
+  else
+    main "$@"
+  fi
 fi

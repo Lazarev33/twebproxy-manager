@@ -1,5 +1,10 @@
 # Настройка TWebProxy Manager / Setting up TWebProxy Manager
 
+Для неопубликованного v0.2.26 стандартный TUI выбирает параметры автоматически;
+ручные поля остаются в Advanced. См. [TUI](TUI-SMART-DEFAULTS.md) и
+[текущий pre-RC](PRERC-v0.2.26.md). Нижеследующие инструкции сохраняют
+совместимость с опубликованным v0.2.25; кандидат ещё не находится в main.
+
 Руководство актуализировано для опубликованной v0.2.25-beta (development, не стабильный Release). Полная установка включает `bridge/` и `sites/`; production не авторизован.
 The English version follows the Russian one.
 
