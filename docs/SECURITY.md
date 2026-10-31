@@ -40,6 +40,22 @@ v0.2.24 (P1-A): the owned table disappears the instant its owning `nft -i` proce
 Managed Caddy/Nginx access logs are disabled for the WEB hostname. Do not add raw URI, authorization or bearer logging without understanding what the WEB transport carries.
 
 For Manual mode, forward the complete hostname to `tproxy-server`; splitting special locations around the relay changes the public surface and is unsupported by this manager.
+## Bridge trust boundary (v0.2.25)
+
+The public client link and HTTPS website remain on RU Entry. The local
+loopback forwarder transmits proxy TCP through WireGuard to the privately
+restricted stock MTProxy on Foreign Exit. Exit does not serve a second public
+client proxy endpoint; stats are not forwarded. An Exit root operator can
+recover the canonical MTProxy profile secret. Independently verify SSH host
+identity and approve the plan; initial passwords are not persisted. Dedicated
+management keys use restricted forced commands; private WG keys remain on
+their own VPSs.
+
+Owned nftables, systemd IP restrictions, exact peer/interface and blackhole
+fallback protect the data path. PARTIAL cleanup retains identity; never manually
+delete state to bypass it. Do not publish full MTProxy argv, private URLs,
+SSH credentials or chat data. [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Manager self-update
 
 `manager-update` considers only the latest stable GitHub Release (never a development branch) and installs it only when its signed release manifest verifies against an Ed25519 key pinned in the manager, or, while no key is pinned, when the operator passes the expected SHA-256 from an independent channel (`--sha256`). A `SHA256SUMS` file from the same source is not authentication. No release-signing key exists yet, so this build pins none and automatic updates fail closed. Downloads are HTTPS-only, size-bounded, and redirects are refused except from GitHub release downloads to GitHub asset hosts; the artifact's SHA-256, Bash syntax and embedded version identity are checked before a verified backup is taken and before the candidate ever runs.
