@@ -1,0 +1,392 @@
+{
+  "sha": "b7179106c8937da526ab04713cbee51947593e5e",
+  "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/b7179106c8937da526ab04713cbee51947593e5e",
+  "tree": [
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2a708a3552f2ba9521a302d0b3afb6a53d6f6a1",
+      "size": 54,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/f2a708a3552f2ba9521a302d0b3afb6a53d6f6a1"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "805f40431ad0721ff8817551a60e3465dbc06d5d",
+      "size": 13931,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/805f40431ad0721ff8817551a60e3465dbc06d5d"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62c8455395f730de6d5e2f4e7b9fa9bf52ac9ef8",
+      "size": 14140,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/62c8455395f730de6d5e2f4e7b9fa9bf52ac9ef8"
+    },
+    {
+      "path": "SHA256SUMS",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45960551ef21da340cac8542325e0c360f0ba068",
+      "size": 3528,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/45960551ef21da340cac8542325e0c360f0ba068"
+    },
+    {
+      "path": "VERSION",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1866a362b7bef6cc0e128e9d3f846fdb6b179858",
+      "size": 6,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/1866a362b7bef6cc0e128e9d3f846fdb6b179858"
+    },
+    {
+      "path": "assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c3aad80e0f8becdf618b0ef5edf27acb2407a060",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/c3aad80e0f8becdf618b0ef5edf27acb2407a060"
+    },
+    {
+      "path": "assets/NFQWS-PROVENANCE.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "617ce8109f02a01f8d77bb30b93465191d03cecc",
+      "size": 1954,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/617ce8109f02a01f8d77bb30b93465191d03cecc"
+    },
+    {
+      "path": "assets/nfqws-LICENSE.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f8f4cc5082d73b677d0433fa7e90cff22db086c",
+      "size": 1069,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/6f8f4cc5082d73b677d0433fa7e90cff22db086c"
+    },
+    {
+      "path": "assets/nfqws-linux-x86_64",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8bdcc4f8560d6d78607764cf3ca2db72fded64f4",
+      "size": 125760,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/8bdcc4f8560d6d78607764cf3ca2db72fded64f4"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "77962681ecbb5ba3de52c6a1f1a9a72c2633157e",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/77962681ecbb5ba3de52c6a1f1a9a72c2633157e"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32fae4149e977778254b5ccc04804f4780d47938",
+      "size": 1603,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/32fae4149e977778254b5ccc04804f4780d47938"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "42099cf6d234de6a73123786d42b2d7193634925",
+      "size": 1989,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/42099cf6d234de6a73123786d42b2d7193634925"
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "67106a1cb9865868551da27dbfbebf17f076acee",
+      "size": 2181,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/67106a1cb9865868551da27dbfbebf17f076acee"
+    },
+    {
+      "path": "docs/TESTING.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "44d26363503cdd904b55bc04c13e8123f95bd762",
+      "size": 1358,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/44d26363503cdd904b55bc04c13e8123f95bd762"
+    },
+    {
+      "path": "docs/UPSTREAM.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad0515bec8b14aa4c3c0b17a451b6ac7b3285602",
+      "size": 2137,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/ad0515bec8b14aa4c3c0b17a451b6ac7b3285602"
+    },
+    {
+      "path": "tests",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ed3c04ef6bddf351a07f95ea5f7ba6e4b0c4d470",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/ed3c04ef6bddf351a07f95ea5f7ba6e4b0c4d470"
+    },
+    {
+      "path": "tests/certificate-smoke.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6608131f5896b8ab5d2dae0c1b1f5fceed54e2c",
+      "size": 1089,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/b6608131f5896b8ab5d2dae0c1b1f5fceed54e2c"
+    },
+    {
+      "path": "tests/cleanup-baseline-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e74b38c32d1247c53b4ddfbd2896cd0343d05944",
+      "size": 3482,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/e74b38c32d1247c53b4ddfbd2896cd0343d05944"
+    },
+    {
+      "path": "tests/fieldgate",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "154903ab886c6dd059dce764320e209e5cba813e",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/154903ab886c6dd059dce764320e209e5cba813e"
+    },
+    {
+      "path": "tests/fieldgate/df3-dpi-cleanup-stage-diagnostics.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28e37582a669f10ff4996107a72904983dd77aab",
+      "size": 17830,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/28e37582a669f10ff4996107a72904983dd77aab"
+    },
+    {
+      "path": "tests/fieldgate/df3b-nfqws-cleanup-propagation.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ca6bfbc052e89b22a8ed98ce2ab255fdd932dab",
+      "size": 9028,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/8ca6bfbc052e89b22a8ed98ce2ab255fdd932dab"
+    },
+    {
+      "path": "tests/fieldgate/fd1-field-report.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc5054e0877917033382d7ca4b3647df21e6b378",
+      "size": 27296,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/bc5054e0877917033382d7ca4b3647df21e6b378"
+    },
+    {
+      "path": "tests/fieldgate/run-fieldgate-suite.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6283d9628d367f9bed8ac0589038831da1281596",
+      "size": 1846,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/6283d9628d367f9bed8ac0589038831da1281596"
+    },
+    {
+      "path": "tests/fieldgate/stage4-function-set-hash.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6a7a254875ae4dd4b465312a92ddece8a95019f",
+      "size": 1805,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/b6a7a254875ae4dd4b465312a92ddece8a95019f"
+    },
+    {
+      "path": "tests/fieldgate/tg1-real-nft-six-mode-gate.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b0f218536515be93990cd58b173462e2a35fae53",
+      "size": 5726,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/b0f218536515be93990cd58b173462e2a35fae53"
+    },
+    {
+      "path": "tests/fieldgate/tg3-installed-manager-lifecycle.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f09306596688721c656392ba88cf4cffc0b19655",
+      "size": 9977,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/f09306596688721c656392ba88cf4cffc0b19655"
+    },
+    {
+      "path": "tests/fieldgate/tg5-dpi-scope-local-address-gate.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fdafd3947b59cee8bf369d0fc247ccf623533871",
+      "size": 8697,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/fdafd3947b59cee8bf369d0fc247ccf623533871"
+    },
+    {
+      "path": "tests/fieldgate/tg5b-errexit-control-flow.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8807491fa53bf7db04d5814798f95cf5f78ab429",
+      "size": 7418,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/8807491fa53bf7db04d5814798f95cf5f78ab429"
+    },
+    {
+      "path": "tests/fieldgate/tg7-backend-state-isolation.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ea22ab04bb65a5f65b7e9966204d78decf2d49d",
+      "size": 5197,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/5ea22ab04bb65a5f65b7e9966204d78decf2d49d"
+    },
+    {
+      "path": "tests/fixtures",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3bacb08b4f7ce98b216270287b5ca393ca74d387",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/3bacb08b4f7ce98b216270287b5ca393ca74d387"
+    },
+    {
+      "path": "tests/fixtures/read-only-core",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9862f1a7539d1d133e297b7303e113fd4164cc73",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/9862f1a7539d1d133e297b7303e113fd4164cc73"
+    },
+    {
+      "path": "tests/fixtures/read-only-core/audit-healthy.tsv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2af27e90a1b8d084b2a7ff99104cefbe4eb46812",
+      "size": 956,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/2af27e90a1b8d084b2a7ff99104cefbe4eb46812"
+    },
+    {
+      "path": "tests/fixtures/read-only-core/status-healthy.tsv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a971a0c74cba9d09fcf4b49dd49bb075862a09dd",
+      "size": 348,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/a971a0c74cba9d09fcf4b49dd49bb075862a09dd"
+    },
+    {
+      "path": "tests/lib",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "29cce58c9375d41be19b03410cdae2b305ab6bf9",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/29cce58c9375d41be19b03410cdae2b305ab6bf9"
+    },
+    {
+      "path": "tests/lib/systemctl-model.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "752445b7093cc10e63a23b56f42d6ef8b051eb19",
+      "size": 4922,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/752445b7093cc10e63a23b56f42d6ef8b051eb19"
+    },
+    {
+      "path": "tests/localization-flow-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d884155ba9a6f60085939b9ef3288efb322d79d",
+      "size": 10626,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/6d884155ba9a6f60085939b9ef3288efb322d79d"
+    },
+    {
+      "path": "tests/localization-static-audit.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2086d9d2fdabe65f59aed655897b95288c321bb1",
+      "size": 4123,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/2086d9d2fdabe65f59aed655897b95288c321bb1"
+    },
+    {
+      "path": "tests/read-only-core-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "029f2f61fe740b8197d5f28c8a6fcbcd8e0e505a",
+      "size": 11305,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/029f2f61fe740b8197d5f28c8a6fcbcd8e0e505a"
+    },
+    {
+      "path": "tests/run-stage-x-dpi-suite.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "558df5ed05cdbf0593285450baef9410cfca771e",
+      "size": 1565,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/558df5ed05cdbf0593285450baef9410cfca771e"
+    },
+    {
+      "path": "tests/run-stage-x-fixui-suite.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "560c8593d8539983c2575c4fec594603ca15963e",
+      "size": 943,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/560c8593d8539983c2575c4fec594603ca15963e"
+    },
+    {
+      "path": "tests/run-stage4-mandatory-suite.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f4ff9eee2438ea3a615f68bccc0470c716ef5833",
+      "size": 807,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/f4ff9eee2438ea3a615f68bccc0470c716ef5833"
+    },
+    {
+      "path": "tests/stage-x-dpi-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "047a0f23669d5451a8bf180e948ea1a2b1e83f75",
+      "size": 17359,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/047a0f23669d5451a8bf180e948ea1a2b1e83f75"
+    },
+    {
+      "path": "tests/stage-x-dpi-installed-asset-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "892393779cbffe0595c8b78e5f5343bbb5f958f0",
+      "size": 10766,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/892393779cbffe0595c8b78e5f5343bbb5f958f0"
+    },
+    {
+      "path": "tests/stage-x-fixui-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "abb6763ab4c937ba57dd19c729efd21dde2146c4",
+      "size": 8972,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/abb6763ab4c937ba57dd19c729efd21dde2146c4"
+    },
+    {
+      "path": "tests/stage4-corrections-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "da831eb0b1f3b268c4563ecf0f9509e4424bc8e3",
+      "size": 5807,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/da831eb0b1f3b268c4563ecf0f9509e4424bc8e3"
+    },
+    {
+      "path": "tests/stage4-update-backup-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf6a01f1842aca2dd6996352275b95c2339697f8",
+      "size": 17784,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/bf6a01f1842aca2dd6996352275b95c2339697f8"
+    },
+    {
+      "path": "tests/static-smoke.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cce0c1e19edcbdec5155416f57ae7010c49bbaae",
+      "size": 1795,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/cce0c1e19edcbdec5155416f57ae7010c49bbaae"
+    },
+    {
+      "path": "tests/tui-presentation-fixture.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93e07f00cea784596bd00eb3d34ba65f089fa515",
+      "size": 9671,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/93e07f00cea784596bd00eb3d34ba65f089fa515"
+    },
+    {
+      "path": "twebproxy-manager.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6abc3546c41bdd9c194fc9764b8d22d6a2febf1b",
+      "size": 325388,
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/blobs/6abc3546c41bdd9c194fc9764b8d22d6a2febf1b"
+    }
+  ],
+  "truncated": false
+}

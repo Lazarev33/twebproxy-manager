@@ -1,0 +1,16 @@
+TWebProxy Status · gamma.example
+--------------------------------------------------------------------------------
+Overall                [ERROR]
+Checks                 OK 2; warnings 0; errors 3; disabled 1; unknown 1
+Mode                   STOCK@unresolved
+
+Attention required
+[UNKNOWN] tls.certificate.summary — TLS certificate: mode=caddy | 
+remaining=?d | renewal=Caddy auto
+  -> HTTPS or the certificate is not confirmed: the DNS A record must point here and ports 80/443 must be reachable; twebproxy cert-status gamma.example
+[ERROR] relay.service.active — inactive
+  -> Relay is not running or not ready: twebproxy repair gamma.example (details: twebproxy diagnose gamma.example)
+[ERROR] relay.healthz — unavailable
+[ERROR] relay.readyz — unavailable
+
+Detailed evidence is available in Diagnostics.

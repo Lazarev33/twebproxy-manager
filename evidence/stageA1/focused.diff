@@ -1,0 +1,950 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 36606d3..fcf13ff 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,0 +3,19 @@
++## 0.2.11-dpi-beta — 2026-10-20 — Stage A.1: DPI state/runtime и подтверждение в меню
++
++- Подготовка DPI snapshot/proposed проверяет ошибки mkdir/cp и точное содержимое
++  копий до commit. Неудачная подготовка не публикуется и не используется для отката.
++- Незавершённая двухэтапная публикация scopes разрешается под существующей DPI
++  блокировкой до чтения состояния. Неоднозначные/повреждённые каталоги сохраняются,
++  операция завершается отказом.
++- STOCK проверяет отсутствие принадлежащих TWebProxy unit/files/table и возвращает
++  ошибки обязательной очистки, включая отказ удаления nft table и orphan binary.
++- Runtime verifier разбирает JSON nftables: точные scope, действия и параметры
++  Window1152/MSS88/nfqws. Чтение producer остаётся однократным, без SIGPIPE pipeline.
++- В меню Anti-DPI добавлено явное подтверждение IPv4-wide scope с default No.
++  Отказ и EOF не вызывают core; CLI gate и локальная проверка IPv4 сохранены.
++- Stage A различает PASS, FAIL и NOT_EXECUTED/INCOMPLETE (exit 77). Пропущенная
++  обязательная ENOSPC-проверка больше не даёт полный PASS.
++- Добавлены узкие regression-first fixtures. Stage 4 и остальные lifecycle
++  подсистемы не изменялись; реальная kernel validation требует disposable Linux
++  среды с разрешёнными namespace/nftables.
++
+diff --git a/VERSION b/VERSION
+index 13dead7..d3b5ba4 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.10
++0.2.11
+diff --git a/tests/fieldgate/df3-dpi-cleanup-stage-diagnostics.sh b/tests/fieldgate/df3-dpi-cleanup-stage-diagnostics.sh
+index 28e3758..3681a47 100644
+--- a/tests/fieldgate/df3-dpi-cleanup-stage-diagnostics.sh
++++ b/tests/fieldgate/df3-dpi-cleanup-stage-diagnostics.sh
+@@ -31,0 +32 @@ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++export TWEBPROXY_TEST_NFT_JSON_MODEL="$ROOT/tests/lib/nft-json-model.sh"
+@@ -56,0 +58,10 @@ live="${MOCK_NFT_LIVE:?}"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+diff --git a/tests/fieldgate/df3b-nfqws-cleanup-propagation.sh b/tests/fieldgate/df3b-nfqws-cleanup-propagation.sh
+index 8ca6bfb..5efe906 100644
+--- a/tests/fieldgate/df3b-nfqws-cleanup-propagation.sh
++++ b/tests/fieldgate/df3b-nfqws-cleanup-propagation.sh
+@@ -27,0 +28 @@ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++export TWEBPROXY_TEST_NFT_JSON_MODEL="$ROOT/tests/lib/nft-json-model.sh"
+@@ -47,0 +49,10 @@ live="${MOCK_NFT_LIVE:?}"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+diff --git a/tests/fieldgate/tg5-dpi-scope-local-address-gate.sh b/tests/fieldgate/tg5-dpi-scope-local-address-gate.sh
+index fdafd39..b8ce977 100755
+--- a/tests/fieldgate/tg5-dpi-scope-local-address-gate.sh
++++ b/tests/fieldgate/tg5-dpi-scope-local-address-gate.sh
+@@ -20,0 +21 @@ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++export TWEBPROXY_TEST_NFT_JSON_MODEL="$ROOT/tests/lib/nft-json-model.sh"
+@@ -34,0 +36,10 @@ live="${MOCK_NFT_LIVE:?}"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+diff --git a/tests/lib/dpi-harness.sh b/tests/lib/dpi-harness.sh
+index b924aeb..fe7b180 100644
+--- a/tests/lib/dpi-harness.sh
++++ b/tests/lib/dpi-harness.sh
+@@ -20,0 +21 @@ dpi_harness_env() {
++  export TWEBPROXY_TEST_NFT_JSON_MODEL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/nft-json-model.sh"
+@@ -38,0 +40,11 @@ live="${MOCK_NFT_LIVE:?}"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  [[ "${MOCK_NFT_LIST_FAIL:-0}" != 1 ]] || exit 77
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+@@ -50,0 +63 @@ elif [[ "${1:-}" == delete && "${2:-}" == table ]]; then
++  [[ "${MOCK_NFT_DELETE_FAIL:-0}" != 1 ]] || exit 77
+diff --git a/tests/lib/nft-json-model.sh b/tests/lib/nft-json-model.sh
+new file mode 100755
+index 0000000..0555d32
+--- /dev/null
++++ b/tests/lib/nft-json-model.sh
+@@ -0,0 +1,34 @@
++#!/usr/bin/env bash
++# TEST MODEL ONLY, not nft validation. Converts the finite generated rules for
++# existing fixtures; real-kernel validation is a separate mandatory gate.
++set -Eeuo pipefail
++live="${1:?live rules file}"
++[[ -s "$live" ]] || exit 1
++if [[ -n "${MOCK_NFT_LIVE_JSON:-}" ]]; then cat "$MOCK_NFT_LIVE_JSON"; exit; fi
++jq -Rn --argjson pad "${MOCK_NFT_PAD_LINES:-0}" '
++  def eqm($l;$r): {match:{op:"==",left:$l,right:$r}};
++  def p($p;$f): {payload:{protocol:$p,field:$f}};
++  def num: if startswith("0x") then .[2:]|explode|reduce .[] as $c (0;.*16+(if $c<=57 then $c-48 else $c-87 end)) else tonumber end;
++  def rule:
++    capture("^\\s*ip saddr (?<ip>[0-9.]+) tcp sport (?<port>[0-9]+) (?<rest>.*)$") as $r |
++    {rule:{family:"ip",table:"twebproxy_dpi",chain:"output",
++      comment:(try ($r.rest|capture("comment \"(?<c>[^\"]+)\"").c) catch ""),
++      expr:([eqm(p("ip";"saddr");$r.ip),eqm(p("tcp";"sport");($r.port|tonumber))] +
++        (if ($r.rest|test("^tcp flags & \\(fin \\| syn \\| rst \\| ack\\) == \\(syn \\| ack\\) tcp window set [0-9]+ counter")) then
++          [eqm({"&":[p("tcp";"flags"),["fin","syn","rst","ack"]]};["syn","ack"]),
++           {mangle:{key:p("tcp";"window"),value:($r.rest|capture("window set (?<v>[0-9]+)").v|tonumber)}},{counter:{packets:7,bytes:420}}]
++         elif ($r.rest|test("^tcp flags & \\(fin \\| syn \\| rst \\| ack\\) == \\(syn \\| ack\\) tcp option maxseg size set [0-9]+ counter")) then
++          [eqm({"&":[p("tcp";"flags"),["fin","syn","rst","ack"]]};["syn","ack"]),
++           {mangle:{key:{"tcp option":{name:"maxseg",field:"size"}},value:($r.rest|capture("size set (?<v>[0-9]+)").v|tonumber)}},{counter:{packets:7,bytes:420}}]
++         elif ($r.rest|test("^meta mark & ")) then
++          ($r.rest|capture("^meta mark & (?<mark>[^ ]+) == (?<zero>[^ ]+) ct reply packets (?<lo>[0-9]+)-(?<hi>[0-9]+) counter queue num (?<q>[0-9]+) bypass")) as $q |
++          [eqm({"&":[{meta:{key:"mark"}},($q.mark|num)]};($q.zero|num)),
++           eqm({ct:{key:"packets",dir:"reply"}};{range:[($q.lo|tonumber),($q.hi|tonumber)]}),
++           {counter:{packets:7,bytes:420}},{queue:{num:($q.q|tonumber),flags:"bypass"}}]
++         else [{accept:null}] end))}};
++  [inputs] as $lines |
++  {nftables:([{metainfo:{json_schema_version:1,version:"fixture",padding:("padding\n" * $pad)}},
++             {table:{family:"ip",name:"twebproxy_dpi",handle:1}},
++             {chain:{family:"ip",table:"twebproxy_dpi",name:"output",type:"filter",hook:"output",prio:-150,policy:"accept",handle:2}}] +
++            [$lines[]|select(test("^\\s*ip saddr "))|rule])}
++' < "$live"
+diff --git a/tests/lib/stage-a-results.sh b/tests/lib/stage-a-results.sh
+new file mode 100644
+index 0000000..66070c7
+--- /dev/null
++++ b/tests/lib/stage-a-results.sh
+@@ -0,0 +1,23 @@
++#!/usr/bin/env bash
++# Test-only result protocol: 0=all executed and passed, 1=failed, 77=incomplete.
++STAGE_A_PASS=0 STAGE_A_FAIL=0 STAGE_A_NOT_EXECUTED=0
++stage_a_run_case() {
++  local label="$1" script="$2" limit="$3" mgr="${4:-}" out rc=0
++  out="$(mktemp /tmp/twebproxy-stage-a-result.XXXXXX)" || return 1
++  if timeout "$limit" bash "$script" "$mgr" > "$out" 2>&1; then :; else rc=$?; fi
++  cat "$out"
++  if (( rc != 0 && rc != 77 )); then
++    STAGE_A_FAIL=$((STAGE_A_FAIL+1)); printf '%s: FAIL (rc=%s)\n' "$label" "$rc"
++  elif (( rc == 77 )) || grep -Eq '^(SKIP|NOT_EXECUTED|INCOMPLETE)([ :]|$)' "$out"; then
++    STAGE_A_NOT_EXECUTED=$((STAGE_A_NOT_EXECUTED+1)); printf '%s: NOT_EXECUTED\n' "$label"
++  else
++    STAGE_A_PASS=$((STAGE_A_PASS+1)); printf '%s: PASS\n' "$label"
++  fi
++  rm -f -- "$out"
++}
++stage_a_result() {
++  printf 'stage-a-results: PASS=%s FAIL=%s NOT_EXECUTED=%s\n' "$STAGE_A_PASS" "$STAGE_A_FAIL" "$STAGE_A_NOT_EXECUTED"
++  (( STAGE_A_FAIL == 0 )) || return 1
++  (( STAGE_A_NOT_EXECUTED == 0 )) || return 77
++  return 0
++}
+diff --git a/tests/stage-x-dpi-fixture.sh b/tests/stage-x-dpi-fixture.sh
+index 047a0f2..ee315ca 100755
+--- a/tests/stage-x-dpi-fixture.sh
++++ b/tests/stage-x-dpi-fixture.sh
+@@ -9,0 +10 @@ export TWEBPROXY_NO_LOG=1
++export TWEBPROXY_TEST_NFT_JSON_MODEL="$PROJECT_DIR_UNDER_TEST/tests/lib/nft-json-model.sh"
+@@ -25,0 +27,11 @@ printf '%q ' "$@" >> "$log"; printf '\n' >> "$log"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  [[ "${MOCK_NFT_LIST_FAIL:-0}" != 1 ]] || exit 77
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+diff --git a/tests/stage-x-dpi-installed-asset-fixture.sh b/tests/stage-x-dpi-installed-asset-fixture.sh
+index ddec245..795f40e 100755
+--- a/tests/stage-x-dpi-installed-asset-fixture.sh
++++ b/tests/stage-x-dpi-installed-asset-fixture.sh
+@@ -8,0 +9 @@ export TWEBPROXY_NO_LOG=1
++export TWEBPROXY_TEST_NFT_JSON_MODEL="$PROJECT_DIR_UNDER_TEST/tests/lib/nft-json-model.sh"
+@@ -99,0 +101,11 @@ live="${MOCK_NFT_LIVE:?}"
++if [[ "${1:-}" == -j ]]; then
++  shift; [[ "${1:-}" != -n ]] || shift
++  [[ "${MOCK_NFT_LIST_FAIL:-0}" != 1 ]] || exit 77
++  if [[ "${1:-}" == list && "${2:-}" == tables ]]; then
++    if [[ -s "$live" ]]; then printf '%s\n' '{"nftables":[{"table":{"family":"ip","name":"twebproxy_dpi"}}]}'
++    else printf '%s\n' '{"nftables":[]}'; fi
++  elif [[ "${1:-}" == list && "${2:-}" == table ]]; then
++    bash "${TWEBPROXY_TEST_NFT_JSON_MODEL:?}" "$live"
++  else exit 2; fi
++  exit
++fi
+diff --git a/tests/stagea/run-stage-a-suite.sh b/tests/stagea/run-stage-a-suite.sh
+index 687f0cd..648f643 100755
+--- a/tests/stagea/run-stage-a-suite.sh
++++ b/tests/stagea/run-stage-a-suite.sh
+@@ -2,5 +2 @@
+-# Stage A regression suite: DPI stabilization + release-gate repair.
+-#
+-# Usage: run-stage-a-suite.sh [path/to/twebproxy-manager.sh]
+-#   With no argument the adjacent release manager is tested. Pass the 0.2.9
+-#   baseline manager to confirm every gate still fails against it.
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
+@@ -11,2 +7,2 @@ TESTS="$ROOT/tests/stagea"
+-
+-declare -a NAMES=(
++source "$ROOT/tests/lib/stage-a-results.sh"
++NAMES=(
+@@ -18,0 +15,3 @@ declare -a NAMES=(
++  "A1.1 correction regression:sa1-correction-fixture.sh:900"
++  "A1.1 result accounting:sa1-runner-status-fixture.sh:60"
++  "A1.1 real nft JSON/runtime:sa1-real-nft-validation.sh:120"
+@@ -20 +18,0 @@ declare -a NAMES=(
+-rc=0
+@@ -22 +20 @@ for entry in "${NAMES[@]}"; do
+-  label="${entry%%:*}"; rest="${entry#*:}"; script="${rest%%:*}"; tmo="${rest##*:}"
++  label="${entry%%:*}"; rest="${entry#*:}"; script="${rest%%:*}"; limit="${rest##*:}"
+@@ -24,8 +22 @@ for entry in "${NAMES[@]}"; do
+-  if timeout "$tmo" bash "$TESTS/$script" "$MGR"; then
+-    printf '%s: PASS\n' "$label"
+-  else
+-    status=$?
+-    if (( status == 124 )); then printf '%s: FAIL (timed out after %ss)\n' "$label" "$tmo" >&2
+-    else printf '%s: FAIL (exit %s)\n' "$label" "$status" >&2; fi
+-    rc=1
+-  fi
++  stage_a_run_case "$label" "$TESTS/$script" "$limit" "$MGR"
+@@ -33 +24,6 @@ done
+-printf '\nstage-a-suite: %s\n' "$( ((rc==0)) && echo 'PASS (A1, A2, A3, A4, A5, A6)' || echo FAIL )"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) printf 'stage-a-suite: PASS (all mandatory checks executed)\n';;
++  77) printf 'stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)\n';;
++  *) printf 'stage-a-suite: FAIL\n';;
++esac
+diff --git a/tests/stagea/sa1-correction-fixture.sh b/tests/stagea/sa1-correction-fixture.sh
+new file mode 100755
+index 0000000..a85ec67
+--- /dev/null
++++ b/tests/stagea/sa1-correction-fixture.sh
+@@ -0,0 +1,225 @@
++#!/usr/bin/env bash
++# Stage A.1 regression-first tests. Only the disposable harness paths mutate.
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${2:-$ROOT/twebproxy-manager.sh}"
++CASE="${1:-all}"
++if [[ -f "$CASE" ]]; then MGR="$CASE"; CASE=all; fi
++if [[ "$CASE" == all ]]; then
++  failed=0
++  for name in proposed-copy snapshot-copy partial-copy snapshot-partial prepare-mkdir interrupted-set interrupted-reinvoke interrupted-disable ambiguous-state corrupt-retired stock-binary stock-delete stock-query-failure stock-cli-error stock-other-scopes stock-symlink-libexec verify-prefix verify-mode verify-good verify-multi verify-parameters verify-json-fields tui-yes tui-no tui-default-no tui-eof tui-core-error tui-die-error tui-ru cli-no-flag cli-flag cli-not-local; do
++    if timeout 45 bash "$0" "$name" "$MGR"; then printf 'PASS a1_%s\n' "$name"
++    else printf 'FAIL a1_%s\n' "$name" >&2; failed=$((failed+1)); fi
++  done
++  printf 'stage-a1-targeted: failed=%s\n' "$failed"
++  (( failed == 0 )); exit
++fi
++TMP="${A1_REUSE_TMP:-$(mktemp -d /tmp/twebproxy-a1-targeted.XXXXXX)}"
++[[ -n "${A1_REUSE_TMP:-}" ]] || trap 'rm -rf -- "$TMP"' EXIT
++export TWEBPROXY_ERROR_SNAPSHOT=1
++source "$ROOT/tests/lib/dpi-harness.sh"
++dpi_harness_env "$TMP"
++source "$MGR"
++trap - ERR
++set +e
++dpi_harness_bind "$ROOT" "$TMP"
++disable_colors
++need_root() { :; }; need_systemd() { :; }
++dpi_local_ipv4_addresses() { printf '%s\n' 198.51.100.10 198.51.100.20; }
++dpi_resolve_ipv4() { printf '%s' 198.51.100.10; }
++dpi_hosts_for_ipv4() { printf '%s\n' alpha.example alias.example; }
++instance_exists() { return 0; }
++CURRENT_LOG="$TMP/trace.log"; : > "$CURRENT_LOG"
++has() { [[ -f "$DPI_STATE_DIR/$1.env" ]] && dpi_load_scope_file "$DPI_STATE_DIR/$1.env"; }
++seed() { dpi_transaction_set 198.51.100.10 mss88 alpha.example; }
++case "$CASE" in
++  proposed-copy|snapshot-copy|partial-copy|snapshot-partial|prepare-mkdir)
++    seed || exit 90
++    old_state="$(sha256sum "$DPI_STATE_DIR/198.51.100.10.env")"
++    old_runtime="$(sha256sum "$MOCK_NFT_LIVE")"
++    cp() {
++      if [[ "$CASE" == snapshot-copy && "${1:-}" == -a && "${2:-}" == "$DPI_DIR" ]]; then return 73; fi
++      if [[ "$CASE" == proposed-copy && "${1:-}" == -a && "${2:-}" == "$DPI_STATE_DIR/." ]]; then return 73; fi
++      command cp "$@" || return
++      if [[ "$CASE" == snapshot-partial && "${2:-}" == "$DPI_DIR" ]]; then
++        command rm -f "${!#}/scopes/198.51.100.10.env"
++        return 0
++      fi
++      if [[ "$CASE" == partial-copy && "${2:-}" == "$DPI_STATE_DIR/." ]]; then
++        command rm -f "${!#}/198.51.100.10.env"
++        return 0
++      fi
++    }
++    mkdir() { [[ "$CASE" == prepare-mkdir && "${1:-}" == -p && "${2:-}" == */snapshot ]] && return 73; command mkdir "$@"; }
++    TWEBPROXY_DPI_TEST_FAIL_POINT=""
++    [[ "$CASE" == snapshot-copy ]] && TWEBPROXY_DPI_TEST_FAIL_POINT=after_state
++    rc=0; dpi_transaction_set 198.51.100.20 window1152 beta.example || rc=$?
++    printf 'operation_rc=%s\n' "$rc"
++    (( rc != 0 )) && has 198.51.100.10 && [[ ! -e "$DPI_STATE_DIR/198.51.100.20.env" ]] &&
++      [[ "$old_state" == "$(sha256sum "$DPI_STATE_DIR/198.51.100.10.env")" ]] &&
++      [[ "$old_runtime" == "$(sha256sum "$MOCK_NFT_LIVE")" ]]
++    ;;
++  interrupted-reinvoke)
++    seed || exit 90
++    command mv -T "$DPI_STATE_DIR" "$DPI_DIR/.scopes.old"
++    A1_REUSE_TMP="$TMP" timeout 30 bash "$0" interrupted-resume "$MGR" &&
++      has 198.51.100.10 && has 198.51.100.20
++    ;;
++  interrupted-resume)
++    dpi_transaction_set 198.51.100.20 window1152 beta.example
++    ;;
++  interrupted-set|interrupted-disable)
++    seed || exit 90
++    command mv -T "$DPI_STATE_DIR" "$DPI_DIR/.scopes.old"
++    if [[ "$CASE" == interrupted-set ]]; then
++      dpi_transaction_set 198.51.100.20 window1152 beta.example && has 198.51.100.10 && has 198.51.100.20
++    else
++      dpi_resolve_ipv4() { printf '%s' 198.51.100.20; }
++      dpi_disable_cmd beta.example && has 198.51.100.10 && [[ ! -e "$DPI_DIR/.scopes.old" ]]
++    fi
++    ;;
++  ambiguous-state|corrupt-retired)
++    seed || exit 90
++    command cp -a "$DPI_STATE_DIR" "$DPI_DIR/.scopes.old"
++    if [[ "$CASE" == corrupt-retired ]]; then
++      command rm -rf "$DPI_STATE_DIR"
++      printf 'broken\n' > "$DPI_DIR/.scopes.old/198.51.100.10.env"
++    fi
++    before="$(sha256sum "$DPI_DIR/.scopes.old/198.51.100.10.env")"
++    rc=0; dpi_transaction_set 198.51.100.20 window1152 beta.example || rc=$?
++    (( rc != 0 )) && [[ -f "$DPI_DIR/.scopes.old/198.51.100.10.env" ]] &&
++      [[ "$before" == "$(sha256sum "$DPI_DIR/.scopes.old/198.51.100.10.env")" ]]
++    ;;
++  stock-binary)
++    printf corrupt > "$DPI_NFQWS_BIN"; printf checksum > "$DPI_NFQWS_SUM_FILE"
++    dpi_disable_cmd alpha.example &&
++      [[ ! -e "$DPI_NFQWS_BIN" && ! -e "$DPI_NFQWS_SUM_FILE" && ! -e "$MOCK_NFT_LIVE" ]]
++    ;;
++  stock-delete)
++    seed || exit 90
++    export MOCK_NFT_DELETE_FAIL=1
++    # Fault only the exact delete; all other nft calls go to the same model.
++    rc=0; dpi_cleanup_stock_runtime || rc=$?
++    (( rc != 0 )) && [[ -s "$MOCK_NFT_LIVE" ]]
++    ;;
++  stock-cli-error)
++    dpi_disable_reconcile_stock() { return 73; }
++    ( dpi_disable_cmd alpha.example ) > "$TMP/cli.out" 2>&1; rc=$?
++    (( rc != 0 )) && ! grep -q 'returned to STOCK' "$TMP/cli.out"
++    ;;
++  stock-query-failure)
++    export MOCK_NFT_LIST_FAIL=1
++    ( dpi_disable_cmd alpha.example ) > "$TMP/cli.out" 2>&1; rc=$?
++    (( rc != 0 ))
++    ;;
++  stock-other-scopes)
++    seed || exit 90
++    before="$(sha256sum "$DPI_STATE_DIR/198.51.100.10.env")"
++    dpi_resolve_ipv4() { printf '%s' 198.51.100.20; }
++    dpi_disable_cmd beta.example && has 198.51.100.10 &&
++      [[ "$before" == "$(sha256sum "$DPI_STATE_DIR/198.51.100.10.env")" ]] &&
++      [[ -s "$MOCK_NFT_LIVE" ]]
++    ;;
++  stock-symlink-libexec)
++    mkdir -p "$TMP/unrelated"
++    printf 'operator helper\n' > "$TMP/unrelated/apply-dpi-firewall"
++    printf 'operator binary\n' > "$TMP/unrelated/twebproxy-nfqws"
++    printf 'operator checksum\n' > "$TMP/unrelated/twebproxy-nfqws.sha256"
++    command mv "$LIBEXEC_DIR" "$TMP/old-libexec"
++    ln -s "$TMP/unrelated" "$LIBEXEC_DIR"
++    rc=0; dpi_cleanup_stock_runtime || rc=$?
++    (( rc != 0 )) &&
++      [[ "$(command cat "$TMP/unrelated/apply-dpi-firewall")" == 'operator helper' ]] &&
++      [[ "$(command cat "$TMP/unrelated/twebproxy-nfqws")" == 'operator binary' ]] &&
++      [[ "$(command cat "$TMP/unrelated/twebproxy-nfqws.sha256")" == 'operator checksum' ]]
++    ;;
++  verify-prefix|verify-mode|verify-good)
++    seed || exit 90
++    case "$CASE" in
++      verify-prefix) sed -i 's/198\.51\.100\.10/198.51.100.100/g' "$MOCK_NFT_LIVE";;
++      verify-mode) sed -i 's/tcp option maxseg size set 88/accept/g' "$MOCK_NFT_LIVE";;
++    esac
++    rc=0; dpi_verify_runtime 0 || rc=$?
++    if [[ "$CASE" == verify-good ]]; then (( rc == 0 )); else (( rc != 0 )); fi
++    ;;
++  verify-multi)
++    seed && dpi_transaction_set 198.51.100.20 window1152 beta.example && dpi_verify_runtime 0
++    ;;
++  verify-parameters)
++    seed || exit 90
++    sed -i 's/size set 88/size set 89/' "$MOCK_NFT_LIVE"
++    rc=0; dpi_verify_runtime 0 || rc=$?
++    (( rc != 0 )) || exit 1
++    seed || exit 90
++    sed -i 's/tcp sport 443/tcp sport 444/' "$MOCK_NFT_LIVE"
++    rc=0; dpi_verify_runtime 0 || rc=$?
++    (( rc != 0 ))
++    ;;
++  verify-json-fields)
++    dpi_harness_seed_scope 198.51.100.10 window1152_nfqws alpha.example || exit 90
++    dpi_render_rules "$DPI_STATE_DIR" "$DPI_NFT_FILE" || exit 90
++    "$DPI_NFT_BIN" -f "$DPI_NFT_FILE" || exit 90
++    dpi_verify_runtime 0 || exit 90
++    bash "$TWEBPROXY_TEST_NFT_JSON_MODEL" "$MOCK_NFT_LIVE" > "$TMP/good.json" || exit 90
++    for filter in \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(has("mangle"))|.mangle.value)=1153' \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(has("queue"))|.queue.num)=218' \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(has("queue"))|.queue.flags)=["fanout"]' \
++      '(.nftables[]|select(has("chain"))|.chain.hook)="input"' \
++      '(.nftables[]|select(has("chain"))|.chain.prio)=0' \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(.match.left["&"][0]? == {"meta":{"key":"mark"}})|.match.left["&"][1])=1' \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(.match.left.ct? != null)|.match.right.range)=[2,6]' \
++      '(.nftables[]|select(has("rule"))|.rule.expr[]|select(.match.left["&"][0]? == {"payload":{"protocol":"tcp","field":"flags"}})|.match.right)=2'; do
++      jq "$filter" "$TMP/good.json" > "$TMP/bad.json" || exit 90
++      export MOCK_NFT_LIVE_JSON="$TMP/bad.json"
++      rc=0; dpi_verify_runtime 0 || rc=$?
++      (( rc != 0 )) || exit 1
++    done
++    unset MOCK_NFT_LIVE_JSON
++    dpi_verify_runtime 0
++    ;;
++  tui-yes|tui-no|tui-default-no|tui-eof|tui-core-error|tui-die-error|tui-ru)
++    # Actual menu and its real stdin/stdout command substitutions. No TTY.
++    dpi_status_cmd() { :; }; clear() { :; }
++    select_instance() { printf alpha.example; }
++    dpi_set_cmd() {
++      printf '%s|%s|%s\n' "$1" "$2" "${3:-}" >> "$TMP/core.calls"
++      [[ "$CASE" != tui-die-error ]] || exit 73
++      [[ "$CASE" != tui-core-error ]]
++    }
++    case "$CASE" in
++      tui-yes|tui-core-error|tui-die-error) input=$'3\n1\ny\n\n0\n';;
++      tui-no) input=$'3\n1\nn\n\n0\n';;
++      tui-default-no) input=$'3\n1\n\n\n0\n';;
++      tui-eof) input=$'3\n1\n';;
++      tui-ru) UI_LANGUAGE=ru; input=$'3\n1\nда\n\n0\n';;
++    esac
++    ( set -e; printf '%s' "$input" | menu_network_compatibility ) > "$TMP/tui.out" 2>&1; rc=$?
++    command cat "$TMP/tui.out"
++    (( rc == 0 )) || exit 1
++    grep -q '198.51.100.10' "$TMP/tui.out" && grep -q 'alias.example' "$TMP/tui.out" || exit 1
++    if [[ "$CASE" == tui-ru ]]; then grep -q 'Невозможно автоматически подтвердить выделенность' "$TMP/tui.out" || exit 1
++    else grep -q 'cannot be proven' "$TMP/tui.out" || exit 1; fi
++    case "$CASE" in
++      tui-yes|tui-core-error|tui-die-error|tui-ru)
++        [[ "$(command cat "$TMP/core.calls")" == 'alpha.example|window1152|--accept-shared-scope' ]] || exit 1
++        case "$CASE" in tui-core-error|tui-die-error) grep -qi 'failed' "$TMP/tui.out";; esac;;
++      *) [[ ! -e "$TMP/core.calls" ]];;
++    esac
++    ;;
++  cli-no-flag|cli-flag|cli-not-local)
++    dpi_transaction_set() { printf called >> "$TMP/mutation"; }
++    if [[ "$CASE" == cli-no-flag ]]; then
++      ( dpi_set_cmd alpha.example window1152 ) </dev/null > "$TMP/cli.out" 2>&1; rc=$?
++      (( rc != 0 )) && [[ ! -e "$TMP/mutation" ]]
++    elif [[ "$CASE" == cli-not-local ]]; then
++      dpi_local_ipv4_addresses() { printf '%s\n' 198.51.100.99; }
++      ( dpi_set_cmd alpha.example window1152 --accept-shared-scope ) </dev/null > "$TMP/cli.out" 2>&1; rc=$?
++      (( rc != 0 )) && [[ ! -e "$TMP/mutation" ]]
++    else
++      ( dpi_set_cmd alpha.example window1152 --accept-shared-scope ) </dev/null > "$TMP/cli.out" 2>&1; rc=$?
++      (( rc == 0 )) && [[ -s "$TMP/mutation" ]]
++    fi
++    ;;
++  *) exit 2;;
++esac
+diff --git a/tests/stagea/sa1-real-nft-validation.sh b/tests/stagea/sa1-real-nft-validation.sh
+new file mode 100644
+index 0000000..5ec54f5
+--- /dev/null
++++ b/tests/stagea/sa1-real-nft-validation.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# Real nft JSON round-trip in a disposable network namespace only.
++# No systemd/nfqws processes are started; no host ruleset is modified.
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++if [[ "${2:-}" != --inside ]]; then
++  NFT="$(command -v nft || true)"
++  if [[ -z "$NFT" ]]; then printf 'NOT_EXECUTED real-nft: nft executable unavailable\n'; exit 77; fi
++  if ! timeout 5 unshare --net true; then
++    printf 'NOT_EXECUTED real-nft: disposable network namespace unavailable\n'; exit 77
++  fi
++  exec timeout 90 unshare --net bash "$0" "$MGR" --inside
++fi
++TMP="$(mktemp -d /tmp/twebproxy-a1-real-nft.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++source "$MGR"
++trap - ERR
++DPI_DIR="$TMP/dpi"; DPI_STATE_DIR="$DPI_DIR/scopes"; DPI_NFT_FILE="$DPI_DIR/firewall.nft"
++DPI_NFT_BIN="$(command -v nft)"
++printf 'nft-version: '; "$DPI_NFT_BIN" --version
++for mode in window1152 mss88 nfqws window1152_nfqws mss88_nfqws; do
++  rm -rf -- "$DPI_STATE_DIR"; install -d -m 0700 "$DPI_STATE_DIR"
++  dpi_write_scope_state "$DPI_STATE_DIR" 198.51.100.10 "$mode" alpha.example
++  dpi_render_rules "$DPI_STATE_DIR" "$DPI_NFT_FILE"
++  "$DPI_NFT_BIN" -c -f "$DPI_NFT_FILE"
++  dpi_apply_rules_file "$DPI_NFT_FILE"
++  # Actual kernel listing, parsed by the production semantic verifier.
++  "$DPI_NFT_BIN" -j -n list table ip "$DPI_NFT_TABLE"
++  dpi_verify_runtime 0
++  printf 'PASS real-nft-%s\n' "$mode"
++done
++dpi_write_scope_state "$DPI_STATE_DIR" 198.51.100.20 mss88 beta.example
++dpi_render_rules "$DPI_STATE_DIR" "$DPI_NFT_FILE"
++dpi_apply_rules_file "$DPI_NFT_FILE"
++dpi_verify_runtime 0
++printf 'PASS real-nft-multiple-scopes\n'
++# Leave the real table in mss88, but demand a different value in canonical state.
++dpi_write_scope_state "$DPI_STATE_DIR" 198.51.100.20 window1152 beta.example
++if dpi_verify_runtime 0; then printf 'FAIL real-nft-wrong-mode\n'; exit 1; fi
++printf 'PASS real-nft-wrong-mode-rejected\n'
++dpi_apply_rules_file /dev/null
++printf 'PASS real-nft-stock-removes-exact-owned-table\n'
+diff --git a/tests/stagea/sa1-runner-status-fixture.sh b/tests/stagea/sa1-runner-status-fixture.sh
+new file mode 100755
+index 0000000..94035d8
+--- /dev/null
++++ b/tests/stagea/sa1-runner-status-fixture.sh
+@@ -0,0 +1,23 @@
++#!/usr/bin/env bash
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++TMP="$(mktemp -d /tmp/twebproxy-runner-status.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/lib/stage-a-results.sh"
++printf 'printf "PASS executed\\n"\n' > "$TMP/pass.sh"
++printf 'printf "FAIL assertion\\n"\nexit 1\n' > "$TMP/fail.sh"
++printf 'printf "NOT_EXECUTED required-check\\n"\nexit 77\n' > "$TMP/ne.sh"
++printf 'printf "SKIP required-check\\n"\nexit 0\n' > "$TMP/legacy-skip.sh"
++stage_a_run_case executed "$TMP/pass.sh" 5
++stage_a_result
++[[ "$STAGE_A_PASS" == 1 && "$STAGE_A_FAIL" == 0 && "$STAGE_A_NOT_EXECUTED" == 0 ]]
++stage_a_run_case skipped "$TMP/ne.sh" 5 > "$TMP/ne.out"
++rc=0; stage_a_result || rc=$?
++[[ "$rc" == 77 && "$STAGE_A_NOT_EXECUTED" == 1 ]]
++stage_a_run_case legacy-skipped "$TMP/legacy-skip.sh" 5 > "$TMP/legacy-ne.out"
++rc=0; stage_a_result || rc=$?
++[[ "$rc" == 77 && "$STAGE_A_NOT_EXECUTED" == 2 ]]
++stage_a_run_case failed "$TMP/fail.sh" 5 > "$TMP/failed.out"
++rc=0; stage_a_result || rc=$?
++[[ "$rc" == 1 && "$STAGE_A_FAIL" == 1 ]]
++printf 'PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct\n'
+diff --git a/tests/stagea/sa1-scope-invariants.sh b/tests/stagea/sa1-scope-invariants.sh
+new file mode 100644
+index 0000000..fe465e1
+--- /dev/null
++++ b/tests/stagea/sa1-scope-invariants.sh
+@@ -0,0 +1,35 @@
++#!/usr/bin/env bash
++set -Eeuo pipefail
++BASE="${1:?baseline tree}"; PROJECT="${2:?candidate tree}"
++TMP="$(mktemp -d /tmp/twebproxy-scope-check.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash --noprofile --norc -c '
++    source "$1"
++    trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side"
++done
++changed=0; checked=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { printf 'FAIL missing function %s\n' "$fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then checked=$((checked+1)); continue; fi
++  case "$fn" in
++    dpi_apply_rules_file|dpi_cleanup_nfqws_runtime|dpi_cleanup_stock_runtime|dpi_verify_runtime|dpi_state_dir_complete|dpi_publish_state_dir|dpi_with_mutation_lock|dpi_transaction_set_locked|dpi_transaction_disable_ip_locked|dpi_disable_cmd|dpi_runtime_artifacts_present|dpi_stock_postcondition_ok|menu_network_compatibility|ui_i18n_init) ;;
++    *) printf 'FAIL out-of-scope function changed: %s\n' "$fn"; exit 1;;
++  esac
++  printf 'allowed modified function: %s\n' "$fn"
++  changed=$((changed+1))
++done < "$TMP/baseline"
++for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do
++  cmp "$BASE/$f" "$PROJECT/$f"
++done
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++printf '%s\n' "$actual"
++printf 'PASS scope: unchanged_functions=%s allowed_modified_functions=%s\n' "$checked" "$changed"
+diff --git a/tests/stagea/sa3-state-publication.sh b/tests/stagea/sa3-state-publication.sh
+index d2b64e0..535ea67 100755
+--- a/tests/stagea/sa3-state-publication.sh
++++ b/tests/stagea/sa3-state-publication.sh
+@@ -25 +25 @@ MGR="${1:-$ROOT/twebproxy-manager.sh}"
+-pass=0; fail=0
++pass=0; fail=0; not_executed=0
+@@ -28 +28 @@ t_bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
+-t_skip(){ printf 'SKIP %s\n' "$*"; }
++t_skip(){ printf 'NOT_EXECUTED %s\n' "$*"; not_executed=$((not_executed+1)); }
+@@ -269,2 +269,3 @@ state_has "$A_IP" && t_bad sa3_control_disable_removed_target   || t_ok sa3_cont
+-printf '\nsa3-state-publication: %s pass, %s fail\n' "$pass" "$fail"
+-(( fail == 0 ))
++printf '\nsa3-state-publication: %s pass, %s fail, %s NOT_EXECUTED\n' "$pass" "$fail" "$not_executed"
++(( fail == 0 )) || exit 1
++(( not_executed == 0 )) || exit 77
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index dfb70cb..1b36386 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -5 +5 @@ umask 077
+-# TWebProxy Manager v0.2.10-dpi-beta
++# TWebProxy Manager v0.2.11-dpi-beta
+@@ -10,2 +10,2 @@ APP="twebproxy"
+-MANAGER_VERSION="0.2.10"
+-MANAGER_RELEASE_VERSION="0.2.10-dpi-beta"
++MANAGER_VERSION="0.2.11"
++MANAGER_RELEASE_VERSION="0.2.11-dpi-beta"
+@@ -225,0 +226,3 @@ dpi_confirm_scope	I understand the IPv4-wide scope and want to continue	Я по
++dpi_tui_scope	Hostname: %s; public IPv4: %s	Hostname: %s; публичный IPv4: %s
++dpi_tui_cancelled	No changes applied.	Изменения не применены.
++dpi_tui_failed	Compatibility mode activation failed; no success is reported.	Не удалось применить режим совместимости; операция не объявлена успешной.
+@@ -1551 +1554,2 @@ dpi_apply_rules_file() {
+-  [[ -s "$rules" ]] && "$DPI_NFT_BIN" -f "$rules" >/dev/null
++  if [[ -s "$rules" ]]; then "$DPI_NFT_BIN" -f "$rules" >/dev/null || return 1; fi
++  return 0
+@@ -1707 +1711,2 @@ dpi_cleanup_nfqws_runtime() {
+-  rm -f -- "$DPI_DOC_DIR/nfqws-LICENSE.txt"
++  [[ ! -L "$DPI_DOC_DIR" ]] || return 1
++  rm -f -- "$DPI_DOC_DIR/nfqws-LICENSE.txt" || return 1
+@@ -1716,6 +1721,10 @@ dpi_cleanup_stock_runtime() {
+-  dpi_apply_rules_file /dev/null || true
+-  rm -f -- "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"
+-  systemctl daemon-reload >/dev/null 2>&1 || true
+-  # Fail closed: STOCK is only reached when no DPI unit is active any more.
+-  if ! dpi_runtime_units_inactive; then
+-    dpi_stage_fail 'cleanup stock runtime' dpi_cleanup_stock_runtime 1 "a TWebProxy DPI unit is still active"
++  dpi_apply_rules_file /dev/null || rc=1
++  # Do not traverse an unexpected libexec/state parent during cleanup.
++  if dpi_nfqws_runtime_parent_safe; then
++    rm -f -- "$LIBEXEC_DIR/apply-dpi-firewall" || rc=1
++  else rc=1; fi
++  if [[ ! -L "$DPI_DIR" ]]; then rm -f -- "$DPI_NFT_FILE" || rc=1
++  else rc=1; fi
++  systemctl daemon-reload >/dev/null 2>&1 || rc=1
++  if ! dpi_stock_postcondition_ok; then
++    dpi_stage_fail 'cleanup stock runtime' dpi_cleanup_stock_runtime 1 "owned DPI runtime remains or its absence could not be verified"
+@@ -1728 +1737 @@ dpi_verify_runtime() {
+-  local need_nfqws="$1" file live=""
++  local need_nfqws="$1" file files scopes="" live=""
+@@ -1730,14 +1739,5 @@ dpi_verify_runtime() {
+-  # The live table is read ONCE, into memory, and the producer's own exit status
+-  # is checked on its own line.
+-  #
+-  # This used to be `"$DPI_NFT_BIN" list table ... | grep -Fq "$ip"`, once per
+-  # scope. grep -q exits the instant it matches, the still-writing nft is killed
+-  # with SIGPIPE, and the manager's global `set -o pipefail` promoted that 141
+-  # to the pipeline's status - turning a SUCCESSFUL verification into a failure
+-  # and triggering a false rollback of a working mode. Field-observed on a real
+-  # VPS as `PIPESTATUS=141 0` while the rule was live and its counter rising.
+-  #
+-  # Matching in-memory keeps the check identical (a literal substring test, as
+-  # grep -F did) while leaving no producer that can be killed mid-write.
+-  live="$("$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" 2>/dev/null)" || return 1
+-  [[ -n "$live" ]] || return 1
++  # Capture the entire producer once and check its own status before parsing.
++  # JSON schema 1 is provided by supported Debian/Ubuntu nftables. No textual
++  # substring matching, locale-dependent tokens or early-exit pipeline reader.
++  live="$("$DPI_NFT_BIN" -j -n list table ip "$DPI_NFT_TABLE" 2>/dev/null)" || return 1
++  files="$(find "$DPI_STATE_DIR" -mindepth 1 -maxdepth 1 -print | sort)" || return 1
+@@ -1744,0 +1745 @@ dpi_verify_runtime() {
++    [[ -n "$file" ]] || continue
+@@ -1746,2 +1747,58 @@ dpi_verify_runtime() {
+-    [[ "$live" == *"$DPI_SCOPE_IPV4"* ]] || return 1
+-  done < <(find "$DPI_STATE_DIR" -mindepth 1 -maxdepth 1 -print | sort)
++    scopes+="$DPI_SCOPE_IPV4"$'\t'"$DPI_SCOPE_MODE"$'\n'
++  done <<< "$files"
++  [[ -n "$scopes" ]] || return 1
++  jq -e --arg scopes "$scopes" --arg table "$DPI_NFT_TABLE" \
++    --argjson mark "$((DPI_NFQWS_MARK))" --argjson queue "$DPI_NFQUEUE_NUM" '
++    def payload($p;$f): {payload:{protocol:$p,field:$f}};
++    def eqm($l;$r): {match:{op:"==",left:$l,right:$r}};
++    def flags: {"&":[payload("tcp";"flags"),23]};
++    def base($ip): [eqm(payload("ip";"saddr");$ip),eqm(payload("tcp";"sport");443)];
++    def wanted($ip;$mode):
++      (if ($mode | startswith("window1152")) then
++         [{kind:"window1152",expr:(base($ip)+[eqm(flags;18),
++           {mangle:{key:payload("tcp";"window"),value:1152}},{counter:null}])}]
++       elif ($mode | startswith("mss88")) then
++         [{kind:"mss88",expr:(base($ip)+[eqm(flags;18),
++           {mangle:{key:{"tcp option":{name:"maxseg",field:"size"}},value:88}},{counter:null}])}]
++       else [] end) +
++      (if ($mode | contains("nfqws")) then
++         [{kind:"nfqws",expr:(base($ip)+[
++           eqm({"&":[{meta:{key:"mark"}},$mark]};0),
++           eqm({ct:{key:"packets",dir:"reply"}};{range:[1,6]}),
++           {counter:null},{queue:{num:$queue,flags:["bypass"]}}])}]
++       else [] end) |
++      map({family:"ip",table:$table,chain:"output",comment:("twebproxy:"+$ip+":"+.kind),expr});
++    def number:
++      if type == "number" then .
++      elif type == "string" and test("^0x[0-9a-fA-F]+$") then
++        ascii_downcase | .[2:] | explode |
++        reduce .[] as $d (0; . * 16 + (if $d <= 57 then $d-48 else $d-87 end))
++      else error("unexpected numeric representation") end;
++    def bits:
++      if type == "number" then .
++      elif type == "array" then map(bits) | unique | add
++      elif type == "string" and test("^0x") then number
++      else ({"fin":1,"syn":2,"rst":4,"psh":8,"ack":16,"urg":32,"ecn":64,"cwr":128}[.] //
++            error("unknown TCP flag")) end;
++    def normalized_expr:
++      if has("counter") then
++        if keys == ["counter"] and (.counter == null or
++          ((.counter|type) == "object" and ((.counter|keys)-["packets","bytes"]|length) == 0))
++        then {counter:null} else error("invalid counter") end
++      elif has("queue") then
++        .queue.flags |= (if type == "string" then [.] else . end | sort)
++      elif .match.left["&"][0]? == payload("tcp";"flags") then
++        .match.left["&"][1] |= bits | .match.right |= bits
++      elif .match.left["&"][0]? == {meta:{key:"mark"}} then
++        .match.left["&"][1] |= number | .match.right |= number
++      else . end;
++    (.nftables | type == "array") and
++    all(.nftables[]; (keys == ["metainfo"] or keys == ["table"] or keys == ["chain"] or keys == ["rule"])) and
++    ([.nftables[]|select(has("table"))|.table|
++      select((.flags // []) == [])|{family,name}] == [{family:"ip",name:$table}]) and
++    ([.nftables[]|select(has("chain"))|.chain|
++      select(.dev? == null)|{family,table,name,type,hook,prio,policy}] ==
++      [{family:"ip",table:$table,name:"output",type:"filter",hook:"output",prio:-150,policy:"accept"}]) and
++    ([.nftables[]|select(has("rule"))|.rule|{family,table,chain,comment,expr:(.expr|map(normalized_expr))}] ==
++      [$scopes|split("\n")[]|select(length>0)|split("\t")|wanted(.[0];.[1])[]])
++  ' <<< "$live" >/dev/null || return 1
+@@ -1752,0 +1810 @@ dpi_verify_runtime() {
++  return 0
+@@ -1848,11 +1906,54 @@ dpi_state_dir_complete() {
+-  local src="$1" dst="$2" rel
+-  [[ -d "$src" && -d "$dst" ]] || return 1
+-  while IFS= read -r rel; do
+-    [[ -n "$rel" ]] || continue
+-    [[ -e "$dst/$rel" ]] || return 1
+-    if [[ -f "$src/$rel" && ! -L "$src/$rel" ]]; then
+-      [[ -f "$dst/$rel" && ! -L "$dst/$rel" ]] || return 1
+-      [[ "$(stat -c '%s' -- "$src/$rel" 2>/dev/null)" \
+-         == "$(stat -c '%s' -- "$dst/$rel" 2>/dev/null)" ]] || return 1
+-    fi
+-  done < <(cd "$src" && find . -mindepth 1 -printf '%P\n' 2>/dev/null | sort)
++  local src="$1" dst="$2"
++  [[ -d "$src" && ! -L "$src" && -d "$dst" && ! -L "$dst" ]] || return 1
++  # Compare content and entry sets, not just file sizes; never dereference links.
++  diff -qr --no-dereference -- "$src" "$dst" >/dev/null 2>&1
++}
++
++dpi_scope_dir_valid() {
++  local dir="$1" entries file
++  [[ -d "$dir" && ! -L "$dir" ]] || return 1
++  entries="$(find "$dir" -mindepth 1 -maxdepth 1 -print)" || return 1
++  while IFS= read -r file; do
++    [[ -n "$file" ]] || continue
++    dpi_load_scope_file "$file" || return 1
++  done <<< "$entries"
++}
++
++# Resolve only this operation's two-rename boundary, under the existing lock,
++# BEFORE any next read/modify/write. Two authoritative-looking directories or
++# malformed evidence are ambiguous: leave them untouched and refuse mutation.
++dpi_resolve_pending_publication() {
++  local retired="$DPI_DIR/.scopes.old" staging="$DPI_DIR/.scopes.new"
++  [[ ! -e "$DPI_DIR" && ! -L "$DPI_DIR" ]] && return 0
++  [[ -d "$DPI_DIR" && ! -L "$DPI_DIR" ]] || return 1
++  if [[ -e "$DPI_STATE_DIR" || -L "$DPI_STATE_DIR" ]]; then
++    dpi_scope_dir_valid "$DPI_STATE_DIR" || return 1
++  fi
++  if [[ -e "$retired" || -L "$retired" ]]; then
++    [[ ! -e "$DPI_STATE_DIR" && ! -L "$DPI_STATE_DIR" ]] || return 1
++    dpi_scope_dir_valid "$retired" || return 1
++    if [[ -e "$staging" || -L "$staging" ]]; then dpi_scope_dir_valid "$staging" || return 1; fi
++    mv -fT -- "$retired" "$DPI_STATE_DIR" || return 1
++  fi
++  if [[ -e "$staging" || -L "$staging" ]]; then
++    # A live directory proves that this is an unpublished candidate.
++    [[ -d "$DPI_STATE_DIR" ]] && dpi_scope_dir_valid "$staging" || return 1
++    rm -rf -- "$staging" || return 1
++  fi
++  return 0
++}
++
++dpi_prepare_transaction_state() {
++  local work="$1"
++  mkdir -p "$work/snapshot" "$work/proposed" || return 1
++  if [[ -e "$DPI_DIR" || -L "$DPI_DIR" ]]; then
++    [[ -d "$DPI_DIR" && ! -L "$DPI_DIR" ]] || return 1
++    cp -a "$DPI_DIR" "$work/snapshot/dpi" || return 1
++    dpi_state_dir_complete "$DPI_DIR" "$work/snapshot/dpi" || return 1
++  fi
++  if [[ -e "$DPI_STATE_DIR" || -L "$DPI_STATE_DIR" ]]; then
++    dpi_scope_dir_valid "$DPI_STATE_DIR" || return 1
++    cp -a "$DPI_STATE_DIR/." "$work/proposed/" || return 1
++    dpi_state_dir_complete "$DPI_STATE_DIR" "$work/proposed" || return 1
++    dpi_scope_dir_valid "$work/proposed" || return 1
++  fi
+@@ -1881,0 +1983,2 @@ dpi_publish_state_dir() {
++  # The caller must have resolved interrupted publication before reading state.
++  [[ ! -e "$retired" && ! -L "$retired" ]] || return 1
+@@ -1883,8 +1985,0 @@ dpi_publish_state_dir() {
+-  # A previous run killed between the two renames leaves $DPI_STATE_DIR absent
+-  # and .scopes.old holding the only copy of the authoritative state. Finish
+-  # that rename instead of deleting it. This is the same transaction-local
+-  # publication, completed - not a recovery subsystem.
+-  if [[ -d "$retired" && ! -e "$DPI_STATE_DIR" ]]; then
+-    mv -fT -- "$retired" "$DPI_STATE_DIR" || return 1
+-  fi
+-  rm -rf -- "$retired" || return 1
+@@ -1914 +2009 @@ dpi_publish_state_dir() {
+-  rm -rf -- "$retired"
++  rm -rf -- "$retired" || return 1
+@@ -2033 +2128,6 @@ dpi_with_mutation_lock() {
+-  "$@" || rc=$?
++  if dpi_resolve_pending_publication; then
++    "$@" || rc=$?
++  else
++    dpi_stage_fail 'prepare state' dpi_resolve_pending_publication 1 'ambiguous or invalid interrupted DPI publication'
++    rc=1
++  fi
+@@ -2053,0 +2154 @@ dpi_transaction_set_locked() {
++  dpi_resolve_pending_publication || return 1
+@@ -2056,4 +2157,3 @@ dpi_transaction_set_locked() {
+-  mkdir -p "$snapshot" "$proposed"
+-  [[ -d "$DPI_DIR" ]] && cp -a "$DPI_DIR" "$snapshot/dpi"
+-  [[ -d "$DPI_STATE_DIR" ]] && cp -a "$DPI_STATE_DIR/." "$proposed/"
+-  find "$proposed" -maxdepth 1 -type f -name '*.env' -exec chmod 0600 {} + 2>/dev/null || true
++  dpi_prepare_transaction_state "$work" || {
++    dpi_stage_fail 'prepare state' dpi_prepare_transaction_state 1 'snapshot or proposed state could not be copied completely'
++    rm -rf -- "$work"; return 1; }
+@@ -2086,0 +2187 @@ dpi_transaction_disable_ip_locked() {
++  dpi_resolve_pending_publication || return 1
+@@ -2089,4 +2190,4 @@ dpi_transaction_disable_ip_locked() {
+-  mkdir -p "$snapshot" "$proposed"
+-  [[ -d "$DPI_DIR" ]] && cp -a "$DPI_DIR" "$snapshot/dpi"
+-  [[ -d "$DPI_STATE_DIR" ]] && cp -a "$DPI_STATE_DIR/." "$proposed/"
+-  rm -f "$(dpi_state_path "$proposed" "$ip")"
++  dpi_prepare_transaction_state "$work" || {
++    dpi_stage_fail 'prepare state' dpi_prepare_transaction_state 1 'snapshot or proposed state could not be copied completely'
++    rm -rf -- "$work"; return 1; }
++  rm -f "$(dpi_state_path "$proposed" "$ip")" || { rm -rf -- "$work"; return 1; }
+@@ -2180,0 +2282,11 @@ dpi_disable_cmd() {
++  need_root; need_systemd
++  local host="${1:-}" rc=0
++  [[ -n "$host" ]] || die "Usage: twebproxy dpi disable HOST"
++  dpi_with_mutation_lock dpi_disable_host_locked "$host" || rc=$?
++  if (( rc != 0 )); then
++    (( rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
++    die "$(dpi_transaction_failure_message)"
++  fi
++}
++
++dpi_disable_host_locked() {
+@@ -2205,2 +2317 @@ dpi_disable_cmd() {
+-    (( dis_rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
+-    return 0
++    return "$dis_rc"
+@@ -2219,0 +2331,6 @@ dpi_runtime_artifacts_present() {
++  local path
++  for path in "$DPI_NFQWS_BIN" "$DPI_NFQWS_SUM_FILE" "$DPI_DOC_DIR/nfqws-LICENSE.txt" \
++    "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" "$SYSTEMD_DIR/$DPI_NFQWS_UNIT" \
++    "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"; do
++    [[ ! -e "$path" && ! -L "$path" ]] || return 0
++  done
+@@ -2239 +2356 @@ dpi_stock_postcondition_ok() {
+-  local remaining=0
++  local remaining=0 path tables
+@@ -2244 +2361,13 @@ dpi_stock_postcondition_ok() {
+-  dpi_runtime_units_inactive
++  dpi_runtime_units_inactive || return 1
++  for path in "$DPI_NFQWS_BIN" "$DPI_NFQWS_SUM_FILE" "$DPI_DOC_DIR/nfqws-LICENSE.txt" \
++    "$SYSTEMD_DIR/$DPI_FIREWALL_UNIT" "$SYSTEMD_DIR/$DPI_NFQWS_UNIT" \
++    "$LIBEXEC_DIR/apply-dpi-firewall" "$DPI_NFT_FILE"; do
++    [[ ! -e "$path" && ! -L "$path" ]] || return 1
++  done
++  # A failed list-table call is not proof of absence (EPERM/netlink failure).
++  tables="$("$DPI_NFT_BIN" -j list tables ip 2>/dev/null)" || return 1
++  jq -e --arg name "$DPI_NFT_TABLE" '
++    (.nftables | type == "array") and
++    all(.nftables[]; if has("metainfo") then true
++      elif has("table") then (.table.family == "ip" and .table.name != $name)
++      else false end)' <<< "$tables" >/dev/null
+@@ -6852,0 +6982,30 @@ menu_diagnostics() {
++# DPI-only reader: the shared legacy chooser does not distinguish EOF from an
++# invalid choice in conditional contexts. Do not change other menus here.
++dpi_tui_choose() {
++  local prompt="$1" zero="$2" choice i; shift 2
++  local options=("$@")
++  printf '%s\n' "$prompt" >&2
++  for i in "${!options[@]}"; do printf '  [%d] %s\n' "$((i+1))" "${options[$i]}" >&2; done
++  printf '  [0] %s\n' "$zero" >&2
++  while true; do
++    IFS= read -r -p '> ' choice || return 1
++    [[ "$choice" =~ ^[0-9]$ ]] || { warn "$(ui_msg enter_number)" >&2; continue; }
++    (( choice <= ${#options[@]} )) || { warn "$(ui_msg unknown_option)" >&2; continue; }
++    printf '%s' "$choice"; return 0
++  done
++}
++
++dpi_tui_confirm_scope() {
++  local host="$1" ip shared reply
++  ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null)" || { warn "$(ui_msgf dpi_resolution_failed "$host")"; return 1; }
++  [[ -n "$ip" ]] || { warn "$(ui_msgf dpi_resolution_failed "$host")"; return 1; }
++  printf '%s\n' "$(ui_msgf dpi_tui_scope "$host" "$ip")"
++  warn "$(ui_msgf dpi_scope_warning "$ip" "$host")"
++  shared="$(dpi_hosts_for_ipv4 "$ip" | paste -sd, -)" || return 1
++  [[ -z "$shared" ]] || printf '%s: %s\n' "$(ui_msg dpi_shared_hosts)" "$shared"
++  printf '%s\n' "$(ui_msg dpi_dedicated_unknown)"
++  printf '%s [y/N]: ' "$(ui_msg dpi_confirm_scope)" >&2
++  IFS= read -r reply || return 1
++  case "$reply" in y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0;; *) return 1;; esac
++}
++
+@@ -6857 +7016 @@ menu_network_compatibility() {
+-    c="$(menu_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
++    c="$(dpi_tui_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
+@@ -6859 +7018 @@ menu_network_compatibility() {
+-      "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")"
++      "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")" || return 0
+@@ -6865 +7024 @@ menu_network_compatibility() {
+-        selected="$(choose "$(ui_msg dpi_enable):" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)"
++        selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)" || return 0
+@@ -6866,0 +7026 @@ menu_network_compatibility() {
++          0) continue;;
+@@ -6870 +7030,9 @@ menu_network_compatibility() {
+-        dpi_set_cmd "$host" "$method"; pause;;
++        if dpi_tui_confirm_scope "$host"; then
++          # Keep the core's CLI gate and validation unchanged. Its exit/die must
++          # not terminate the containing menu; never print success on failure.
++          if ( dpi_set_cmd "$host" "$method" --accept-shared-scope ); then :
++          else warn "$(ui_msg dpi_tui_failed)"; fi
++        else
++          log "$(ui_msg dpi_tui_cancelled)"
++        fi
++        pause;;

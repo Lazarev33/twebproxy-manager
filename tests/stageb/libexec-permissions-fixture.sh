@@ -23,8 +23,8 @@ run() { (rebuild_firewall) > "$TMP/output" 2>&1; }
 mode() { stat -c '%a:%u:%g' -- "$1"; }
 # Everything except the helper rebuild_firewall itself owns.
 snapshot() {
-  (cd "$LIBEXEC_DIR" && find . -mindepth 1 ! -name apply-firewall -printf '%p %m %U:%G %s\n' | sort &&
-    find . -mindepth 1 -type f ! -name apply-firewall -exec sha256sum {} + | sort)
+  (cd "$LIBEXEC_DIR" && find . -mindepth 1 ! -name apply-firewall ! -name firewall-guard ! -name backend-start-check -printf '%p %m %U:%G %s\n' | sort &&
+    find . -mindepth 1 -type f ! -name apply-firewall ! -name firewall-guard ! -name backend-start-check -exec sha256sum {} + | sort)
 }
 # Production-shaped content: entrypoints and the nfqws checksum file.
 cp /bin/true "$LIBEXEC_DIR/mtproto-proxy"

@@ -1,0 +1,1356 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 607ca59..0433aab 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,38 @@
+ # Changelog
+ 
++## 0.2.22-beta — 2026-10-28 — Stage H: удобство и пошаговая настройка
++
++- Пошаговая настройка:
++  - первый запуск показывает требования (DNS-запись A, TCP 443/80, система)
++    и предлагает быструю настройку первым пунктом;
++  - мастер `add` спрашивает тип настройки: быстрая (рекомендуется) задаёт
++    только hostname, сайт и TLS, а порты, профиль `default`, новый secret,
++    carrier `https` и лимиты MTProxy выбирает сама; расширенная спрашивает всё,
++    как раньше;
++  - Caddy с автоматическим HTTPS помечен как рекомендуемый; варианты сайта
++    описаны честно (заглушка — только временная страница; конструктора сайтов
++    нет);
++  - в плане указаны тип настройки и сетевой режим `STOCK`; неверный hostname
++    можно ввести заново (три попытки); Ctrl-D и ответ «нет» ничего не создают.
++- После создания и в `show`: шаги подключения Telegram по уже существующим
++  ссылкам `https://t.me/webproxy?…` и `tg://webproxy?…`, честная оговорка о
++  поддержке клиентов, проверка и следующие шаги.
++- Главное меню по задачам: подключить Telegram, статус, инстансы, профили,
++  диагностика, обслуживание, совместимость сети / Anti-DPI (для опытных),
++  настройки.
++- Anti-DPI: `STOCK` по умолчанию и рекомендован; `dpi list-methods` и меню
++  объясняют для каждого из шести режимов направление, накладные расходы,
++  действие на весь общий IPv4 и отсутствие гарантии; подтверждение для общего
++  IPv4 сохранено; совет, как вернуть `STOCK`.
++- Краткий `status` показывает следующий шаг к каждой проблеме (только в
++  человекочитаемом выводе; `--json`/`--raw` не изменены).
++- Справка: «Быстрый старт»; руководство `docs/SETUP.md` (RU/EN).
++- Команды, форматы `--json`/`--raw`, коды выхода, проверки безопасности, режимы
++  DPI, механизм обновления (Stage 4/F/G) и MTProxy не изменены. Два P1 из аудита
++  Stage G (P1-G-01, P1-INHERITED-01) остаются в предрелизном backlog и описаны
++  в документации. Статус: H завершён по модельным тестам разработки; следующий
++  шаг — интегрированные предрелизные испытания.
++
+ ## 0.2.21-beta — 2026-10-28 — Stage G: усиление безопасности
+ 
+ - Исправлены два P1, воспроизведённые на реальном Linux при проверке Stage F:
+diff --git a/README.md b/README.md
+index 31db780..b4de127 100644
+--- a/README.md
++++ b/README.md
+@@ -7,17 +7,25 @@
+ 
+ ## Статус разработки
+ 
+-**Последний принятый checkpoint разработки: Stage F — v0.2.20-beta (с backlog).**
+-Независимая кампания на disposable Ubuntu 24.04.5 подтвердила реальные обновление
+-с operator-pinned SHA-256, backup, offline rollback, `flock`, SIGTERM/SIGKILL,
+-ENOSPC и systemd: **24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (P1)**.
+-Найдены два воспроизводимых P1: неограниченное ожидание health-check из-за дочернего
+-stdout и наследование update-lock дочерним `curl` после SIGKILL родителя.
+-**Stage G — Security Hardening (v0.2.21-beta): разработка завершена, ожидает
+-независимой проверки.** Оба P1 исправлены. После принятия G следующий этап —
+-**Stage H — UX**.
+-Реальное подписание GitHub releases, full CLI на live-путях и production release
+-ещё не проверены.
++**Последний независимо проверенный checkpoint: Stage G — v0.2.21-beta.**
++Завершено исправление двух P1, выявленных в реальных испытаниях Stage F:
++health-check теперь ограничен по времени при удержании stdout дочерним процессом,
++а `curl` не наследует блокировку обновления. Дополнительно исправлены проход
++ACME webroot, версия `global.env` после offline rollback и проверка hostname.
++Независимый полный аудит Codex: **ACCEPTED_WITH_BACKLOG**, оба предыдущих P1
++исправлены на реальных Linux-процессах (18/18), проверены обновление и offline rollback,
++конкурентные операции, ENOSPC, отдельные сценарии systemd/Nginx и регрессии C1–G.
++Остались два подтверждённых P1: ложный полный успех offline restore, если обновить
++`global.env` не удаётся; локальная доступность MTProxy client secret через `/proc`.
++**Не production-ready**: Caddy, публичный ACME/TLS, реальные Telegram-клиенты,
++доверенный подписанный релиз и полные лабораторные nft/systemd-проверки ещё впереди.
++
++**Stage H — UX и Guided Setup (v0.2.22-beta): разработка завершена, ожидает
++независимой проверки.** Быстрая настройка (Caddy, HTTPS, `STOCK` по умолчанию),
++понятные RU/EN описания режимов Anti-DPI, подсказки к статусу и помощь по
++подключению Telegram. Руководство: [docs/SETUP.md](docs/SETUP.md). Два P1 из
++аудита Stage G остаются в предрелизном backlog. Следующий шаг — интегрированные
++предрелизные испытания (RC), а не новый этап разработки.
+ 
+ | Ветка / артефакт | Состояние |
+ | --- | --- |
+@@ -26,7 +34,8 @@ stdout и наследование update-lock дочерним `curl` посл
+ | D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
+ | E `v0.2.19-beta` | **Development accepted** (независимые 48/48 модельных проверок; цельный ZIP, Git bundle; исходники ещё не загружены в GitHub) |
+ | F `v0.2.20-beta` | **Development accepted with backlog**: 24 реальных PASS / 2 P1 FAIL, 4 модельных набора PASS; исходники в проверенном ZIP/Git bundle, GitHub-ветка ещё не опубликована |
+-| G `v0.2.21-beta` | **Development complete** (ожидает независимой проверки): оба P1 исправлены — health-check ограничен и при потомках, держащих stdout; update-lock не наследуется дочерними процессами (RED на F, GREEN на G, включая реальный curl/TLS и SIGKILL родителя); ACME webroot доступен веб-серверу при `/var/lib/twebproxy` 0700; `global.env` после офлайн-отката; проверка hostname в изменяющих командах |
++| G `v0.2.21-beta` | **Codex ACCEPTED_WITH_BACKLOG**: реальные обновление/rollback/locks/ENOSPC, Stage G oracle 18/18; 2 P1 в backlog; исходники в проверенном ZIP/Git bundle, ветка GitHub ещё не опубликована |
++| H `v0.2.22-beta` | **Development complete** (ожидает независимой проверки): быстрая и расширенная настройка, главное меню по задачам, RU/EN объяснение шести режимов совместимости с подтверждением для общего IPv4, подсказки в статусе, помощь по подключению клиентов |
+ 
+ **Внимание:** development accepted не означает production-ready. Для RC
+ по-прежнему нужны независимые испытания на disposable Linux VM, включая
+@@ -108,8 +117,10 @@ sudo twebproxy
+ обновления, repair и любой неинтерактивный запуск не получают нового prompt.
+ Язык можно сменить в `Settings → Language` / `Настройки → Язык`.
+ 
+-Главное меню сгруппировано по задачам: инстансы, профили, статус и статистика,
+-обслуживание, диагностика и логи, настройки. Обычные `status` и `stats` теперь
++Главное меню сгруппировано по задачам (с v0.2.22): подключить Telegram, статус и
++статистика, инстансы, профили, диагностика и логи, обслуживание, совместимость
++сети / Anti-DPI (для опытных), настройки. Первый запуск предлагает быструю
++настройку; пошагово — в [docs/SETUP.md](docs/SETUP.md). Обычные `status` и `stats` теперь
+ показывают краткую операторскую сводку. Прежние подробные данные доступны через
+ `status [hostname] --verbose`, `stats [hostname] --verbose` и раздел диагностики.
+ Машинные форматы `--json` и `--raw` не локализуются и сохраняют стабильную схему.
+diff --git a/VERSION b/VERSION
+index 599028f..109a20f 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.21
++0.2.22
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 355a666..d68d824 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -28,9 +28,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
+ | v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
+ | v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
+-| v0.2.21 Stage G | **Development complete (pending independent acceptance)** | Both Stage F P1 failures fixed and shown RED on v0.2.20 / GREEN on v0.2.21 with real processes, locks, curl/TLS and parent-only SIGKILL in sandboxes: health probes bounded even with stdout-holding descendants (file capture, process-group cleanup), update lock no longer inherited by curl/helper children; ACME webroot traversal with a pre-existing 0700 `/var/lib/twebproxy`; `global.env` version follows an offline restore; hostname validation in mutating commands; GitHub source branch still not published |
++| v0.2.21 Stage G | **Codex ACCEPTED_WITH_BACKLOG (real Linux)** | RED Stage F 6 expected failures; Stage G oracle 18/18 PASS; real update/rollback/flock/SIGKILL/ENOSPC, Nginx & limited systemd PASS; 2 reproducible P1 in backlog, no confirmed P0; source ZIP/Git bundle not yet published to a branch |
++| v0.2.22 Stage H | **Development complete (pending independent acceptance)** | Quick/advanced guided setup (Caddy + HTTPS + STOCK recommended), task-ordered main menu, RU/EN explanations of the six compatibility modes with shared-IPv4 consent kept, actionable status hints, client connection help, docs/SETUP.md; Stage G P1 backlog unchanged; source ZIP/Git bundle not yet published to a branch |
+ 
+-**Current development stage: G — security hardening (development complete, awaiting independent acceptance).** Stage F passed independent model and real-host integration checks with two P1 failures, which Stage G fixes. Nothing is production-ready. Stage H — UX — follows G.
++**Current development stage: H — UX / guided setup (development complete, awaiting independent acceptance).** Independent Codex full security and real-Linux regression of Stage G is complete: **ACCEPTED_WITH_BACKLOG**. Next activity after H acceptance: RC / integrated pre-release validation. Neither a production RC nor a GitHub source-branch publication is implied.
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+@@ -46,23 +47,19 @@ All development checkpoints are **not authorized for production deployment**. Th
+ - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
+ - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
+ 
+-## Immediate work: Stage G — security hardening
++## Immediate work: Stage H — UX and guided setup
+ 
+-Stage F (`v0.2.20-beta`) is **DEVELOPMENT_ACCEPTED_WITH_BACKLOG**, not an RC or production release. A disposable Ubuntu 24.04.5 host ran the real Stage F update function with dedicated root-owned paths and localhost TLS: 24 real-host passes, 2 real-host failures (P1), 4 model suite passes, 3 unexecuted lab/real release scenarios. Observed success: operator-pinned trusted update, backup, offline rollback, concurrency, SIGTERM/SIGKILL recovery, true ENOSPC and actual systemd relay lifecycle. The running v0.2.9 host binaries were preserved.
++**Stage G v0.2.21-beta independent Codex audit completed: ACCEPTED_WITH_BACKLOG.** Real Linux validation independently passed the Stage G process oracle (18/18), operator-pinned trusted update, backup/rollback, real concurrent `flock`, signals and SIGKILL recovery, dedicated tmpfs ENOSPC, limited systemd/Nginx checks, ACME directory permission traversal and safe diagnostic outputs. Stage A/B complete destructive nft/systemd lab gates still returned 77. Caddy, real public CA, Telegram clients and signed release remain untested.
+ 
+-**Confirmed P1 findings to address early in G:**
+-1. `s4_manager_health`: a descendant retaining stdout can outlive the intended timeout; updater lock remains held.
+-2. `curl` inherits updater lock FD 9; after parent-only SIGKILL, a blocked child retains the lock until it exits.
++**Known P1 before production RC (do not conceal):**
++- Offline restore of both executables can return `RESTORE_SUCCESS` / exit 0 even when `global.env` cannot be atomically updated (e.g. immutable file); metadata remains stale. Preserve error distinction in operator guidance and fix during a scoped reliability pass before RC.
++- Stock MTProxy `-S` client secret is visible through `/proc/<pid>/cmdline` to local unprivileged users without a system-wide `/proc` restriction. Inherited, documented risk; mitigate or close with explicit verified host policy before RC.
+ 
+-**P2 backlog:** offline restore of both old executables can leave `global.env` version metadata showing the newer version; verify and correct coherently when relevant. Review the conditional ACME directory traversal issue recorded in Stage F DEFERRED.md.
++**Stage H (`v0.2.22-beta`) is implemented and awaits independent acceptance** (see `docs/SETUP.md`; P1-G-01 and P1-INHERITED-01 remain in the pre-RC backlog). Scope: clear RU/EN guided quick setup and beginner/advanced workflows, main-menu Anti-DPI access with explanations, concise actionable statuses, desktop/mobile client guidance, predictable EOF/default-no handling and consistent prompts. Recommend Caddy + functional HTTPS site + `STOCK` by default; current code cannot yet fully manage a real custom site (dedicated later-stage scope). Preserve the six tested optional DPI modes and explicit IPv4 shared-scope consent. Do not add automatic DPI circumvention or new protocols without separate design approval.
+ 
+-Stage G scope: privilege/permissions boundaries, controlled input validation and path ownership, safe resource limits, updater child-process/FD cleanup, and regression tests. Prioritize confirmed exploit/failure paths rather than an unrestricted audit or redesign. Preserve the simple operation-local backup → verified update → health → rollback workflow. No resurrection of advanced Stage 3 recovery.
++One focused Stage H implementation + RED/GREEN regression + independent acceptance, no speculative correction chain. Before RC, full dedicated Linux VM validation of privileged firewall/systemd, Caddy/Nginx TLS, genuine client traffic and signed release policy is mandatory.
+ 
+-Still NOT_EXECUTED: actual signed immutable GitHub release publication (no owner-pinned signing key/release), full CLI update on live default manager paths, and loop-device ENOSPC (tmpfs ENOSPC already verified). Before production RC, complete separately justified acceptance gates and signed-release trust bootstrap.
+-
+-GitHub `main` continues to expose the older `v0.2.9` source baseline. The accepted Stage D/E/F Git commits are retained in `handoff/history.bundle` from the Stage F all-in-one ZIP, **not yet published to separate GitHub source branches**. Updating README and ROADMAP is not source publication. Do not overwrite `main` or call a development acceptance a release.
+-
+-Stage G (`v0.2.21-beta`) is implemented and awaits independent acceptance; real-VM gates (ENOSPC, immutable files, live systemd/installed paths, real GitHub releases) remain for the reviewer's disposable host. After Stage G is accepted, move to Stage H — UX.
++The GitHub `main` source is still `v0.2.9`; accepted source checkpoints D/E/F/G are in Git bundles, **not verified as remote branches**. Update docs without falsely asserting code publication. Do not force-push or merge to main.
+ 
+ ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
+ 
+diff --git a/docs/SETUP.md b/docs/SETUP.md
+new file mode 100644
+index 0000000..f57e354
+--- /dev/null
++++ b/docs/SETUP.md
+@@ -0,0 +1,233 @@
++# Настройка TWebProxy Manager / Setting up TWebProxy Manager
++
++Руководство относится к v0.2.22 (Stage H). Это development-checkpoint, а не
++релиз: не ставьте его на рабочий VPS до предрелизных испытаний.
++The English version follows the Russian one.
++
++---
++
++## Русский
++
++### Что нужно заранее
++
++- Debian 12+ или Ubuntu 22.04+, x86_64, systemd, права root.
++- Публичный IPv4 и hostname, у которого DNS-запись `A` указывает на этот сервер.
++- Свободный TCP 443 (HTTPS). Для автоматических сертификатов (Caddy или
++  Nginx + Let's Encrypt) нужен ещё TCP 80.
++- Telegram WEB Proxy всегда работает по HTTPS на порту 443; в клиенте порт не
++  указывается.
++
++### Быстрая настройка
++
++1. Запустите `sudo ./twebproxy-manager.sh` (после установки — `sudo twebproxy`).
++2. При первом интерактивном запуске выберите язык.
++3. Выберите «Быстрая настройка». Manager установит основу (relay, MTProxy,
++   службы) и спросит:
++   - hostname;
++   - тип настройки: «Быстрая (рекомендуется)» или «Расширенная»;
++   - сайт на этом hostname (см. ниже);
++   - TLS: рекомендуется Caddy с автоматическим HTTPS.
++4. Проверьте план и подтвердите. В быстрой настройке порты подбираются
++   автоматически; создаётся профиль `default` с новым secret и carrier `https`;
++   MTProxy получает 1 worker и 4096 соединений. Сетевой режим — `STOCK`.
++5. В конце Manager покажет ссылки для Telegram и шаги подключения.
++
++Расширенная настройка задаёт те же вопросы, что и раньше: порты, имя профиля,
++secret, carrier, workers и лимит соединений. `sudo twebproxy add` запускает тот
++же мастер.
++
++Конец ввода (Ctrl-D) на любом вопросе отменяет создание. Ответ «нет» на
++подтверждении плана ничего не меняет. Если DNS не совпадает с адресом сервера,
++по умолчанию создание прерывается. Неверный hostname можно ввести заново
++(три попытки).
++
++### Сайт на hostname
++
++На том же hostname работает обычный сайт. Сейчас поддерживаются три варианта:
++
++| Вариант | Что делает |
++|---|---|
++| Временная страница-заглушка | Генерирует простую страницу. Подходит, чтобы проверить HTTPS; позже замените её настоящим сайтом. |
++| Мой статический сайт | Копирует указанный каталог с `index.html`. |
++| Моё веб-приложение | Проксирует адрес на loopback (например, `http://127.0.0.1:3000`). |
++
++Конструктора сайтов, загрузки или снимков сайта в этой версии нет.
++
++### TLS и фронтенд
++
++| Режим | Когда выбирать |
++|---|---|
++| Caddy (рекомендуется) | Новый сервер: сертификат выпускается и продлевается автоматически; нужны порты 80 и 443. |
++| Nginx + Let's Encrypt | На сервере уже используется Nginx; certbot продлевает сертификат, нужен порт 80. |
++| Nginx + свой сертификат | Сертификат выпускается вне Manager; продлевать его нужно самостоятельно. |
++| Вручную | Порт 443 уже обслуживает ваш веб-сервер; `twebproxy manual-snippet` покажет нужную конфигурацию. |
++
++### Подключение Telegram
++
++`twebproxy show <hostname>` (или пункт меню «Подключить Telegram») выводит для
++каждого профиля «Ссылку» `https://t.me/webproxy?server=…&secret=…` и «Ссылку TG»
++`tg://webproxy?…`.
++
++1. Откройте ссылку на устройстве с Telegram или отправьте её себе в Telegram и
++   нажмите.
++2. Подтвердите добавление прокси. Порт и протокол вводить не нужно.
++3. Выдавайте разным пользователям отдельные профили (`twebproxy profile-add`),
++   чтобы менять или отзывать доступ по отдельности.
++
++Нужен клиент Telegram с поддержкой WEB Proxy. Manager не проверяет версии
++клиентов; работа настоящих клиентов на компьютере и телефоне проверяется на
++предрелизных испытаниях.
++
++### Совместимость сети / Anti-DPI
++
++По умолчанию действует `STOCK`: трафик не изменяется. С него и стоит начинать.
++Пять дополнительных режимов (`window1152`, `mss88`, `nfqws`,
++`window1152_nfqws`, `mss88_nfqws`) экспериментальны:
++
++- они работают только для IPv4 и затрагивают все HTTPS-соединения с того же
++  публичного IPv4 на порту 443, включая другие сайты и службы на этом адресе;
++- включение требует явного подтверждения (`--accept-shared-scope` в CLI);
++- ни один режим не гарантирует обход DPI; накладные расходы и направление
++  каждого режима показывает `twebproxy dpi list-methods`;
++- вернуть `STOCK`: `twebproxy dpi disable <hostname>`.
++
++Меняйте режим только при реальных проблемах с подключением, по одному, и
++проверяйте настоящим клиентом.
++
++### Проверка и устранение неполадок
++
++- `twebproxy status <hostname>` — краткий статус; у каждой проблемы указан
++  следующий шаг.
++- `https://<hostname>/` должен открываться в браузере с действительным
++  сертификатом.
++- `twebproxy diagnose <hostname>`, `twebproxy audit <hostname>` — подробности
++  и проверка изоляции backend.
++- `twebproxy cert-status <hostname>` — сертификат; `twebproxy repair <hostname>` —
++  восстановить службы и конфигурацию.
++- Частые причины: запись `A` указывает не на этот сервер; порт 80 или 443 занят
++  другим веб-сервером; закрыт межсетевой экран провайдера.
++
++### Известные ограничения (предрелизный backlog)
++
++- P1-G-01: офлайн-восстановление (`restore-update-backup`) сообщает
++  `RESTORE_SUCCESS`, даже если обновить `MANAGER_VERSION` в `global.env` не
++  удалось (например, файл неизменяемый). Исполняемые файлы при этом
++  восстановлены. Сообщение об этом выводится в stderr; `twebproxy repair`
++  переписывает метаданные.
++- P1-INHERITED-01: stock MTProxy получает secret клиента через `-S`; локальные
++  пользователи сервера могут прочитать его в `/proc`. Не используйте сервер с
++  недоверенными локальными учётными записями либо смонтируйте `/proc` с
++  `hidepid=2`.
++
++---
++
++## English
++
++### Prerequisites
++
++- Debian 12+ or Ubuntu 22.04+, x86_64, systemd, root.
++- A public IPv4 and a hostname whose DNS `A` record points to this server.
++- TCP 443 free for HTTPS. Automatic certificates (Caddy, or Nginx with Let's
++  Encrypt) also need TCP 80.
++- Telegram WEB Proxy always uses HTTPS on port 443; clients never enter a port.
++
++### Quick setup
++
++1. Run `sudo ./twebproxy-manager.sh` (after installation: `sudo twebproxy`).
++2. On the first interactive start, choose the language.
++3. Choose "Quick setup". The manager installs the core (relay, MTProxy,
++   services) and asks for:
++   - the hostname;
++   - the setup type: "Quick (recommended)" or "Advanced";
++   - the website on that hostname (below);
++   - TLS: Caddy with automatic HTTPS is recommended.
++4. Review the plan and confirm. Quick setup picks ports automatically and
++   creates the profile `default` with a new secret and the `https` carrier;
++   MTProxy gets 1 worker and 4096 connections. The network mode is `STOCK`.
++5. At the end the manager prints the Telegram links and connection steps.
++
++Advanced setup asks the full set of questions as before: ports, profile name,
++secret, carrier, workers and connection limit. `sudo twebproxy add` runs the
++same wizard.
++
++End of input (Ctrl-D) at any question cancels the creation. Answering "no" to
++the plan changes nothing. If DNS does not match the server address, the
++default answer stops the creation. A mistyped hostname can be entered again
++(three attempts).
++
++### The website on the hostname
++
++The hostname also serves an ordinary website. Three options exist today:
++
++| Option | What it does |
++|---|---|
++| Temporary placeholder page | Generates a simple page. Good for checking HTTPS; replace it with a real site later. |
++| My static website | Copies a directory with `index.html`. |
++| My web application | Reverse-proxies a loopback URL (for example `http://127.0.0.1:3000`). |
++
++There is no website builder, upload or snapshot feature in this version.
++
++### TLS and frontend
++
++| Mode | When to choose it |
++|---|---|
++| Caddy (recommended) | New servers. The certificate is issued and renewed automatically; ports 80 and 443 are needed. |
++| Nginx + Let's Encrypt | Nginx is already in use. certbot renews the certificate; port 80 is needed. |
++| Nginx + own certificate | The certificate is issued outside the manager, and you renew it yourself. |
++| Manual | Port 443 is already served by your web server; `twebproxy manual-snippet` prints the configuration to add. |
++
++### Connecting Telegram
++
++`twebproxy show <hostname>` (or the menu item "Connect Telegram") prints two
++links for every profile: the Link `https://t.me/webproxy?server=…&secret=…` and
++the TG link `tg://webproxy?…`.
++
++1. Open the link on the device with Telegram, or send it to yourself in
++   Telegram and tap it.
++2. Accept the new proxy. No port or protocol has to be entered.
++3. Give separate users their own profiles (`twebproxy profile-add`), so access
++   can be changed or revoked individually.
++
++A Telegram client with WEB Proxy support is required. The manager does not
++check client versions; real desktop and mobile clients are verified during
++pre-release testing.
++
++### Network compatibility / Anti-DPI
++
++The default is `STOCK`, which leaves traffic unchanged. Start there. The five
++other modes (`window1152`, `mss88`, `nfqws`, `window1152_nfqws`,
++`mss88_nfqws`) are experimental:
++
++- They work on IPv4 only. They affect every HTTPS connection from the same
++  public IPv4 on port 443, including other sites and services on that address.
++- Enabling one needs explicit confirmation (`--accept-shared-scope` on the
++  command line).
++- None guarantees getting past DPI. `twebproxy dpi list-methods` shows each
++  mode's direction and overhead.
++- Return to `STOCK` with `twebproxy dpi disable <hostname>`.
++
++Change the mode only for real connection problems, one mode at a time, and test
++with a real client.
++
++### Validation and troubleshooting
++
++- `twebproxy status <hostname>`: compact status; every problem comes with the
++  next step to take.
++- `https://<hostname>/` must open in a browser with a valid certificate.
++- `twebproxy diagnose <hostname>` and `twebproxy audit <hostname>`: details and
++  the backend isolation check.
++- `twebproxy cert-status <hostname>`: the certificate. `twebproxy repair <hostname>`:
++  restores services and configuration.
++- Common causes: the `A` record points elsewhere; another web server holds
++  port 80 or 443; the provider's firewall blocks them.
++
++### Known limitations (pre-release backlog)
++
++- P1-G-01: the offline restore (`restore-update-backup`) prints
++  `RESTORE_SUCCESS` even when it could not update `MANAGER_VERSION` in
++  `global.env` (for example, an immutable file). The executables are restored;
++  the problem is reported on stderr, and `twebproxy repair` rewrites the
++  metadata.
++- P1-INHERITED-01: stock MTProxy receives the client secret with `-S`, so local
++  users of the server can read it in `/proc`. Do not run the proxy on a host
++  with untrusted local accounts, or mount `/proc` with `hidepid=2`.
+diff --git a/docs/UPDATES.md b/docs/UPDATES.md
+index 71dc141..e7d7d09 100644
+--- a/docs/UPDATES.md
++++ b/docs/UPDATES.md
+@@ -148,6 +148,10 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
+   `restore <id>`). It needs no network and does not use the installed manager.
+   It also sets `MANAGER_VERSION` in `global.env` to the restored version (only
+   that line; a symlinked or unsafe `global.env` is left alone and reported).
++  Known pre-RC limitation (P1-G-01): `RESTORE_SUCCESS` and exit status 0 prove
++  the restored executables, not that this metadata update worked. If it could
++  not be written (for example an immutable `global.env`), the helper says so on
++  stderr; run `twebproxy repair` to rewrite the metadata.
+   The next `manager-update` then works again; it removes the stale staging and
+   temp files itself.
+ - A busy lock after a crash cannot happen (flock); a lock file with a wrong
+diff --git a/tests/stage-x-fixui-fixture.sh b/tests/stage-x-fixui-fixture.sh
+index abb6763..024b061 100755
+--- a/tests/stage-x-fixui-fixture.sh
++++ b/tests/stage-x-fixui-fixture.sh
+@@ -117,13 +117,14 @@ if LC_ALL=C grep -Eq '(^|[^A-Za-z])(live|legacy|lifecycle|Audit|renewal|Offline|
+   fail 'ordinary English prose leaked into Russian compact UI'
+ fi
+ 
+-# Main navigation has six task groups, explicit zero Exit, no Anti-DPI action.
++# Main navigation: the six task groups plus (Stage H) Connect Telegram first and
++# advanced network compatibility, explicit zero Exit, no menu_anti_dpi action.
+ body="$(declare -f menu)"
+ for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings; do
+   [[ "$body" == *"$fn"* ]] || fail "main route missing: $fn"
+ done
+ [[ "$body" != *menu_anti_dpi* ]]
+-for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings menu_logs menu_certificates menu_update_recovery; do
++for fn in menu_web_proxy menu_profiles menu_status_statistics menu_maintenance menu_diagnostics menu_settings menu_logs menu_certificates menu_update_recovery menu_network_compatibility; do
+   fn_body="$(declare -f "$fn")"
+   [[ "$fn_body" == *'0)'* && "$fn_body" == *return* ]] || fail "$fn lacks consistent zero Back"
+ done
+@@ -135,8 +136,8 @@ grep -q 'Enter a number' "$TMP/menu-choice.err"
+ # Execute each visible main-menu route and then Exit. Stubs make the test
+ # read-only while proving the case mapping, one-level return and zero semantics.
+ for route in \
+-  '1:menu_web_proxy' '2:menu_profiles' '3:menu_status_statistics' \
+-  '4:menu_maintenance' '5:menu_diagnostics' '6:menu_settings'; do
++  '1:menu_connect' '2:menu_status_statistics' '3:menu_web_proxy' '4:menu_profiles' \
++  '5:menu_diagnostics' '6:menu_maintenance' '7:menu_network_compatibility' '8:menu_settings'; do
+   number="${route%%:*}"; function_name="${route#*:}"
+   (
+     need_root() { :; }; need_systemd() { :; }; core_installed() { return 0; }; clear() { :; }
+@@ -147,6 +148,8 @@ for route in \
+     menu_maintenance() { echo ROUTE:menu_maintenance; }
+     menu_diagnostics() { echo ROUTE:menu_diagnostics; }
+     menu_settings() { echo ROUTE:menu_settings; }
++    menu_connect() { echo ROUTE:menu_connect; }
++    menu_network_compatibility() { echo ROUTE:menu_network_compatibility; }
+     export TWEBPROXY_UI_LANGUAGE=en
+     printf '%s\n0\n' "$number" | menu
+   ) > "$TMP/route-$number.txt" 2>&1
+diff --git a/tests/stagec1/state-harness.sh b/tests/stagec1/state-harness.sh
+index 5c10967..ad031bf 100644
+--- a/tests/stagec1/state-harness.sh
++++ b/tests/stagec1/state-harness.sh
+@@ -25,6 +25,9 @@ c1_harness() {
+   source "$MGR"
+   trap - ERR
+   set +e
++  # Sourced inside this function, the manager's top-level `declare -A` catalog
++  # is local; the prompts of the add flow need it after the harness returns.
++  declare -gA UI_EN=() UI_RU=()
+   BASE_DIR="$TMP/etc"; INSTANCES_DIR="$BASE_DIR/instances"; BACKENDS_DIR="$BASE_DIR/backends"
+   MTPROXY_DATA_DIR="$BASE_DIR/mtproxy"; GLOBAL_ENV="$BASE_DIR/global.env"
+   FIREWALL_FILE="$BASE_DIR/firewall.nft"; DPI_DIR="$BASE_DIR/dpi"
+@@ -163,8 +166,9 @@ c1_answers() {
+       *) return 0;;
+     esac
+   }
+-  # add_instance_cmd: placeholder site, manual TLS frontend.
+-  choose() { case "$1" in 'Обычный сайт на hostname:') printf 1;; 'SSL / reverse proxy:') printf 4;; *) printf 1;; esac; }
++  # add_instance_cmd: advanced setup (every prompt below is asked), placeholder
++  # site, manual TLS frontend.
++  choose() { case "$1" in 'Setup type:'|'Тип настройки:') printf 2;; 'Обычный сайт на hostname:') printf 1;; 'SSL / reverse proxy:') printf 4;; *) printf 1;; esac; }
+   carrier_choose() { c1_barrier "${C1_AT_CARRIER:-}"; printf '%s' "${C1_CARRIER:-https}"; }
+   openssl() {
+     if [[ "${1:-} ${2:-}" == "rand -hex" && -n "${C1_SECRET:-}" ]]; then printf '%s\n' "$C1_SECRET"; return 0; fi
+diff --git a/tests/stageh/README.md b/tests/stageh/README.md
+new file mode 100644
+index 0000000..b9cbf9d
+--- /dev/null
++++ b/tests/stageh/README.md
+@@ -0,0 +1,29 @@
++# Stage H verification
++
++User experience and guided setup. Model tests through the real prompts
++(stdin, and a pseudo-terminal where `read -p` prompts or the first-run language
++selection must be visible); the host boundary (systemd, nft, ip, dig, curl,
++Caddy/Nginx/certbot) is modeled by the Stage C1–E harness layers.
++
++| Check | What it proves |
++|---|---|
++| H1 | quick setup asks only hostname, setup type, website and TLS, and creates profile `default` (new secret, `https`, automatic ports) with `STOCK`; advanced setup still asks every value |
++| H2 | Ctrl-D at the setup type, website or plan, "no" at the plan and the default "no" on a DNS mismatch create nothing; an invalid hostname is asked again, three invalid names abort |
++| H3 | first run on a terminal: language selection, prerequisites, Quick setup first, Russian text |
++| H4 | main menu order and routing of all eight items; 0 and Ctrl-D return; network compatibility is no longer duplicated in Settings |
++| H5 | `dpi list-methods`: six IDs, original one-line descriptions, direction, overhead, IPv4-wide effect, no-guarantee note, revert command, no "best mode"; menu: STOCK intro, explained choices, shared-IPv4 consent (Enter and Ctrl-D change nothing, "y" applies) |
++| H6 | `show`: connection steps, only the two existing link forms and the site URL, honest client-support note, troubleshooting commands (EN/RU) |
++| H7 | compact status prints a next step for a stopped relay; one next step per check family (an UNKNOWN TLS state reads "not confirmed", never "failed"); `--json` is unchanged |
++| H8 | help: quick start in EN/RU, printed literally (shell-function tripwires for `sudo`/`twebproxy` prove nothing is executed); NO_COLOR leaves no ANSI |
++| `heredoc-guard.sh` | no backtick in an unquoted heredoc of the manager (a draft of the help once executed `sudo twebproxy`) |
++
++```sh
++bash tests/stageh/run-stage-h-suite.sh            # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stageh/ux-fixture.sh [<manager>]
++bash tests/stageh/heredoc-guard.sh [<manager>]
++bash tests/stageh/h-scope-invariants.sh <v0.2.21 source tree>
++```
++
++Not proven here: real Caddy/Nginx/ACME, a public website, real Telegram
++clients on desktop and mobile, real network compatibility effects — RC lab
++gates.
+diff --git a/tests/stageh/h-scope-invariants.sh b/tests/stageh/h-scope-invariants.sh
+new file mode 100755
+index 0000000..8ef76e6
+--- /dev/null
++++ b/tests/stageh/h-scope-invariants.sh
+@@ -0,0 +1,96 @@
++#!/usr/bin/env bash
++# Stage H scope against the exact v0.2.21 (Stage G, 0a14a29) tree. Allowed
++# changes: the guided setup (collect_instance_settings, collect_profile_settings,
++# add_instance_cmd), client help (show_instance_cmd + new helpers), menus
++# (menu, menu_settings, menu_network_compatibility, new menu_connect and
++# first_run_prerequisites), Anti-DPI explanations (dpi_list_methods_cmd), status
++# hints (tui_render_status, new tui_check_hint), help (usage) and the RU/EN
++# catalog (ui_i18n_init). The updater (Stage 4/F/G set), the offline helper,
++# DPI/firewall/relay/frontend/TLS/state code and every top-level variable stay
++# byte-identical. Test changes: the C1 harness answers the new setup prompt and
++# keeps its catalog global; the FixUI route test follows the new menu order.
++# README and ROADMAP carry the owner's newer text from GitHub main.
++# Usage: h-scope-invariants.sh <v0.2.21 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.21 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-h-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(add_instance_cmd collect_instance_settings collect_profile_settings dpi_list_methods_cmd menu
++  menu_network_compatibility menu_settings show_instance_cmd tui_render_status ui_i18n_init usage)
++ADDED=(client_help_render first_run_prerequisites menu_connect setup_next_steps tui_check_hint)
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS README.md docs/ROADMAP.md docs/UPDATES.md
++  tests/stagec1/state-harness.sh tests/stage-x-fixui-fixture.sh)
++ADDED_FILES=(docs/SETUP.md tests/stageh/README.md tests/stageh/ux-harness.sh tests/stageh/ux-fixture.sh
++  tests/stageh/heredoc-guard.sh tests/stageh/run-stage-h-suite.sh tests/stageh/h-scope-invariants.sh)
++# The updater is untouched in Stage H: the Stage G hashes hold before and after.
++LEGACY_BEFORE=2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0
++LEGACY_AFTER=2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0
++FULL_BEFORE=b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d
++FULL_AFTER=b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++(( modified == ${#MODIFIED[@]} && added == ${#ADDED[@]} )) || { echo "FAIL expected ${#MODIFIED[@]} modified / ${#ADDED[@]} added"; exit 1; }
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars"
++echo "PASS top-level variables unchanged except the release identity"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageH/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (assets, other docs, all earlier tests and evidence included)"
++
++legacy_before="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$BASE/twebproxy-manager.sh")"
++legacy_after="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++full_before="$(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$BASE/twebproxy-manager.sh" | tail -1)"
++full_after="$(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$PROJECT/twebproxy-manager.sh" | tail -1)"
++[[ "${legacy_before%% *}" == "$LEGACY_BEFORE" && "${full_before%% *}" == "$FULL_BEFORE" ]] || { echo "FAIL baseline hashes: $legacy_before / $full_before"; exit 1; }
++[[ "${legacy_after%% *}" == "$LEGACY_AFTER" && "${full_after%% *}" == "$FULL_AFTER" ]] || { echo "FAIL candidate hashes (update the documented values): $legacy_after / $full_after"; exit 1; }
++echo "PASS Stage 4/F/G updater set unchanged: legacy ${LEGACY_AFTER:0:12}, full ${FULL_AFTER:0:12}"
++printf 'PASS h-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stageh/heredoc-guard.sh b/tests/stageh/heredoc-guard.sh
+new file mode 100755
+index 0000000..158dfc1
+--- /dev/null
++++ b/tests/stageh/heredoc-guard.sh
+@@ -0,0 +1,30 @@
++#!/usr/bin/env bash
++# Stage H static guard: no backtick inside an unquoted heredoc of the manager.
++# An unquoted heredoc (<<EOF) expands $(...) and `...`; a backtick in help or
++# message text there runs that text as a command (it did once, in a draft of the
++# Stage H help: `sudo twebproxy` executed the installed manager). Text meant to
++# be printed uses plain quotes; deliberate expansions use $(...).
++# Usage: heredoc-guard.sh [path/to/twebproxy-manager.sh]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++awk '
++  term == "" {
++    if ($0 ~ /^[[:space:]]*#/) next
++    if (match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/)) {
++      tok = substr($0, RSTART, RLENGTH)
++      if (RSTART > 1 && substr($0, RSTART - 1, 1) == "<") next   # here-string <<<
++      quoted = (tok ~ /["\047]/)
++      dash = (tok ~ /^<<-/)
++      sub(/^<<-?[[:space:]]*["\047]?/, "", tok); sub(/["\047]$/, "", tok)
++      term = tok; start = NR
++    }
++    next
++  }
++  {
++    cur = $0; if (dash) sub(/^\t+/, "", cur)
++    if (cur == term) { term = ""; next }
++    if (!quoted && index($0, "`") > 0) { printf "unquoted heredoc (line %d) has a backtick at line %d: %s\n", start, NR, $0; bad = 1 }
++  }
++  END { exit bad }
++' "$MGR" && echo 'heredoc-guard: PASS (no backtick in an unquoted heredoc)'
+diff --git a/tests/stageh/run-stage-h-suite.sh b/tests/stageh/run-stage-h-suite.sh
+new file mode 100755
+index 0000000..f5001f7
+--- /dev/null
++++ b/tests/stageh/run-stage-h-suite.sh
+@@ -0,0 +1,20 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage H: guided setup, menus, Anti-DPI explanations, client help, status hints
++# and RU/EN text through the real prompts (tests/stageh/ux-harness.sh, model
++# host boundary), plus the static heredoc guard. Root required for the shared
++# harness; nothing outside temporary sandboxes is touched.
++# Scope: h-scope-invariants.sh <v0.2.21 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "H UX: setup, menus, Anti-DPI text, client help, status hints (MODEL)" "$ROOT/tests/stageh/ux-fixture.sh" 1200 "$MGR"
++stage_a_run_case "H static: no backtick in an unquoted heredoc" "$ROOT/tests/stageh/heredoc-guard.sh" 60 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-h-suite: PASS (all mandatory checks executed)';;
++  77) echo 'stage-h-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-h-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/tests/stageh/ux-fixture.sh b/tests/stageh/ux-fixture.sh
+new file mode 100755
+index 0000000..bef4a3c
+--- /dev/null
++++ b/tests/stageh/ux-fixture.sh
+@@ -0,0 +1,223 @@
++#!/usr/bin/env bash
++# Stage H regression: guided setup and everyday UX.
++#   H1  quick setup asks only hostname, setup type, website and TLS; uses safe
++#       defaults (auto ports, profile "default", new secret, https carrier,
++#       STOCK); the advanced path still asks every value
++#   H2  EOF, "no" and invalid input never create anything; an invalid hostname
++#       is asked again (three attempts) with an actionable message
++#   H3  first run: language selection, prerequisites, quick setup first
++#   H4  main menu: task order, every item routes, 0/EOF return; network
++#       compatibility is a separate advanced item
++#   H5  Anti-DPI: STOCK default, six mode IDs with direction/overhead/IPv4-wide
++#       effect/no-guarantee explanation, shared-IPv4 consent before any change
++#   H6  client help after setup and in "show"; only the existing link forms
++#   H7  compact status gives an actionable next step per problem; JSON unchanged
++#   H8  RU/EN natural text, help, NO_COLOR
++# Real prompts read stdin (tests/stagee/ops-harness.sh: models for systemd,
++# nft, ip, dig, curl, Caddy/Nginx/certbot). The isolation audit is stubbed in
++# the creation flows (covered by the C/E suites); nothing outside $TMP.
++#
++# Usage: ux-fixture.sh [path/to/twebproxy-manager.sh]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-h-ux.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stageh/ux-harness.sh"
++h_harness
++export TWEBPROXY_RELAY_READY_WAIT=3 TWEBPROXY_DIAG_TIMEOUT=2
++pass=0; fail=0
++check() { local name="$1"; shift; if "$@"; then printf 'PASS %s\n' "$name"; pass=$((pass+1)); else printf 'FAIL %s\n' "$name"; fail=$((fail+1)); fi; }
++plain() { sed 's/\x1b\[[0-9;]*m//g' "$TMP/out"; }
++has() { plain | grep -Fq -- "$1"; }
++lacks() { ! plain | grep -Fq -- "$1"; }
++cyr() { perl -CSD -ne 'BEGIN { $c = 0 } $c = 1 if /\p{Cyrillic}/; END { exit !$c }' "$TMP/out"; }
++no_untranslated() { ! grep -q 'UNTRANSLATED_MESSAGE' "$TMP/out"; }
++A=alpha.example C=gamma.example SEC=0123456789abcdef0123456789abcdef
++# $1=seconds $2=language, rest=command (eval); stdin from $STDIN. rc 124 = hung.
++run() { local t="$1" lang="$2"; shift 2; H_LANG="$lang" timeout -k 3 "$t" bash -c 'source "$H_HARNESS"; h_harness; set -Eeuo pipefail; eval "$1"' h-run "$*" \
++  < "${STDIN:-/dev/null}" > "$TMP/out" 2>&1; rc=$?; }
++# The same on a pseudo-terminal (first-run language selection needs a TTY).
++run_tty() { local t="$1"; shift; printf '%s\n' "${@:2}" | H_LANG="" H_CMD="$1" timeout -k 3 "$t" script -qec \
++  'bash -c '"'"'source "$H_HARNESS"; h_harness; set -Eeuo pipefail; eval "$H_CMD"'"'"'' /dev/null > "$TMP/out" 2>&1; rc=$?; }
++answers() { printf '%s\n' "$@" > "$TMP/in"; STDIN="$TMP/in"; }
++# Creation flows: everything real except the isolation audit and the DNS lookup of the new name.
++CREATE='audit_instance_impl() { return 0; }; check_dns_for_host() { return 0; }; add_instance_cmd'
++
++reset() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$SITES_DIR" "$BASE_DIR/.locks" "$BASE_DIR/dpi" "$TMP"/units/* "$PROJECT_DIR" "$LANGUAGE_FILE"
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR" "$PROJECT_DIR"
++  install -d -m 0755 "$SITES_DIR"
++}
++seed_host() { # $1=host $2=index $3=tls
++  d_seed_instance "$1" $((18080 + 2 * $2)) $((18081 + 2 * $2)) "$3"
++  c1_seed_profile "$1" main "$SEC" https $((23980 + $2)) $((28980 + $2))
++  c1_run rebuild_profiles_json "$1" >/dev/null 2>&1
++  "$TMP/bin/systemctl" start "twebproxy-mtproxy@$1--main.service" "twebproxy@$1.service"
++}
++core_present() { install -d -m 0755 "$LIBEXEC_DIR" "$SYSTEMD_DIR"; printf '#!/bin/sh\n' > "$MTPROXY_BIN"; chmod 0755 "$MTPROXY_BIN"; : > "$SYSTEMD_DIR/twebproxy@.service"; }
++core_absent() { rm -f "$MTPROXY_BIN" "$SYSTEMD_DIR/twebproxy@.service"; }
++created() { [[ -f "$INSTANCES_DIR/$C/instance.env" ]]; }
++nothing_created() { [[ ! -e "$INSTANCES_DIR/$C" ]] && ! ls "$BACKENDS_DIR" 2>/dev/null | grep -q "^$C--"; }
++profile_value() { sed -n "s/^$2=//p" "$INSTANCES_DIR/$C/profiles.d/$1.env" 2>/dev/null | head -n1; }
++
++# ================= H1 quick and advanced setup ==============================
++reset; core_present
++# On a pseudo-terminal, so that every read -p prompt is visible in the output.
++# hostname, setup type 1 (quick), site 1, TLS 1 (Caddy), plan confirmation (Enter)
++run_tty 60 "$CREATE" "$C" 1 1 1 ""
++check "h1_quick_creates (rc=$rc)" eval 'test "$rc" -eq 0 && created'
++check h1_quick_hostname_prompt_visible has 'WEB Proxy hostname'
++check h1_quick_asks_setup_type has 'Setup type:'
++check h1_quick_recommends_quick has 'Quick (recommended)'
++check h1_quick_recommends_caddy has 'Caddy — automatic HTTPS certificate (recommended)'
++check h1_quick_honest_placeholder has 'Temporary placeholder page'
++check h1_quick_skips_port_questions lacks 'ports automatically'
++check h1_quick_skips_profile_questions eval "lacks 'Profile/secret name' && lacks 'Carrier mode' && lacks 'MTProxy workers' && lacks 'Maximum connections' && lacks 'Generate a new'"
++check h1_quick_default_profile test -f "$INSTANCES_DIR/$C/profiles.d/default.env"
++check h1_quick_default_carrier test "$(profile_value default CARRIER_MODE)" = https
++check h1_quick_new_secret eval '[[ "$(profile_value default SECRET)" =~ ^[0-9a-f]{32}$ ]]'
++check h1_quick_plan_states_stock has 'Network mode:   STOCK'
++check h1_quick_stock_no_dpi_state test ! -e "$BASE_DIR/dpi"
++check h1_quick_client_help has 'How to connect Telegram'
++check h1_quick_link has "https://t.me/webproxy?server=$C&secret="
++check h1_quick_next_steps has "twebproxy status $C"
++check h1_quick_no_untranslated no_untranslated
++
++reset; core_present
++# hostname, setup type 2 (advanced), internal ports auto (Enter), site 1, TLS 4 (manual),
++# profile name, generate secret, carrier 2, profile ports auto, workers, max connections, confirm
++run_tty 60 "$CREATE" "$C" 2 "" 1 4 team "" 2 "" "" "" ""
++check "h1_advanced_creates (rc=$rc)" eval 'test "$rc" -eq 0 && created'
++check h1_advanced_asks_ports has 'ports automatically'
++check h1_advanced_asks_profile eval "has 'Profile/secret name' && has 'Carrier mode' && has 'MTProxy workers' && has 'Maximum connections'"
++check h1_advanced_profile_named test -f "$INSTANCES_DIR/$C/profiles.d/team.env"
++check h1_advanced_carrier_choice test "$(profile_value team CARRIER_MODE)" = https-lanes
++check h1_advanced_plan_states_stock has 'Network mode:   STOCK'
++
++# ================= H2 EOF, no, invalid input ================================
++reset; core_present
++answers "$C"; run 30 en "$CREATE"
++check "h2_eof_at_setup_type_creates_nothing (rc=$rc)" eval 'test "$rc" -ne 0 -a "$rc" -ne 124 && nothing_created'
++check h2_eof_no_untranslated no_untranslated
++answers "$C" 1; run 30 en "$CREATE"
++check "h2_eof_at_website_creates_nothing (rc=$rc)" eval 'test "$rc" -ne 0 -a "$rc" -ne 124 && nothing_created'
++answers "$C" 1 1 1; run 30 en "$CREATE"
++check "h2_eof_at_confirmation_creates_nothing (rc=$rc)" eval 'test "$rc" -ne 124 && nothing_created'
++answers "$C" 1 1 1 n; run 30 en "$CREATE"
++check "h2_no_at_confirmation_creates_nothing (rc=$rc)" eval 'test "$rc" -ne 124 && nothing_created'
++answers "$C" 1 1 1 "" n; run 30 en 'audit_instance_impl() { return 0; }; check_dns_for_host() { return 1; }; add_instance_cmd'
++check "h2_dns_mismatch_default_no_creates_nothing (rc=$rc)" eval 'test "$rc" -ne 0 -a "$rc" -ne 124 && nothing_created'
++run_tty 60 "$CREATE" 'Bad_Host!' "$C" 1 1 1 ""
++check "h2_invalid_hostname_asked_again (rc=$rc)" eval 'test "$rc" -eq 0 && created'
++check h2_invalid_hostname_actionable has 'proxy.example.com'
++reset; core_present
++run_tty 30 "$CREATE" 'Bad_Host!' 'https://x.example' 'nodot'
++check "h2_three_invalid_hostnames_abort (rc=$rc)" eval 'test "$rc" -ne 0 -a "$rc" -ne 124 && nothing_created && ! ls "$INSTANCES_DIR" | grep -q .'
++check h2_invalid_hostname_three_prompts test "$(plain | grep -c 'WEB Proxy hostname (without')" -eq 3
++
++# ================= H3 first run ==============================================
++reset; core_absent
++run_tty 30 'menu' 1 0
++check "h3_first_run_language_prompt (rc=$rc)" has 'Select language / Выберите язык'
++check h3_first_run_language_saved test "$(cat "$LANGUAGE_FILE" 2>/dev/null)" = en
++check h3_first_run_prerequisites eval "has 'DNS A record' && has 'TCP 443' && has 'TCP 80'"
++check h3_first_run_quick_setup_first eval "plain | grep -E '^\s*\[1\]' | tail -n1 | grep -q 'Quick setup'"
++check h3_first_run_core_only_second eval "plain | grep -E '^\s*\[2\]' | tail -n1 | grep -q 'core only'"
++check "h3_first_run_exit (rc=$rc)" test "$rc" -eq 0
++rm -f "$LANGUAGE_FILE"; run_tty 30 'menu' 2 0
++check h3_first_run_russian has 'Быстрая настройка'
++check h3_first_run_russian_prerequisites has 'DNS-записью A'
++check h3_first_run_russian_saved test "$(cat "$LANGUAGE_FILE" 2>/dev/null)" = ru
++
++# ================= H4 main menu ==============================================
++reset; core_present; seed_host "$A" 0 manual
++STUBS='menu_connect() { echo ROUTE:connect; }; menu_status_statistics() { echo ROUTE:status; }; menu_web_proxy() { echo ROUTE:instances; }
++  menu_profiles() { echo ROUTE:profiles; }; menu_diagnostics() { echo ROUTE:diagnostics; }; menu_maintenance() { echo ROUTE:maintenance; }
++  menu_network_compatibility() { echo ROUTE:compatibility; }; menu_settings() { echo ROUTE:settings; }; clear() { :; }'
++expect=(connect status instances profiles diagnostics maintenance compatibility settings)
++for n in 1 2 3 4 5 6 7 8; do
++  answers "$n" 0; run 30 en "$STUBS; menu"
++  check "h4_main_menu_item_${n}_routes_${expect[n-1]}" eval "grep -qx 'ROUTE:${expect[n-1]}' '$TMP/out' && test $rc -eq 0"
++done
++answers; run 30 en "$STUBS; menu"
++check "h4_main_menu_eof_exits (rc=$rc)" test "$rc" -eq 0
++answers 0; run 30 en 'clear() { :; }; menu_network_compatibility'
++check "h4_compatibility_zero_returns (rc=$rc)" test "$rc" -eq 0
++answers 0; run 30 en 'clear() { :; }; menu_settings'
++check h4_settings_has_no_duplicate_compatibility lacks 'Network compatibility'
++
++# ================= H5 Anti-DPI ===============================================
++run 30 en 'dpi_list_methods_cmd'
++for id in stock window1152 mss88 nfqws window1152_nfqws mss88_nfqws; do
++  check "h5_list_has_$id" eval "plain | grep -Eq '^$id {2,}'"
++done
++check h5_list_six_ids test "$(plain | grep -Ec '^(stock|window1152|mss88|nfqws|window1152_nfqws|mss88_nfqws) {2,}')" -eq 6
++check h5_list_stock_default has 'No traffic modification; production default.'
++check h5_list_direction has 'Direction:'
++check h5_list_overhead has 'Overhead:'
++check h5_list_ipv4_wide has 'every HTTPS connection from the same public IPv4'
++check h5_list_no_guarantee has 'No mode guarantees'
++check h5_list_revert has 'twebproxy dpi disable'
++check h5_list_no_best_mode eval "! plain | grep -Eiq 'best (mode|method)|recommended mode: (window|mss|nfqws)'"
++run 30 ru 'dpi_list_methods_cmd'
++check h5_list_russian cyr
++check h5_list_russian_no_english_prose eval "! LC_ALL=C grep -Eqi '\\b(live|legacy|lifecycle|Audit|renewal|Offline|helper|receive window|traffic|scope|shared)\\b' '$TMP/out'"
++DPI_STUBS='clear() { :; }; dpi_resolve_ipv4() { printf "198.51.100.10"; }; dpi_hosts_for_ipv4() { printf "%s\n" "$@" >/dev/null; printf "alpha.example\n"; }
++  dpi_set_cmd() { echo "DPI_SET $*"; }'
++answers 3 1 "" "" 0; run 30 en "$DPI_STUBS; menu_network_compatibility"
++check h5_tui_intro_stock_default has 'STOCK (default)'
++check h5_tui_methods_explained has 'window1152 — experimental'
++check h5_tui_consent_shown has 'every HTTPS flow sourced from 198.51.100.10:443'
++check h5_tui_consent_default_no eval "lacks 'DPI_SET' && has 'No changes applied.'"
++answers 3 1 y "" 0; run 30 en "$DPI_STUBS; menu_network_compatibility"
++check h5_tui_revert_tip has 'twebproxy dpi disable alpha.example'
++check h5_tui_consent_yes_applies has 'DPI_SET alpha.example window1152 --accept-shared-scope'
++answers 3 1; run 30 en "$DPI_STUBS; menu_network_compatibility"
++check h5_tui_consent_eof_no_change eval "lacks 'DPI_SET' && test $rc -ne 124"
++
++# ================= H6 client help ============================================
++run 30 en "show_instance_cmd $A"
++check h6_show_help has 'How to connect Telegram'
++check h6_show_web_link has "https://t.me/webproxy?server=$A&secret=$SEC"
++check h6_show_tg_link has "tg://webproxy?server=$A&secret=$SEC"
++check h6_show_check_site has "https://$A/"
++check h6_show_troubleshooting has "twebproxy status $A"
++check h6_show_client_support_honest has 'does not check client versions'
++check h6_show_no_other_urls eval "! plain | grep -oE '(https?|tg)://[^ )\`]+' | grep -vE '^(https://t\\.me/webproxy\\?server=|tg://webproxy\\?server=|https://$A/)' | grep -q ."
++run 30 ru "show_instance_cmd $A"
++check h6_show_russian has 'Как подключить Telegram'
++check h6_show_russian_no_untranslated no_untranslated
++
++# ================= H7 actionable status ======================================
++"$TMP/bin/systemctl" stop "twebproxy@$A.service" >/dev/null 2>&1
++run 30 en "collect_status $A; tui_render_status $A"
++check h7_status_problem_shown eval "plain | grep -q 'relay.service.active'"
++check h7_status_hint_repair has "twebproxy repair $A"
++run 30 ru "collect_status $A; tui_render_status $A"
++check h7_status_hint_russian eval "has 'twebproxy repair $A' && cyr"
++# One next step per check family; an UNKNOWN TLS state is "not confirmed", never "failed".
++run 30 en "for c in relay.healthz frontend.service.active tls.certificate.summary profiles.present firewall.backend profile.backend.service.active other.check; do tui_check_hint \$c $A; echo; done"
++check h7_hint_families eval "has 'twebproxy repair $A (details: twebproxy diagnose $A)' && has 'web server (Caddy/Nginx)' && has 'certificate is not confirmed' && has 'twebproxy cert-status $A' && has 'twebproxy profile-add $A' && has 'twebproxy audit $A' && has 'A profile backend needs attention' && has 'twebproxy status $A --verbose'"
++check h7_hint_tls_not_failed lacks 'check failed'
++run 30 en "OUTPUT_MODE=json; collect_status $A; tcore_render_json"
++check h7_json_has_no_hint eval "jq -e . '$TMP/out' >/dev/null && ! grep -q 'twebproxy repair' '$TMP/out'"
++"$TMP/bin/systemctl" start "twebproxy@$A.service" >/dev/null 2>&1
++
++# ================= H8 help, localization, NO_COLOR ===========================
++# The help text is printed, never executed: an unquoted heredoc would run
++# `sudo twebproxy` (it did once). Shell-function tripwires record any such run.
++TRIP='sudo() { printf "EXECUTED:sudo %s\n" "$*"; }; twebproxy() { printf "EXECUTED:twebproxy %s\n" "$*"; }'
++run 30 en "$TRIP; usage"
++check h8_help_quick_start has 'Quick start'
++check h8_help_english_only eval '! cyr'
++check h8_help_text_literal eval "has 'run \"sudo twebproxy\" and choose' && has '\"twebproxy show HOSTNAME\"' && has '\"twebproxy status HOSTNAME\"' && test $rc -eq 0"
++check h8_help_runs_nothing lacks 'EXECUTED:'
++run 30 ru "$TRIP; usage"
++check h8_help_russian_quick_start has 'Быстрый старт'
++check h8_help_russian_literal eval "has '«sudo twebproxy»' && has '«twebproxy show HOSTNAME»' && ! grep -q 'EXECUTED:' '$TMP/out'"
++run 30 en "enable_colors; NO_COLOR=1; disable_colors; show_instance_cmd $A; collect_status $A; tui_render_status $A; dpi_list_methods_cmd"
++check h8_no_color_no_ansi eval "! grep -q \$'\\033' '$TMP/out'"
++
++printf 'ux-fixture: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageh/ux-harness.sh b/tests/stageh/ux-harness.sh
+new file mode 100755
+index 0000000..e6142f7
+--- /dev/null
++++ b/tests/stageh/ux-harness.sh
+@@ -0,0 +1,19 @@
++#!/usr/bin/env bash
++# Stage H UX sandbox: tests/stagee/ops-harness.sh (real prompts on stdin, models
++# for systemd, nft, ip, dig, curl, Caddy/Nginx/certbot) plus:
++#   - the real show_instance_cmd, show_profile_cmd and carrier_choose (the C1
++#     layer stubs them);
++#   - no forced language: H_LANG=en|ru sets it, empty leaves the manager's own
++#     choice (language file, first-run selection).
++H_HARNESS="${BASH_SOURCE[0]}"
++# shellcheck source=/dev/null
++source "$(dirname "$H_HARNESS")/../stagee/ops-harness.sh"
++
++h_harness() {
++  export H_HARNESS
++  e_harness
++  unset TWEBPROXY_UI_LANGUAGE
++  eval "$(TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c 'source "$1" >/dev/null 2>&1; trap - ERR
++    declare -f show_instance_cmd show_profile_cmd carrier_choose' _ "$MGR")"
++  [[ -z "${H_LANG:-}" ]] || UI_LANGUAGE="$H_LANG"
++}
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 38e583b..591362d 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.21-beta
++# TWebProxy Manager v0.2.22-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.21"
+-MANAGER_RELEASE_VERSION="0.2.21-beta"
++MANAGER_VERSION="0.2.22"
++MANAGER_RELEASE_VERSION="0.2.22-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -378,6 +378,63 @@ local_backups	Local update backups	Локальные резервные коп
+ offline_helper	Offline rollback helper	Офлайн-помощник отката
+ helper_available	Available	Доступен
+ helper_unavailable	Unavailable	Недоступен
++connect_telegram	Connect Telegram: links and client help	Подключить Telegram: ссылки и помощь
++network_compatibility_advanced	Network compatibility / Anti-DPI (advanced)	Совместимость сети / Anti-DPI (для опытных)
++first_quick_setup	Quick setup: install the core and add the first hostname (recommended)	Быстрая настройка: установить основу и добавить первый hostname (рекомендуется)
++first_core_only	Install the core only	Только установить основу
++prereq_title	Before you start	Перед началом
++prereq_dns	A hostname with a DNS A record pointing to this server's public IPv4.	Hostname с DNS-записью A, указывающей на публичный IPv4 этого сервера.
++prereq_ports	TCP 443 free for HTTPS; TCP 80 as well for automatic certificates.	Свободный TCP 443 для HTTPS; для автоматических сертификатов — ещё TCP 80.
++prereq_system	Debian 12+ or Ubuntu 22.04+, x86_64, systemd, root.	Debian 12+ или Ubuntu 22.04+, x86_64, systemd, права root.
++prereq_defaults	Recommended: Caddy with automatic HTTPS and the STOCK network mode (traffic unchanged).	Рекомендуется: Caddy с автоматическим HTTPS и сетевой режим STOCK (трафик не изменяется).
++setup_hostname_intro	The hostname needs a DNS A record pointing to this server. Telegram WEB Proxy uses HTTPS on port 443; automatic certificates also need port 80.	Для hostname нужна DNS-запись A, указывающая на этот сервер. Telegram WEB Proxy работает по HTTPS на порту 443; для автоматических сертификатов нужен ещё порт 80.
++setup_hostname_retry	Attempts left: %s.	Осталось попыток: %s.
++setup_type	Setup type:	Тип настройки:
++setup_quick	Quick (recommended): automatic ports, profile "default", new secret, https carrier	Быстрая (рекомендуется): порты автоматически, профиль «default», новый secret, carrier https
++setup_advanced	Advanced: choose ports, profile, secret, carrier and MTProxy limits yourself	Расширенная: порты, профиль, secret, carrier и лимиты MTProxy вручную
++setup_site_intro	The same hostname also serves an ordinary website. A real site or application is better; the placeholder only shows that HTTPS works.	На том же hostname работает обычный сайт. Лучше указать настоящий сайт или приложение; заглушка лишь показывает, что HTTPS работает.
++site_placeholder	Temporary placeholder page (generated; replace it with a real site later)	Временная страница-заглушка (создаётся автоматически; позже замените настоящим сайтом)
++site_directory	My static website: copy a directory with index.html	Мой статический сайт: скопировать каталог с index.html
++site_upstream	My web application on this server (loopback URL)	Моё веб-приложение на этом сервере (адрес loopback)
++tls_caddy	Caddy — automatic HTTPS certificate (recommended)	Caddy — автоматический HTTPS-сертификат (рекомендуется)
++tls_nginx_le	Nginx + Let's Encrypt (automatic renewal; needs port 80)	Nginx + Let's Encrypt (автоматическое продление; нужен порт 80)
++tls_nginx_custom	Nginx + my certificate and key	Nginx + мой сертификат и ключ
++tls_manual	Manual: my web server already serves port 443 (advanced)	Вручную: порт 443 уже обслуживает мой веб-сервер (для опытных)
++setup_quick_short	quick	быстрая
++setup_advanced_short	advanced	расширенная
++plan_network_value	STOCK (default; traffic unchanged)	STOCK (по умолчанию; трафик не изменяется)
++client_help_title	How to connect Telegram	Как подключить Telegram
++client_help_step1	Open the Link on the device with Telegram, or send it to yourself in Telegram and tap it; the TG link opens Telegram directly.	Откройте «Ссылку» на устройстве с Telegram или отправьте её себе в Telegram и нажмите; «Ссылка TG» открывает Telegram напрямую.
++client_help_step2	Telegram should offer to add this proxy; accept it. Nothing else (port, protocol) has to be entered: it is all in the link.	Telegram предложит добавить этот прокси — подтвердите. Больше ничего (порт, протокол) вводить не нужно: всё уже есть в ссылке.
++client_help_step3	One profile is one secret: give separate users or groups their own profiles, so access can be changed or revoked individually.	Один профиль — один secret: выдавайте разным пользователям или группам отдельные профили, чтобы доступ можно было сменить или отозвать по отдельности.
++client_help_support	Client support: a Telegram client with WEB Proxy support is required; this manager does not check client versions. Desktop and mobile clients are verified during pre-release testing.	Поддержка клиентов: нужен клиент Telegram с поддержкой WEB Proxy; Manager не проверяет версии клиентов. Работа на компьютере и телефоне проверяется на предрелизных испытаниях.
++client_help_check	If it does not connect: open %s in a browser (the certificate must be valid), then run: twebproxy status %s; details: twebproxy diagnose %s	Если не подключается: откройте %s в браузере (сертификат должен быть действительным), затем выполните: twebproxy status %s; подробности: twebproxy diagnose %s
++next_steps_title	Next steps	Что дальше
++next_status	Check the state: twebproxy status %s	Проверить состояние: twebproxy status %s
++next_profiles	More users or devices: twebproxy profile-add %s	Ещё пользователи или устройства: twebproxy profile-add %s
++next_compat	Only if connections fail on a restrictive network: Network compatibility / Anti-DPI (advanced); see twebproxy dpi list-methods	Только если подключения не проходят в сети с ограничениями: «Совместимость сети / Anti-DPI (для опытных)»; см. twebproxy dpi list-methods
++dpi_intro	STOCK (default) leaves traffic unchanged and is the recommended starting point. The other modes are experimental IPv4 workarounds for networks that interfere with HTTPS; none guarantees a bypass. A mode applies to every HTTPS connection from the server's public IPv4 on port 443, including other sites on that address.	Режим STOCK (по умолчанию) не изменяет трафик; с него и стоит начинать. Остальные режимы — экспериментальные обходные приёмы для IPv4 в сетях, которые мешают HTTPS; ни один не гарантирует обход. Режим действует на все HTTPS-соединения с публичного IPv4 сервера на порту 443, включая другие сайты на этом адресе.
++dpi_choice_window	window1152 — experimental: TCP window 1152 in the server's SYN+ACK	window1152 — экспериментальный: окно TCP 1152 в SYN+ACK сервера
++dpi_choice_mss	mss88 — aggressive: TCP MSS 88 in the server's SYN+ACK; high overhead	mss88 — агрессивный: TCP MSS 88 в SYN+ACK сервера; большие накладные расходы
++dpi_choice_nfqws	nfqws — experimental: pinned nfqws strategy for the first reply packets	nfqws — экспериментальный: закреплённая стратегия nfqws для первых ответных пакетов
++dpi_choice_window_nfqws	window1152_nfqws — experimental: window1152, then nfqws	window1152_nfqws — экспериментальный: сначала window1152, затем nfqws
++dpi_choice_mss_nfqws	mss88_nfqws — most aggressive: mss88, then nfqws	mss88_nfqws — самый агрессивный: сначала mss88, затем nfqws
++dpi_revert_tip	If connections get worse, return to STOCK: twebproxy dpi disable %s	Если подключения стали хуже, верните STOCK: twebproxy dpi disable %s
++dpi_detail_stock	Nothing is installed or changed.	Ничего не устанавливается и не изменяется.
++dpi_detail_window	Direction: server to client, outbound IPv4 SYN+ACK from :443. Overhead: low; the first data may arrive in smaller pieces. Status: experimental.	Направление: от сервера к клиенту, исходящий IPv4 SYN+ACK с :443. Накладные расходы: низкие; первые данные могут приходить мелкими частями. Статус: экспериментальный.
++dpi_detail_mss	Direction: server to client, outbound IPv4 SYN+ACK from :443. Overhead: high; clients send many small TCP segments. Status: aggressive, experimental.	Направление: от сервера к клиенту, исходящий IPv4 SYN+ACK с :443. Накладные расходы: высокие; клиенты отправляют много мелких сегментов TCP. Статус: агрессивный, экспериментальный.
++dpi_detail_nfqws	Direction: server to client, the first reply packets of each HTTPS connection, handled in user space by the pinned nfqws. Overhead: one extra service and CPU for every new connection. Status: experimental.	Направление: от сервера к клиенту, первые ответные пакеты каждого HTTPS-соединения; их обрабатывает закреплённый nfqws в пространстве пользователя. Накладные расходы: дополнительная служба и CPU на каждое новое соединение. Статус: экспериментальный.
++dpi_detail_window_nfqws	Direction and overhead: those of window1152 and nfqws together. Status: experimental.	Направление и накладные расходы: как у window1152 и nfqws вместе. Статус: экспериментальный.
++dpi_detail_mss_nfqws	Direction and overhead: those of mss88 and nfqws together, the highest of all modes. Status: most aggressive, experimental.	Направление и накладные расходы: как у mss88 и nfqws вместе, самые высокие из всех режимов. Статус: самый агрессивный, экспериментальный.
++dpi_footer_scope	All modes except STOCK work on IPv4 only (IPv6 stays STOCK) and affect every HTTPS connection from the same public IPv4 on port 443, including other hostnames and services on it; enabling one needs explicit confirmation (--accept-shared-scope).	Все режимы, кроме STOCK, работают только для IPv4 (IPv6 остаётся STOCK) и затрагивают все HTTPS-соединения с того же публичного IPv4 на порту 443, включая другие hostname и службы на нём; для включения нужно явное подтверждение.
++dpi_footer_guarantee	No mode guarantees getting past DPI. Start with STOCK, change one mode at a time, test with a real client, and go back with: twebproxy dpi disable HOST	Ни один режим не гарантирует обход DPI. Начинайте со STOCK, меняйте по одному режиму, проверяйте настоящим клиентом и возвращайтесь командой: twebproxy dpi disable HOST
++hint_relay	Relay is not running or not ready: twebproxy repair %s (details: twebproxy diagnose %s)	Relay не запущен или не готов: twebproxy repair %s (подробности: twebproxy diagnose %s)
++hint_frontend	The web server (Caddy/Nginx) is not running: twebproxy repair %s	Веб-сервер (Caddy/Nginx) не запущен: twebproxy repair %s
++hint_tls	HTTPS or the certificate is not confirmed: the DNS A record must point here and ports 80/443 must be reachable; twebproxy cert-status %s	HTTPS или сертификат не подтверждены: DNS-запись A должна указывать сюда, порты 80/443 — быть доступны; twebproxy cert-status %s
++hint_profile	A profile backend needs attention: twebproxy repair %s	Требуется внимание к backend профиля: twebproxy repair %s
++hint_no_profile	No profile yet: twebproxy profile-add %s	Профилей пока нет: twebproxy profile-add %s
++hint_firewall	Backend isolation is not confirmed: twebproxy repair %s rebuilds the firewall, then twebproxy audit %s	Изоляция backend не подтверждена: twebproxy repair %s пересоздаёт межсетевой экран, затем twebproxy audit %s
++hint_generic	Details: twebproxy status %s --verbose or twebproxy diagnose %s	Подробности: twebproxy status %s --verbose или twebproxy diagnose %s
+ UI_I18N
+ }
+ 
+@@ -2589,12 +2646,19 @@ dpi_mode_for_host() {
+ dpi_list_methods_cmd() {
+   banner
+   printf '%-22s %s\n' stock "$(ui_msg dpi_method_stock)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_stock)"
+   printf '%-22s %s\n' window1152 "$(ui_msg dpi_method_window)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_window)"
+   printf '%-22s %s\n' mss88 "$(ui_msg dpi_method_mss)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_mss)"
+   printf '%-22s %s\n' nfqws "$(ui_msg dpi_method_nfqws)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_nfqws)"
+   printf '%-22s %s\n' window1152_nfqws "$(ui_msg dpi_method_window_nfqws)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_window_nfqws)"
+   printf '%-22s %s\n' mss88_nfqws "$(ui_msg dpi_method_mss_nfqws)"
++  printf '%-22s %s\n' '' "$(ui_msg dpi_detail_mss_nfqws)"
+   printf '\n%s\n' "$(ui_msgf dpi_nfqws_provenance "$DPI_NFQWS_VERSION" "$DPI_NFQWS_COMMIT")"
++  printf '\n%s\n%s\n' "$(ui_msg dpi_footer_scope)" "$(ui_msg dpi_footer_guarantee)"
+ }
+ 
+ dpi_status_cmd() {
+@@ -5833,9 +5897,28 @@ configure_ufw() {
+ }
+ 
+ collect_instance_settings() {
+-  HOSTNAME="$(ask 'Hostname WEB-proxy (без https://)' '')"; HOSTNAME="${HOSTNAME,,}"
+-  is_valid_hostname "$HOSTNAME" || die "Нужен lowercase ASCII/ACE hostname вида proxy.example.com"
+-  instance_exists "$HOSTNAME" && die "Инстанс $HOSTNAME уже существует."
++  local attempt reason
++  printf '%s\n' "$(ui_msg setup_hostname_intro)"
++  # Three attempts for a mistyped name; EOF still cancels (ask returns 130).
++  for attempt in 1 2 3; do
++    HOSTNAME="$(ask 'Hostname WEB-proxy (без https://)' '')" || return $?
++    HOSTNAME="${HOSTNAME,,}"
++    if ! is_valid_hostname "$HOSTNAME"; then
++      reason="Нужен lowercase ASCII/ACE hostname вида proxy.example.com"
++    elif instance_exists "$HOSTNAME"; then
++      reason="Инстанс $HOSTNAME уже существует."
++    else
++      break
++    fi
++    (( attempt < 3 )) || die "$reason"
++    warn "$reason"; warn "$(ui_msgf setup_hostname_retry $((3 - attempt)))"
++  done
++
++  # Quick setup keeps every safety check and only answers the advanced
++  # questions (ports, profile, secret, carrier, MTProxy limits) with defaults.
++  local st
++  st="$(choose "$(ui_msg setup_type)" "$(ui_msg setup_quick)" "$(ui_msg setup_advanced)")" || return $?
++  SETUP_MODE=quick; [[ "$st" == 1 ]] || SETUP_MODE=advanced
+ 
+   echo
+   if [[ "$UI_LANGUAGE" == en ]]; then
+@@ -5845,7 +5928,7 @@ collect_instance_settings() {
+   fi
+   local auto rdef adef
+   INSTANCE_PORTS_AUTO=0
+-  if yesno "Внутренние relay/admin порты подобрать автоматически?" y; then
++  if [[ "$SETUP_MODE" == quick ]] || yesno "Внутренние relay/admin порты подобрать автоматически?" y; then
+     INSTANCE_PORTS_AUTO=1
+     RELAY_PORT="$(next_free_port 18080 19999)" || die "Нет свободного relay port."
+     ADMIN_PORT="$(next_free_port $((RELAY_PORT+1)) 20999)" || die "Нет свободного admin port."
+@@ -5856,10 +5939,9 @@ collect_instance_settings() {
+   [[ "$RELAY_PORT" != "$ADMIN_PORT" ]] || die "Порты должны быть разными."
+ 
+   local sm
++  echo; printf '%s\n' "$(ui_msg setup_site_intro)"
+   sm="$(choose 'Обычный сайт на hostname:' \
+-    'Уникальная автозаглушка (только для теста)' \
+-    'Скопировать мой статический сайт' \
+-    'Проксировать существующее web-приложение на loopback')"
++    "$(ui_msg site_placeholder)" "$(ui_msg site_directory)" "$(ui_msg site_upstream)")" || return $?
+   SITE_UPSTREAM=""; SOURCE_SITE_DIR=""
+   case "$sm" in
+     1) SITE_MODE=placeholder ;;
+@@ -5869,10 +5951,7 @@ collect_instance_settings() {
+ 
+   local tm
+   tm="$(choose 'SSL / reverse proxy:' \
+-    'Caddy — автоматический сертификат' \
+-    'Nginx + Let’s Encrypt' \
+-    'Nginx + мой certificate/key' \
+-    'Manual — фронт 443 уже настроен')"
++    "$(ui_msg tls_caddy)" "$(ui_msg tls_nginx_le)" "$(ui_msg tls_nginx_custom)" "$(ui_msg tls_manual)")" || return $?
+   ACME_EMAIL=""; NGINX_CERT=""; NGINX_KEY=""
+   case "$tm" in
+     1) TLS_MODE=caddy ;;
+@@ -5885,7 +5964,20 @@ collect_instance_settings() {
+ }
+ 
+ collect_profile_settings() {
+-  local host="$1" suggested="${2:-default}" auto bdef sdef
++  local host="$1" suggested="${2:-default}" mode="${3:-advanced}" auto bdef sdef
++  if [[ "$mode" == quick ]]; then
++    # Quick setup of a new hostname: its first profile with safe defaults.
++    PROFILE_NAME="$suggested"
++    SECRET="$(openssl rand -hex 16)"
++    CARRIER_MODE=https
++    PROFILE_PORTS_AUTO=1
++    BACKEND_PORT="$(next_free_port 23980 26999)" || die "Нет свободного backend port."
++    STATS_PORT="$(next_free_port 28980 31999)" || die "Нет свободного stats port."
++    WORKERS=1
++    MAX_CONNECTIONS=4096
++    PROFILE_CREATED_AT="$(date -Is)"
++    return 0
++  fi
+   while true; do
+     PROFILE_NAME="$(ask 'Имя профиля/секрета' "$suggested")" || return $?; PROFILE_NAME="${PROFILE_NAME,,}"
+     is_valid_profile_name "$PROFILE_NAME" || { warn "Имя: a-z, 0-9, _ и -, максимум 32 символа."; continue; }
+@@ -5948,7 +6040,7 @@ add_instance_cmd() {
+   [[ "$UI_LANGUAGE" == en ]] && printf "%bFirst profile for %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET" \
+     || printf "%bПервый профиль для %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET"
+   local host="$HOSTNAME" profile others other bid
+-  collect_profile_settings "$host" default
++  collect_profile_settings "$host" default "${SETUP_MODE:-advanced}"
+   profile="$PROFILE_NAME"
+ 
+   echo
+@@ -5964,6 +6056,8 @@ Plan:
+   Carrier:        $CARRIER_MODE
+   MTProxy:        :$BACKEND_PORT (blocked externally by firewall)
+   MTProxy stats:  :$STATS_PORT (blocked externally by firewall)
++  Setup:          $(ui_msg "setup_${SETUP_MODE:-advanced}_short")
++  Network mode:   $(ui_msg plan_network_value)
+ EOF
+   else cat <<EOF
+ План:
+@@ -5977,6 +6071,8 @@ EOF
+   Carrier:        $CARRIER_MODE
+   MTProxy:        :$BACKEND_PORT (будет закрыт межсетевым экраном снаружи)
+   Статистика MTProxy: :$STATS_PORT (будет закрыт межсетевым экраном снаружи)
++  Настройка:      $(ui_msg "setup_${SETUP_MODE:-advanced}_short")
++  Сетевой режим:  $(ui_msg plan_network_value)
+ EOF
+   fi
+   yesno "Создать?" y || exit 0
+@@ -6021,6 +6117,7 @@ EOF
+   install_manager_copy
+   ok "Инстанс $host создан и прошёл isolation audit."
+   show_instance_cmd "$host"
++  setup_next_steps "$host"
+ }
+ 
+ repair_instance_cmd() {
+@@ -6458,6 +6555,24 @@ show_instance_cmd() {
+   printf '%-22s %s\n' "$(ui_msg profiles_count):" "$(count_profiles "$host")"
+   echo
+   while read -r p; do [[ -n "$p" ]] && show_profile_cmd "$host" "$p" && echo; done < <(list_profiles_array "$host")
++  client_help_render "$host"
++}
++
++# Client guidance for the link forms the manager already prints; nothing here
++# claims client support the project has not verified.
++client_help_render() { # $1=hostname
++  local h="$1"
++  tui_section "$(ui_msg client_help_title)"
++  printf '  1. %s\n' "$(ui_msg client_help_step1)"
++  printf '  2. %s\n' "$(ui_msg client_help_step2)"
++  printf '  3. %s\n' "$(ui_msg client_help_step3)"
++  printf '  %s\n' "$(ui_msg client_help_support)"
++  printf '  %s\n' "$(ui_msgf client_help_check "https://$h/" "$h" "$h")"
++}
++
++setup_next_steps() { # $1=hostname
++  tui_section "$(ui_msg next_steps_title)"
++  printf '  - %s\n' "$(ui_msgf next_status "$1")" "$(ui_msgf next_profiles "$1")" "$(ui_msg next_compat)"
+ }
+ 
+ manual_snippet_cmd() {
+@@ -8418,8 +8533,23 @@ tui_render_dashboard() {
+   done
+ }
+ 
++# The operator's next step for a status check (human output only; --json and
++# --raw keep their schema).
++tui_check_hint() { # $1=check id $2=hostname
++  local h="$2"
++  case "$1" in
++    relay.*|*.listener.loopback) ui_msgf hint_relay "$h" "$h";;
++    frontend.*) ui_msgf hint_frontend "$h";;
++    tls.*|https.*) ui_msgf hint_tls "$h";;
++    profiles.present|inventory.profiles) ui_msgf hint_no_profile "$h";;
++    firewall.*|profile.*.firewall.*) ui_msgf hint_firewall "$h" "$h";;
++    profile.*) ui_msgf hint_profile "$h";;
++    *) ui_msgf hint_generic "$h" "$h";;
++  esac
++}
++
+ tui_render_status() {
+-  local host="$1" i problems=0 dpi=STOCK
++  local host="$1" i problems=0 dpi=STOCK hint shown=$'\n'
+   tui_title "$(ui_msg status_title) · $host"
+   tui_kv "$(ui_msg overall)" "$(tui_state_text "$TCORE_OVERALL")"
+   tui_kv "$(ui_msg checks)" "$(tui_status_counts)"
+@@ -8431,7 +8561,12 @@ tui_render_status() {
+     case "${TCORE_STATUSES[$i]}" in ERROR|WARNING|UNKNOWN)
+       (( problems == 0 )) && tui_section "$(ui_msg attention)"
+       problems=$((problems+1))
+-      tui_text "$(tui_state_text "${TCORE_STATUSES[$i]}") ${TCORE_IDS[$i]} — ${TCORE_OBSERVED[$i]}";; esac
++      tui_text "$(tui_state_text "${TCORE_STATUSES[$i]}") ${TCORE_IDS[$i]} — ${TCORE_OBSERVED[$i]}"
++      # One next step per kind of problem, not one per check.
++      hint="$(tui_check_hint "${TCORE_IDS[$i]}" "$host")"
++      if [[ "$shown" != *$'\n'"$hint"$'\n'* ]]; then
++        printf '  -> %s\n' "$hint"; shown+="$hint"$'\n'
++      fi;; esac
+   done
+   (( problems > 0 )) || tui_text "$(tui_state_text OK) $(ui_msg healthy)"
+   printf '\n'; tui_text "$(ui_msg raw_diagnostics_hint)"
+@@ -8735,7 +8870,7 @@ dpi_tui_confirm_scope() {
+ menu_network_compatibility() {
+   local c host method selected
+   while true; do
+-    clear 2>/dev/null || true; dpi_status_cmd; echo
++    clear 2>/dev/null || true; tui_text "$(ui_msg dpi_intro)"; dpi_status_cmd; echo
+     c="$(dpi_tui_choose "$(ui_msg dpi_title):" "$(ui_msg back)" \
+       "$(ui_msg dpi_status)" "$(ui_msg dpi_methods)" \
+       "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")" || return 0
+@@ -8744,7 +8879,9 @@ menu_network_compatibility() {
+       2) dpi_list_methods_cmd; pause;;
+       3)
+         host="$(select_instance)" || continue
+-        selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)" || return 0
++        selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" "$(ui_msg dpi_choice_window)" \
++          "$(ui_msg dpi_choice_mss)" "$(ui_msg dpi_choice_nfqws)" "$(ui_msg dpi_choice_window_nfqws)" \
++          "$(ui_msg dpi_choice_mss_nfqws)")" || return 0
+         case "$selected" in
+           0) continue;;
+           1) method=window1152;; 2) method=mss88;; 3) method=nfqws;;
+@@ -8753,7 +8890,7 @@ menu_network_compatibility() {
+         if dpi_tui_confirm_scope "$host"; then
+           # Keep the core's CLI gate and validation unchanged. Its exit/die must
+           # not terminate the containing menu; never print success on failure.
+-          if ( dpi_set_cmd "$host" "$method" --accept-shared-scope ); then :
++          if ( dpi_set_cmd "$host" "$method" --accept-shared-scope ); then printf '%s\n' "$(ui_msgf dpi_revert_tip "$host")"
+           else warn "$(ui_msg dpi_tui_failed)"; fi
+         else
+           log "$(ui_msg dpi_tui_cancelled)"
+@@ -8769,44 +8906,62 @@ menu_settings() {
+   while true; do
+     clear 2>/dev/null || true; tui_render_settings; echo
+     local c lang; c="$(menu_choose "$(ui_msg settings):" "$(ui_msg back)" \
+-      "$(ui_msg change_language)" "$(ui_msg enable_color)" "$(ui_msg disable_color)" \
+-      "$(ui_msg network_compatibility)")"
++      "$(ui_msg change_language)" "$(ui_msg enable_color)" "$(ui_msg disable_color)")"
+     case "$c" in
+       1) lang="$(choose "$(ui_msg change_language):" "$(ui_msg english)" "$(ui_msg russian)")" || continue
+          [[ "$lang" == 1 ]] && ui_language_store en || ui_language_store ru
+          ok "$(ui_msg language_saved)";;
+       2) enable_colors;;
+       3) disable_colors;;
+-      4) menu_network_compatibility;;
+       0) return;;
+     esac
+   done
+ }
+ 
++# Connection details and client help for one hostname (secrets are shown).
++menu_connect() {
++  local host; host="$(select_instance)" || return 0
++  clear 2>/dev/null || true
++  warn "$(ui_msg secret_warning)"
++  show_instance_cmd "$host"
++  pause
++}
++
++first_run_prerequisites() {
++  tui_section "$(ui_msg prereq_title)"
++  printf '  - %s\n' "$(ui_msg prereq_dns)" "$(ui_msg prereq_ports)" "$(ui_msg prereq_system)" "$(ui_msg prereq_defaults)"
++  echo
++}
++
+ menu() {
+   need_root; need_systemd; ui_language_load
+   while true; do
+     if core_installed; then
+       clear 2>/dev/null || true
+       collect_overview; tui_render_dashboard; echo
++      # Everyday tasks first; advanced network compatibility and settings last.
+       local c; c="$(menu_choose "$(ui_msg main_menu):" "$(ui_msg exit)" \
+-        "$(ui_msg instances)" "$(ui_msg profiles)" "$(ui_msg status_stats)" \
+-        "$(ui_msg maintenance)" "$(ui_msg diagnostics_logs)" "$(ui_msg settings)")"
++        "$(ui_msg connect_telegram)" "$(ui_msg status_stats)" "$(ui_msg instances)" \
++        "$(ui_msg profiles)" "$(ui_msg diagnostics_logs)" "$(ui_msg maintenance)" \
++        "$(ui_msg network_compatibility_advanced)" "$(ui_msg settings)")"
+       case "$c" in
+-        1) menu_web_proxy;;
+-        2) menu_profiles;;
+-        3) menu_status_statistics;;
+-        4) menu_maintenance;;
++        1) menu_connect;;
++        2) menu_status_statistics;;
++        3) menu_web_proxy;;
++        4) menu_profiles;;
+         5) menu_diagnostics;;
+-        6) menu_settings;;
++        6) menu_maintenance;;
++        7) menu_network_compatibility;;
++        8) menu_settings;;
+         0) exit 0;;
+       esac
+     else
+       ui_language_ensure_interactive_install
+       clear 2>/dev/null || true; banner; echo
++      first_run_prerequisites
+       local c; c="$(menu_choose "$(ui_msg first_action):" "$(ui_msg exit)" \
+-        "$(ui_msg first_install)" "$(ui_msg first_install_add)")"
+-      case "$c" in 1) core_install_cmd; pause;; 2) add_instance_cmd; pause;; 0) exit 0;; esac
++        "$(ui_msg first_quick_setup)" "$(ui_msg first_core_only)")"
++      case "$c" in 1) add_instance_cmd; pause;; 2) core_install_cmd; pause;; 0) exit 0;; esac
+     fi
+   done
+ }
+@@ -8818,6 +8973,10 @@ TWebProxy Manager v$MANAGER_RELEASE_VERSION
+ 
+ Usage: twebproxy [--json|--raw] [--no-color] [command] [args]
+ 
++Quick start: run "sudo twebproxy" and choose Quick setup, or "sudo twebproxy add".
++Then "twebproxy show HOSTNAME" prints the Telegram links and connection help,
++and "twebproxy status HOSTNAME" the state. Guide: docs/SETUP.md
++
+ Manager / Core:
+   check-update                 check for a new Manager version
+   manager-update [--force] [--sha256 HEX]
+@@ -8865,6 +9024,11 @@ TWebProxy Manager v$MANAGER_RELEASE_VERSION
+ 
+ Использование: twebproxy [--json|--raw] [--no-color] [команда] [аргументы]
+ 
++Быстрый старт: запустите «sudo twebproxy» и выберите быструю настройку
++или выполните «sudo twebproxy add». Затем «twebproxy show HOSTNAME» покажет
++ссылки для Telegram и помощь по подключению, а «twebproxy status HOSTNAME» —
++состояние. Руководство: docs/SETUP.md
++
+ TWebProxy Manager / основа:
+   check-update                 проверить новую версию TWebProxy Manager
+   manager-update [--force] [--sha256 HEX]

@@ -1,0 +1,35 @@
+{
+ "manager_args": [
+  "repair",
+  "<host>"
+ ],
+ "stub": "none",
+ "stub_mount_calls": 0,
+ "proc_before": {
+  "proc_mounts": 1,
+  "top_options": [
+   "rw,nosuid,nodev,noexec,relatime,rw,gid=985,hidepid=invisible"
+  ]
+ },
+ "proc_after_private_mount": {
+  "proc_mounts": 2,
+  "top_options": [
+   "rw,nosuid,nodev,noexec,relatime,rw"
+  ]
+ },
+ "proc_after_command": {
+  "proc_mounts": 2,
+  "top_options": [
+   "rw,nosuid,nodev,noexec,relatime,rw"
+  ]
+ },
+ "rc": 0,
+ "duration_ms": 9152,
+ "outcome_lines": [
+  "\u001b[32m[+]\u001b[0m Процессы других пользователей скрыты (procfs invisible): secrets клиентов MTProxy недоступны непривилегированным локальным учётным записям.",
+  "\u001b[32m[+]\u001b[0m ИТОГ АУДИТА: ПРОЙДЕН (0 предупреждений)"
+ ],
+ "backend_units_active": 2,
+ "mtproxy_pids": 4,
+ "nobody_readable_secrets": 4
+}

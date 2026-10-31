@@ -1,0 +1,23 @@
+name	rc	seconds	last_line
+bash-n-manager	0	0	(no output)
+F1-libexec-permissions	0	1	stageb-libexec-permissions: pass=30 fail=0 not_executed=0
+R3-apply-ambiguity	0	0	stageb-apply-ambiguity: pass=28 fail=0
+R1-firewall-unit	0	1	stageb-firewall-unit: pass=16 fail=0
+R5-lab-gate	0	9	lab-gate: pass=49 fail=0
+stageb-transaction	0	2	stageb-model: pass=47 fail=0
+stageb-json-verifier	0	0	PASS backend-json-empty-chain
+suite-stage-b	77	12	stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)
+suite-stage-a	77	69	stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)
+protocol-meta	0	0	PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+sa6-release-metadata	0	0	sa6-release-metadata: 6 pass, 0 fail
+fg-tg5	0	1	tg5: pass=13 fail=0
+fg-tg5b	0	0	tg5b: pass=19 fail=0
+fg-tg7	0	1	tg7: pass=12 fail=0
+fg-df3	0	11	df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail
+fg-df3b	0	2	df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
+read-only-core	0	6	read-only-core-fixture: PASS
+static-smoke	0	0	static-smoke: PASS
+certificate-smoke	0	1	certificate-smoke: PASS
+b1-scope-vs-v0212	0	5	PASS b1-scope unchanged=327 modified=4 added=1
+stageb-scope-vs-A1	0	5	PASS scope unchanged=317 modified=3 added=12
+stage4-hash	0	0	fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set

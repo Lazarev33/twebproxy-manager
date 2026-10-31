@@ -1,0 +1,1604 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b86f7a5..39f4446 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,44 @@
+ # Changelog
+ 
++## 0.2.19-beta — 2026-10-28 — Stage E: эксплуатация и диагностика
++
++- TUI и ввод:
++  - конец ввода (Ctrl-D, закрытый stdin) больше не подтверждает и не выбирает
++    ничего: вопросы да/нет отвечают «нет» (раньше EOF на вопросе с ответом
++    «да» по умолчанию подтверждал, например, генерацию нового secret при
++    `rotate`), выбор и ввод значения отменяют команду (код 130, без
++    сообщения об «ошибке»), меню возвращается назад и завершается;
++  - выбор пункта не зацикливается на EOF; номера только десятичные
++    (`010` — это 10, а не 8; слишком длинные числа отклоняются);
++  - отменённый выбор hostname/профиля в меню возвращает в меню; read-only
++    действия (diagnose, audit, JSON/raw, field report, статус DPI) не
++    завершают меню при сбое.
++- Диагностика:
++  - каждая read-only проверка (systemctl, nft, journalctl, dig, hostnamectl,
++    ufw, git) ограничена по времени (`TWEBPROXY_DIAG_TIMEOUT`, 10 с), запросы
++    к relay `/healthz` и `/readyz` в status — 3 с; status/overview/audit/
++    diagnose/снимки больше не зависают;
++  - недоступный или не ответивший systemd/nftables даёт UNKNOWN, а не
++    «сервис не активен»/«firewall отсутствует»; без публичного сертификата
++    совпадение с локальным не объявляется несовпадением; неразбираемый
++    сертификат — UNKNOWN, а не «истёк»;
++  - аудит с непроверенными пунктами завершается «AUDIT RESULT: INCOMPLETE»,
++    а не PASS (код выхода по-прежнему зависит только от ошибок);
++  - на дашборде состояние hostname — худшее из всех его проверок (hostname
++    без профилей больше не показывается как OK).
++- Логи и отчёты:
++  - безопасный пакет логов заново применяет текущее обезличивание ко всем
++    файлам, включая логи старых версий; дополнительно скрываются блоки
++    приватных ключей PEM и учётные данные в URL (`user:pass@`);
++  - пропавший или нечитаемый лог пропускается с пометкой `SKIPPED.txt`;
++    временный каталог и недописанный архив удаляются при ошибке и при
++    прерывании; архив собирается под временным именем;
++  - снимок не собирает чужие таблицы маршрутизации и UDP-слушателей.
++- Контракты `--json`/`--raw` (схема `twebproxy.output.v1`, набор проверок) и
++  коды выхода status/audit не изменены. Stage A/A.1, B/B.1, C1/C1.1/C1.2,
++  C2, D, Stage 4, DPI и stock MTProxy не изменены. Статус: E завершён по
++  модельным тестам разработки; следующий этап — F (обновление и supply chain).
++
+ ## 0.2.18-beta — 2026-10-27 — Stage D: надёжность frontend и TLS
+ 
+ - Caddy:
+diff --git a/README.md b/README.md
+index 62c8455..3f4e42f 100644
+--- a/README.md
++++ b/README.md
+@@ -4,7 +4,36 @@
+ 
+ Репозиторий: https://github.com/Lazarev33/twebproxy-manager
+ 
+-Текущий выпуск: **0.2.9-dpi-beta**. Машиночитаемый `VERSION` — **0.2.9**:
++
++## Статус разработки
++
++**Последний независимо принятый checkpoint: Stage D — v0.2.18-beta.**
++В Stage D реализовано безопасное применение и восстановление конфигураций Caddy/Nginx
++и обработка ошибок TLS/Let's Encrypt. Изолированные модельные проверки Stage D
++приняты; обязательные испытания на отдельной Linux VM ещё впереди.
++**Stage E — Operations & Diagnostics (v0.2.19-beta) реализован в отдельной
++development-ветке и ожидает независимой проверки** (безопасное TUI, ограниченные
++read-only диагностики, достоверные status/log/report). **Следующий этап — Stage F —
++Updater & Supply Chain.**
++
++| Ветка / артефакт | Состояние |
++| --- | --- |
++| `main` | Опубликованный ранее исходный baseline `v0.2.9-dpi-beta` |
++| C2 `v0.2.17-beta` | Development accepted; входит в историю Stage D |
++| D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
++| E `v0.2.19-beta` | Development complete (модели 48/48, регрессии C1–D зелёные); ожидает независимой проверки; ветка исходников не загружена в GitHub из среды разработки (нет прав на запись), передан единый ZIP с Git bundle |
++| F | Следующий этап: Updater & Supply Chain |
++
++**Внимание:** development accepted не означает production-ready. Для RC
++по-прежнему нужны независимые испытания на disposable Linux VM, включая
++реальный systemd/nftables, TLS и ENOSPC. Не устанавливайте dev-checkpoint на
++рабочий VPS. Текущий опубликованный в `main` исходный код и новый checkpoint
++не следует смешивать до загрузки и проверки соответствующей ветки.
++
++Подробности и порядок этапов — [docs/ROADMAP.md](docs/ROADMAP.md).
++
++
++Текущая версия кода в `main`: **0.2.9-dpi-beta**. Машиночитаемый `VERSION` — **0.2.9**:
+ это строгий semver, совместимый с уже принятой Stage 4 update/rollback-проверкой;
+ beta-метка хранится отдельно в `MANAGER_RELEASE_VERSION` и используется в UI.
+ 
+diff --git a/VERSION b/VERSION
+index 51e8fdc..6bf5ecb 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.18
++0.2.19
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 10c99ec..65fcd17 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1,6 +1,6 @@
+ # TWebProxy Manager — Development Roadmap
+ 
+-Updated: 2026-10-27. This document tracks **planned work**, not production release status.
++Updated: 2026-10-28. This document tracks **planned work**, not production release status.
+ 
+ ## Product goal
+ 
+@@ -16,18 +16,20 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ 
+ | Checkpoint | Status | Notes |
+ | --- | --- | --- |
+-| v0.2.9 (`main` at planning time) | Earlier GitHub baseline | Existing field-tested stock setup; not evidence for newer changes |
+-| v0.2.10 Stage A | Development completed | DPI state transaction and isolation improvements |
+-| v0.2.11 Stage A.1 | Development checkpoint | F01/F02/F11/F12/F18 and TUI shared-IPv4 consent; real nft and ENOSPC gates incomplete |
+-| v0.2.12 Stage B | Superseded by B.1 | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
+-| v0.2.13 Stage B.1 | Development checkpoint | libexec permissions, privileged-test safety gate, R1/R3; real nft/systemd NOT_EXECUTED |
+-| v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | F03/F04/F05/F13 state and profile integrity; independent audit: C1-AUD-01/02 |
+-| v0.2.15 Stage C1.1 | Superseded by C1.2 | C1-AUD-01/02 fixed; independent audit: C11-AUD-03/04 |
+-| v0.2.16 Stage C1.2 | Development accepted (model gates) | C11-AUD-03/04 backend-id ownership fixed; real systemd/nft/race/ENOSPC gates remain mandatory before an RC |
+-| v0.2.17 Stage C2 | Development accepted (model gates) | Relay update with atomic install, bounded readiness, final verification, rollback and interruption handling; relay update/restart serialization; restart/delete failure propagation; real systemd/curl/Go/ENOSPC gates remain mandatory before an RC |
+-| v0.2.18 Stage D | **Development complete (model gates)** | Transactional Caddy blocks and Nginx vhosts (validation, atomic swap, exact restore, no restart), non-interrupting Let's Encrypt issuance/renewal with certificate preservation, frontend-first delete, frontend lock; real Caddy/Nginx/certbot/ACME/systemd gates remain mandatory before an RC |
+-
+-**Next development stage: E — operations / diagnostics** (see "Core implementation stages").
++| v0.2.9 (`main`) | Published code baseline | Still the source shown on `main`; not the latest accepted development checkpoint |
++| v0.2.10 Stage A | Development completed | DPI state/isolation model improvements |
++| v0.2.11 Stage A.1 | Development checkpoint | Real nft and ENOSPC gates remain |
++| v0.2.12 Stage B | Superseded by B.1 | Backend firewall and isolated test corrections |
++| v0.2.13 Stage B.1 | Development checkpoint | Permission/test safety corrections; privileged gates outstanding |
++| v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | State, profile and port integrity |
++| v0.2.15 Stage C1.1 | Superseded by C1.2 | Backend stop and orphan-repair corrections |
++| v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
++| v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
++| v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
++| v0.2.19 Stage E | **Development complete (model gates) — pending independent review** | Safe TUI EOF/default-no and decimal menu input, bounded read-only probes reporting UNKNOWN for unobservable state, truthful audit/dashboard, bounded redacted report bundles; real systemd/TTY/journald gates remain for RC; source branch not uploaded from the development environment (no GitHub write credentials) |
++| Stage F | **NEXT** | Updater / supply chain |
++
++**Current development stage: E — operations / diagnostics, development complete and pending independent review.** Stage D is development-accepted as an isolated/model checkpoint, not a production release. Stage F — updater / supply-chain — is next after approval.
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+@@ -43,17 +45,15 @@ All development checkpoints are **not authorized for production deployment**. Th
+ - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
+ - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
+ 
+-## Immediate work: Stage B.1
++## Immediate work: Stage E — operations / diagnostics
+ 
+-Scope: close independently verified Stage B regressions and dangerous test behavior **before Stage C**.
++Stage D (`v0.2.18-beta`) is **DEVELOPMENT_ACCEPTED**, not production-ready. Independently repeated: Stage D model 122/122 PASS, C2 regression 100/100 PASS, Stage 4 protected hash unchanged, and source tree matches the bundled Git commit exactly. Real privileged/network checks are postponed to the isolated pre-RC lab.
+ 
+-1. **P0 — executable directory permissions:** correct the v0.2.12 `rebuild_firewall()` path that changes `/usr/local/libexec/twebproxy` from traversable 0755 to root-only 0700, breaking the `mtproxy` service user. Apply a minimal independently verified patch and regression for non-root execution.
+-2. **P0 — privileged test safety:** make real nftables/systemd/mount/ENOSPC tests opt-in and disposable-environment-only. A production host must never be modified merely by invoking a general test suite.
+-3. **Investigate, don't pre-judge:** `nftables.service` reload/restart ownership (audit R1), systemd dependency and stop propagation (R2), nft command timeout and ambiguous kernel outcome (R3). Fix only reproducible defects within a clearly defined B.1 scope.
+-4. Preserve all Stage A/A.1 behavior, Stage 4 protected hash, foreign firewall objects, and the existing managed backend service behavior. Do not add protocols, a new UI or generic recovery.
+-5. Version proposal: `0.2.13-beta` if this becomes a distinct shipped source checkpoint. Later numbering must be recalculated rather than reused.
++Stage E implementation is **complete as a model checkpoint (`v0.2.19-beta`)** and awaits independent development review. Scope: safe TUI EOF/default-no handling, bounded non-destructive diagnostics, truthful status and error propagation, reliable logs/report output, retention and secret redaction. Confirm any issue with a focused fixture before changing behavior. Preserve all accepted C1–D invariants and do not revive the rejected generalized recovery architecture.
+ 
+-Acceptance: regression for permissions, safe negative/positive tests, reviewed diff, verified artifact hashes, explicit limitations. **A correction is not by itself proof of the real-kernel guarantee.**
++Acceptance: relevant RED/GREEN regression fixtures, no known reproducible critical diagnostics/operations blocker, existing regressions green, coherent version+hashes, one complete ZIP, and independent development review. After approval proceed to Stage F; do not treat a development checkpoint as a production release.
++
++Current GitHub `main` still contains the older `v0.2.9` source baseline. Updating this roadmap and README does not publish Stage D source. The complete Stage D commit and Git bundle must be uploaded to a separate development branch before claiming source publication. The Stage D/E commits could not be pushed from the development environment (no GitHub write credentials); they are delivered as Git bundles inside the checkpoint ZIPs.
+ 
+ ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
+ 
+diff --git a/tests/stagee/README.md b/tests/stagee/README.md
+new file mode 100644
+index 0000000..e77ce80
+--- /dev/null
++++ b/tests/stagee/README.md
+@@ -0,0 +1,27 @@
++# Stage E verification
++
++Operations and diagnostics: prompts and menus under end of input (Ctrl-D,
++closed stdin), malformed numbers and Ctrl-C; bounded read-only probes in
++status, overview, audit, diagnose and the runtime snapshot; truthful states
++(UNKNOWN for what could not be observed, INCOMPLETE audits, worst-state
++dashboard); report bundles (re-applied redaction including private keys and URL
++credentials, skipped unreadable logs, cleanup of staging and partial archives,
++no unrelated routing tables). Model tests only; no system state changes.
++
++```sh
++bash tests/stagee/run-stage-e-suite.sh             # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stagee/operations-fixture.sh [<manager>]
++bash tests/stagee/e-scope-invariants.sh <v0.2.18 source tree>
++```
++
++`ops-harness.sh` extends the Stage D frontend harness. The real prompts, audit
++and renderers run (the C1 harness's scripted answers are replaced by stdin);
++`nft`, `ip`, `hostnamectl`, `dig`, `getent` and `openssl s_client` are models,
++and systemctl, curl, journalctl and tar get hang/fail/barrier fault layers.
++`DPI_NFT_BIN` is rebound to the nft model; nothing reads the host's firewall.
++Hung probes are detected with an outer `timeout`; `TWEBPROXY_DIAG_TIMEOUT` is
++shortened for the model.
++
++Not proven here: real systemd/D-Bus stalls, real TTY Ctrl-D/Ctrl-C behaviour,
++journald on large journals and real tcpdump/field captures — disposable-VM
++gates before an RC.
+diff --git a/tests/stagee/e-scope-invariants.sh b/tests/stagee/e-scope-invariants.sh
+new file mode 100644
+index 0000000..5a4d994
+--- /dev/null
++++ b/tests/stagee/e-scope-invariants.sh
+@@ -0,0 +1,100 @@
++#!/usr/bin/env bash
++# Stage E scope against the exact v0.2.18 (Stage D, d3bf510) tree: only the
++# prompts and menus (EOF/number handling), the read-only collectors and
++# renderers (bounded probes, truthful states), diagnose, the snapshot/log/report
++# path and the redaction filter may change; ui_localize_legacy may only gain
++# lines; new top-level variables are the probe bound and the log-bundle cleanup
++# state; README and ROADMAP carry the owner's newer text from GitHub main;
++# every other file except release metadata is byte-identical (assets, other
++# docs, all C1-D code and tests included).
++# Usage: e-scope-invariants.sh <v0.2.18 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.18 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-e-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(ask yesno choose menu_choose ui_select_language on_error select_instance select_profile
++  ask_internal_port carrier_choose collect_profile_settings menu_profiles menu_certificates
++  menu_status_statistics menu_diagnostics menu_network_compatibility menu_settings
++  redact_sensitive_stream collect_overview collect_status collect_audit render_audit_human
++  firewall_has_backend_port tui_render_dashboard diagnose_cmd journal_current_unit
++  collect_history_snapshot collect_runtime_snapshot field_collect_journal_window field_collect_nft
++  copy_recent_files logs_pack_cmd ui_localize_legacy ui_naturalize_ru_legacy)
++ADDED=(ui_input_closed ui_number_in_range diag_run diag_show diag_unit_state logs_copy_file
++  logs_pack_cleanup logs_pack_on_signal)
++REMOVED=()
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS README.md docs/ROADMAP.md)
++ADDED_FILES=(tests/stagee/README.md tests/stagee/ops-harness.sh tests/stagee/operations-fixture.sh
++  tests/stagee/run-stage-e-suite.sh tests/stagee/e-scope-invariants.sh)
++NEW_VARS=(DIAG_TIMEOUT LOGS_STAGING LOGS_PARTIAL)
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  if [[ -z "$new" ]]; then
++    in_list "$fn" "${REMOVED[@]}" || { echo "FAIL removed function: $fn"; exit 1; }
++    echo "allowed removed: $fn"; continue
++  fi
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${NEW_VARS[*]}"))=" "$TMP/candidate.vars" > "$TMP/candidate.vars.old"
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars.old"
++echo "PASS top-level variables unchanged except release identity and ${#NEW_VARS[@]} probe-bound/log-cleanup variables"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageE/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (README, assets, docs, other tests and evidence included)"
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS e-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagee/operations-fixture.sh b/tests/stagee/operations-fixture.sh
+new file mode 100644
+index 0000000..4b68eaf
+--- /dev/null
++++ b/tests/stagee/operations-fixture.sh
+@@ -0,0 +1,171 @@
++#!/usr/bin/env bash
++# Stage E regression: everyday administration is safe and diagnostics are
++# bounded and truthful.
++#   E1  EOF/Ctrl-D/empty/interrupted input never confirms or selects anything:
++#       yes/no answers NO, selections cancel, menus exit, numbers are decimal.
++#   E2  status/overview/audit/diagnose/snapshot finish when probes hang.
++#   E3  an unobservable state is UNKNOWN, never ERROR or OK; an incomplete
++#       audit is not PASS; the dashboard shows each host's worst state.
++#   E4  report bundles: no secrets/keys/credentials, unreadable logs skipped,
++#       no staging or partial archive left behind, no unrelated routing tables.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-e-ops.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagee/ops-harness.sh"
++e_harness
++export TWEBPROXY_RELAY_READY_WAIT=3 TWEBPROXY_DIAG_TIMEOUT=2
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++not() { ! "$@"; }
++plain() { sed 's/\x1b\[[0-9;]*m//g' "$TMP/out"; }
++show() { plain | grep -E '\[(x|!|\+)\]' | tail -n 3 | sed 's/^/  | /'; }
++A=alpha.example B=beta.example C=gamma.example SEC=0123456789abcdef0123456789abcdef
++# Bounded run of a manager command: $1=seconds, rest=command. rc 124 = it hung.
++run() { local t="$1"; shift; timeout -k 3 "$t" bash -c 'source "$E_HARNESS"; e_harness; set -Eeuo pipefail; eval "$1"' e-run "$*" \
++  < "${STDIN:-/dev/null}" > "$TMP/out" 2>&1; rc=$?; }
++json_check() { jq -r --arg id "$1" '.checks[] | select(.id == $id) | .status' "$TMP/out" | sort -u | paste -sd, -; }   # $1=id
++
++reset() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$SITES_DIR" "$BASE_DIR/.locks" "$TMP"/units/* "$TMP"/fail-* "$TMP"/hang-* \
++    "$TMP"/state-* "$TMP"/public-cert-* "$TMP/custom" "$PROJECT_DIR" "$TMP"/*.reached "$TMP"/*.go "$TMP"/*.pid
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR" "$PROJECT_DIR" "$LOG_DIR" "$LOG_MANAGER_DIR" "$LOG_RUNTIME_DIR" \
++    "$LOG_BUNDLE_DIR" "$LOG_FULL_DIR"   # as setup_logging leaves them
++  install -d -m 0755 "$SITES_DIR"
++}
++seed_host() { # $1=host $2=index $3=tls [$4 $5] [$6=profiles: 1 default]
++  d_seed_instance "$1" $((18080 + 2 * $2)) $((18081 + 2 * $2)) "$3" "${4:-}" "${5:-}"
++  if [[ "${6:-1}" == 1 ]]; then
++    c1_seed_profile "$1" main "$SEC" https $((23980 + $2)) $((28980 + $2))
++    c1_run rebuild_profiles_json "$1" >/dev/null 2>&1
++    "$TMP/bin/systemctl" start "twebproxy-mtproxy@$1--main.service"
++  fi
++  "$TMP/bin/systemctl" start "twebproxy@$1.service"
++}
++world() { # alpha: nginx-custom with a local certificate; beta: manual TLS
++  reset
++  d_make_cert "$TMP/custom/$A/fullchain.pem" "$TMP/custom/$A/privkey.pem" "$A"
++  seed_host "$A" 0 nginx-custom "$TMP/custom/$A/fullchain.pem" "$TMP/custom/$A/privkey.pem"
++  seed_host "$B" 1 manual
++  # Relay/admin and stats listeners on loopback (backend listeners come from the unit model).
++  printf 'LISTEN 0 4096 127.0.0.1:%s 0.0.0.0:*\n' 18080 18081 18082 18083 28980 28981 > "$TMP/ss-extra"
++  "$TMP/bin/systemctl" start twebproxy-firewall.service
++  : > "$TMP/events"
++}
++new_tmp_entries() { comm -13 "$TMP/tmp.before" <(ls /tmp | sort) | grep -E '^(twebproxy-bundle|twebproxy-audit-cert|twebproxy-field)' || true; }
++mark_tmp() { ls /tmp | sort > "$TMP/tmp.before"; }
++
++# ---------- E1: input closed / Ctrl-D / malformed input ----------
++world
++# Prompts are used as at their call sites: yes/no as a condition, selections in $(...).
++confirmed() { grep -qx CONFIRMED "$TMP/out"; }
++run 10 'if yesno "Создать?" y; then echo CONFIRMED; fi'
++check e1_eof_default_yes_is_no eval '[[ "$rc" -ne 124 ]] && ! confirmed'
++run 10 'if yesno "Удалить?" n; then echo CONFIRMED; fi'
++check e1_eof_default_no_is_no eval '[[ "$rc" -ne 124 ]] && ! confirmed'
++printf 'y\n' > "$TMP/in"; STDIN="$TMP/in" run 10 'if yesno "Удалить?" n; then echo CONFIRMED; fi'
++check e1_explicit_yes_still_yes confirmed
++printf 'yes\n' > "$TMP/in"; STDIN="$TMP/in" run 10 'if yesno "Удалить?" n; then echo CONFIRMED; fi'
++check e1_unexpected_word_is_no not confirmed
++got() { sed -n 's/^got=//p' "$TMP/out"; }
++run 10 'x="$(choose "Pick:" a b)"; echo "got=$x"'
++check e1_choose_eof_cancels eval '[[ "$rc" -ne 0 && "$rc" -ne 124 && -z "$(got)" ]]'
++printf '010\n' > "$TMP/in"; STDIN="$TMP/in" run 10 'x="$(choose "Pick:" 1 2 3 4 5 6 7 8 9 10)"; echo "got=$x"'
++check e1_choose_leading_zero_is_decimal test "$(got)" = 10
++printf '99999999999999999999\n' > "$TMP/in"; STDIN="$TMP/in" run 10 'x="$(choose "Pick:" a b)"; echo "got=$x"'
++check e1_choose_huge_number_selects_nothing eval '[[ "$rc" -ne 0 && "$rc" -ne 124 && -z "$(got)" ]]'
++run 10 'x="$(menu_choose "Menu:" Exit a b)"; echo "got=$x"'
++check e1_menu_eof_means_back test "$(got)" = 0
++run 10 'x="$(ask "Hostname" default.example)"; printf "got=%s\n" "$x"'
++check e1_ask_eof_cancels_not_default eval '[[ "$rc" -ne 0 && "$rc" -ne 124 ]] && ! grep -q "got=default.example" "$TMP/out"'
++run 10 'h="$(select_instance)"; echo "got=$h"'
++check e1_select_eof_selects_no_host eval '[[ "$rc" -ne 0 && "$rc" -ne 124 && -z "$(got)" ]]'
++run 20 'delete_instance_cmd'
++check e1_delete_without_host_eof_deletes_nothing eval '[[ "$rc" -ne 124 && -f "$INSTANCES_DIR/$A/instance.env" && -f "$INSTANCES_DIR/$B/instance.env" ]]'
++printf '%s\n' "$C" > "$TMP/in"; STDIN="$TMP/in" run 20 'add_instance_cmd'
++check e1_add_wizard_eof_creates_nothing eval '[[ "$rc" -ne 0 && "$rc" -ne 124 && ! -e "$INSTANCES_DIR/$C" ]]'
++before="$(cat "$INSTANCES_DIR/$A/profiles.d/main.env")"
++run 20 "profile_rotate_cmd $A main"
++check e1_rotate_eof_does_not_rotate eval '[[ "$rc" -ne 124 && "$(cat "$INSTANCES_DIR/$A/profiles.d/main.env")" == "$before" ]]'
++run 20 'menu'
++check e1_menu_eof_exits_cleanly test "$rc" -eq 0
++check e1_menu_eof_no_spin test "$(plain | grep -c 'Enter a number')" -le 1
++# Ctrl-C at the delete confirmation: nothing deleted.
++mkfifo "$TMP/fifo"; exec {hold}<>"$TMP/fifo"
++# Background jobs of a non-interactive shell start with SIGINT ignored: restore
++# the default disposition before the manager starts, as a terminal would have it.
++E_PIDFILE="$TMP/mgr.pid" python3 -I -c 'import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])' \
++  bash -c 'source "$E_HARNESS"; e_harness; set -Eeuo pipefail; delete_instance_cmd "$1"' e-run "$A" \
++  < "$TMP/fifo" > "$TMP/out" 2>&1 & p=$!
++for ((i = 0; i < 100; i++)); do plain 2>/dev/null | grep -q 'will be deleted' && break; sleep 0.1; done; sleep 0.3
++kill -INT "$(cat "$TMP/mgr.pid")" 2>/dev/null; wait "$p"; rc=$?; exec {hold}>&-
++check e1_ctrl_c_at_confirmation_deletes_nothing eval '[[ "$rc" -ne 0 && -f "$INSTANCES_DIR/$A/instance.env" && -f "$BACKENDS_DIR/$A--main.env" ]]'
++
++# ---------- E2: bounded read-only diagnostics ----------
++world; : > "$TMP/hang-admin"; run 30 "OUTPUT_MODE=json status_cmd $A"
++check e2_status_hung_relay_endpoint_bounded test "$rc" -ne 124
++check e2_status_hung_relay_endpoint_reported eval '[[ "$(json_check relay.healthz)" == ERROR && "$(json_check relay.readyz)" == ERROR ]]'
++world; : > "$TMP/hang-systemctl"; run 30 "OUTPUT_MODE=json status_cmd $A"
++check e2_status_hung_systemd_bounded test "$rc" -ne 124
++check e2_status_hung_systemd_is_unknown test "$(json_check relay.service.active)" = UNKNOWN
++world; : > "$TMP/hang-systemctl"; run 40 'OUTPUT_MODE=json overview_cmd'
++check e2_overview_hung_systemd_bounded test "$rc" -ne 124
++world; : > "$TMP/hang-systemctl"; : > "$TMP/hang-nft"; run 60 "OUTPUT_MODE=json audit_cmd $A"
++check e2_audit_hung_systemd_nft_bounded test "$rc" -ne 124
++check e2_audit_hung_firewall_not_claimed_missing not test "$(json_check firewall.backend.boundary)" = ERROR
++world; : > "$TMP/hang-journalctl"; : > "$TMP/hang-dig"; : > "$TMP/hang-nft"; run 60 "diagnose_cmd $A"
++check e2_diagnose_hung_probes_bounded test "$rc" -ne 124
++world; : > "$TMP/hang-hostnamectl"; : > "$TMP/hang-journalctl"; run 60 'logs_collect_cmd'
++check e2_snapshot_hung_probes_bounded test "$rc" -ne 124
++
++# ---------- E3: truthful status ----------
++world; : > "$TMP/fail-systemctl"; run 30 "OUTPUT_MODE=json status_cmd $A"; show
++check e3_status_systemd_unavailable_is_unknown test "$(json_check relay.service.active)" = UNKNOWN
++check e3_status_systemd_unavailable_backend_unknown test "$(json_check profile.backend.service.active)" = UNKNOWN
++check e3_status_exit_code_contract_kept test "$rc" -eq 0
++world; run 30 "OUTPUT_MODE=json audit_cmd $A"
++check e3_audit_public_cert_unavailable_no_false_mismatch not test "$(json_check tls.certificate.match)" = ERROR
++check e3_audit_public_cert_unavailable_match_unknown test "$(json_check tls.certificate.match)" = UNKNOWN
++world; printf 'not a certificate\n' > "$TMP/public-cert-$A"; run 30 "OUTPUT_MODE=json audit_cmd $A"
++check e3_audit_unparseable_cert_not_expired test "$(json_check tls.public.certificate.validity)" = UNKNOWN
++world; run 30 "audit_cmd $A"
++check e3_audit_unverified_is_not_pass eval '! plain | grep -q "AUDIT RESULT: PASS"'
++check e3_audit_unverified_is_incomplete eval 'plain | grep -q "AUDIT RESULT: INCOMPLETE"'
++world; seed_host "$C" 2 manual "" "" 0; run 30 'collect_overview; tui_render_dashboard'
++check e3_dashboard_host_without_profiles_not_ok eval 'plain | grep -E "^$C[[:space:]]" | grep -q "\[ERROR\]"'
++check e3_dashboard_healthy_host_ok eval 'plain | grep -E "^$B[[:space:]]" | grep -q "\[OK\]"'
++world; run 30 "OUTPUT_MODE=raw status_cmd $A"
++check e3_raw_contract_header_kept eval 'head -n 2 "$TMP/out" | grep -q "^twebproxy.raw.v1	command=status	scope=hostname:$A" && sed -n 2p "$TMP/out" | grep -qx "id	status	severity	scope	source	observed	expected	message"'
++
++# ---------- E4: logs and reports ----------
++world; install -d -m 0700 "$PROJECT_DIR/logs/manager"
++printf 'old session\nSecret:    dd%s\nlink https://t.me/webproxy?server=%s&secret=dd%s\n' "$SEC" "$A" "$SEC" > "$PROJECT_DIR/logs/manager/20260101-000000-old-1.log"
++printf -- '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAAS\n-----END PRIVATE KEY-----\nproxy https://ops:hunter2@proxy.example:3128/\n' >> "$PROJECT_DIR/logs/manager/20260101-000000-old-1.log"
++mark_tmp; run 60 'logs_pack_cmd'; show
++bundle="$(ls "$PROJECT_DIR"/logs/bundles/twebproxy-logs-*.tar.gz 2>/dev/null | head -n 1)"
++check e4_pack_ok test "$rc" -eq 0 -a -n "$bundle"
++mkdir -p "$TMP/x"; [[ -n "$bundle" ]] && tar -xzf "$bundle" -C "$TMP/x" 2>/dev/null
++check e4_safe_bundle_no_secret not grep -rqE "$SEC" "$TMP/x"
++check e4_safe_bundle_no_private_key not grep -rqE 'BEGIN PRIVATE KEY|MIIEvQIBADAN' "$TMP/x"
++check e4_safe_bundle_no_url_credentials not grep -rq 'hunter2' "$TMP/x"
++check e4_snapshot_no_unrelated_routing_tables not grep -rq 'table local' "$TMP/x"
++check e4_pack_no_temp_left test -z "$(new_tmp_entries)"
++world; install -d -m 0700 "$PROJECT_DIR/logs/runtime"; printf 'runtime\n' > "$PROJECT_DIR/logs/runtime/20260101-000000-gone.log"
++: > "$TMP/fail-copy-20260101-000000-gone.log"; mark_tmp; run 60 'logs_pack_cmd'; show
++check e4_unreadable_log_skipped_bundle_made eval '[[ "$rc" -eq 0 ]] && ls "$PROJECT_DIR"/logs/bundles/twebproxy-logs-*.tar.gz >/dev/null 2>&1'
++check e4_unreadable_log_no_temp_left test -z "$(new_tmp_entries)"
++world; mark_tmp
++E_AT_TAR=tp E_PIDFILE="$TMP/mgr.pid" bash -c 'source "$E_HARNESS"; e_harness; set -Eeuo pipefail; logs_pack_cmd' e-run \
++  < /dev/null > "$TMP/out" 2>&1 & p=$!
++c1_wait_reached tp; kill -TERM "$(cat "$TMP/mgr.pid")" 2>/dev/null; : > "$TMP/tp.go"; wait "$p"; rc=$?; sleep 1
++check e4_interrupted_pack_reported test "$rc" -ne 0
++check e4_interrupted_pack_no_staging_left test -z "$(new_tmp_entries)"
++check e4_interrupted_pack_no_partial_archive test -z "$(find "$PROJECT_DIR/logs/bundles" -name '*.partial' 2>/dev/null)"
++world; mark_tmp; run 30 "OUTPUT_MODE=json audit_cmd $A"
++check e4_audit_no_temp_left test -z "$(new_tmp_entries)"
++
++printf 'e-operations: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagee/ops-harness.sh b/tests/stagee/ops-harness.sh
+new file mode 100644
+index 0000000..b07c849
+--- /dev/null
++++ b/tests/stagee/ops-harness.sh
+@@ -0,0 +1,151 @@
++#!/usr/bin/env bash
++# Behavioral sandbox for the Stage E operations and diagnostics regressions.
++#
++# Extends tests/staged/frontend-harness.sh (same rules: the manager code under
++# test is unmodified, commands run through e_run/e_eval in a separate bash
++# process with production `set -Eeuo pipefail`, nothing outside $TMP is read or
++# written, the real audit/diagnose/snapshot code runs). Added host-boundary
++# models in $TMP/bin: nft, ip, hostnamectl, dig, getent, openssl s_client (the
++# rest of openssl is real), plus fault layers over systemctl, curl, journalctl
++# and tar. DPI_NFT_BIN is rebound to the nft model. fetch_public_leaf_cert (a
++# network boundary) answers from $TMP/public-cert-<host>.
++#
++# Faults (files in $TMP):
++#   hang-systemctl     systemctl is-active/status/show/cat never return
++#   fail-systemctl     systemctl is-active/status fail with no output (no bus)
++#   hang-admin         the relay admin endpoint accepts but never answers; curl
++#                      returns only when given --max-time (exit 28)
++#   hang-journalctl, hang-nft, hang-dig, hang-hostnamectl   never return
++#   fail-https         public strict HTTPS check fails
++#   fail-copy-<name>   cp of a file named <name> fails (vanished or unreadable log)
++# E_PIDFILE=<file> receives the pid of the manager process (for signal cases).
++# Barrier: E_AT_TAR=<name> parks the first tar run (pid of the manager in name.pid).
++
++E_HARNESS="${BASH_SOURCE[0]}"
++# shellcheck source=/dev/null
++source "$(dirname "$E_HARNESS")/../staged/frontend-harness.sh"
++
++e_harness() {
++  export E_HARNESS
++  d_harness
++  if [[ ! -e "$TMP/bin/.e-models" ]]; then
++    e_write_models
++    : > "$TMP/bin/.e-models"
++  fi
++  DPI_NFT_BIN="$TMP/bin/nft"
++  # Sourced inside a function, the manager's top-level `declare -A` catalog
++  # became local; the human renderers need it global.
++  declare -gA UI_EN=() UI_RU=()
++  # Stage E exercises the real audit and the real prompts (the C1 harness
++  # replaces them with scripted answers): input comes from stdin.
++  eval "$(TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c 'source "$1" >/dev/null 2>&1; trap - ERR
++    declare -f audit_instance_impl ask yesno choose menu_choose pause' _ "$MGR")"
++  fetch_public_leaf_cert() { [[ -f "$TMP/public-cert-$1" ]] && command cp "$TMP/public-cert-$1" "$2"; }
++  # fail-copy-<name>: copying a file with that basename fails (vanished/unreadable).
++  eval "e_prev_cp() $(declare -f cp | tail -n +2)"
++  cp() {
++    local a
++    for a in "$@"; do
++      [[ "$a" == -* || ! -e "$TMP/fail-copy-${a##*/}" ]] || { echo "cp: cannot open '$a': model failure" >&2; return 1; }
++    done
++    e_prev_cp "$@"
++  }
++  [[ -z "${E_PIDFILE:-}" ]] || echo "$$" > "$E_PIDFILE"
++}
++
++e_run() { bash -c 'source "$E_HARNESS"; e_harness; set -Eeuo pipefail; "$@"' e-run "$@"; }
++e_eval() { bash -c 'source "$E_HARNESS"; e_harness; set -Eeuo pipefail; eval "$1"' e-eval "$1"; }
++
++e_write_models() {
++  local hang='exec sleep 3600'
++  cat > "$TMP/bin/nft" <<SH
++#!/bin/bash
++printf 'nft %s\n' "\$*" >> "\$D_ROOT/events"
++[[ ! -e "\$D_ROOT/hang-nft" ]] || $hang
++case "\$*" in
++  *'list table inet twebproxy_backend'*)
++    ports="\$(sed -n 's/^MTPROXY_\(CLIENT\|STATS\)_PORT=//p' "\$C1_BACKENDS_DIR"/*.env 2>/dev/null | sort -n | paste -sd, -)"
++    printf 'table inet twebproxy_backend {\n  chain input {\n    iifname != "lo" tcp dport { %s } drop\n  }\n}\n' "\$ports";;
++  *list*) exit 1;;
++esac
++exit 0
++SH
++  cat > "$TMP/bin/ip" <<'SH'
++#!/bin/bash
++case "$*" in
++  *'-br addr'*) echo 'lo UNKNOWN 127.0.0.1/8';;
++  *'table all'*) echo 'default via 192.0.2.1 dev eth0'; echo 'local 127.0.0.1 dev lo table local proto kernel scope host src 127.0.0.1'; echo 'broadcast 192.0.2.255 dev eth0 table local';;
++  *route*) echo 'default via 192.0.2.1 dev eth0';;
++esac
++exit 0
++SH
++  cat > "$TMP/bin/hostnamectl" <<SH
++#!/bin/bash
++[[ ! -e "\$D_ROOT/hang-hostnamectl" ]] || $hang
++echo ' Static hostname: model'
++SH
++  cat > "$TMP/bin/dig" <<SH
++#!/bin/bash
++printf 'dig %s\n' "\$*" >> "\$D_ROOT/events"
++[[ ! -e "\$D_ROOT/hang-dig" ]] || $hang
++exit 0
++SH
++  cat > "$TMP/bin/getent" <<'SH'
++#!/bin/bash
++exit 2
++SH
++  cat > "$TMP/bin/openssl" <<'SH'
++#!/bin/bash
++# s_client is a network boundary: never connect; everything else is real openssl.
++[[ "${1:-}" == s_client ]] && { echo 'model: connect: no route' >&2; exit 1; }
++exec /usr/bin/openssl "$@"
++SH
++  mv "$TMP/bin/systemctl" "$TMP/bin/systemctl-d"
++  cat > "$TMP/bin/systemctl" <<SH
++#!/bin/bash
++case "\${1:-}" in
++  is-active|status|show|cat)
++    [[ ! -e "\$D_ROOT/hang-systemctl" ]] || { printf 'systemctl %s (hung)\n' "\$*" >> "\$D_ROOT/events"; $hang; }
++    if [[ -e "\$D_ROOT/fail-systemctl" && "\$1" != cat && "\$1" != show ]]; then
++      echo 'System has not been booted with systemd as init system (PID 1). Can'"'"'t operate.' >&2; exit 1
++    fi;;
++esac
++exec "\$(dirname "\$0")/systemctl-d" "\$@"
++SH
++  mv "$TMP/bin/curl" "$TMP/bin/curl-c2"
++  cat > "$TMP/bin/curl" <<'SH'
++#!/bin/bash
++url="${*: -1}"
++if [[ -e "$D_ROOT/hang-admin" && "$url" =~ ^http://127\.0\.0\.1:[0-9]+/(healthz|readyz)$ ]]; then
++  t=""; a=("$@"); for ((i = 0; i < ${#a[@]}; i++)); do [[ "${a[i]}" == --max-time ]] && t="${a[i+1]}"; done
++  [[ -n "$t" ]] || exec sleep 3600
++  sleep "$t"; exit 28
++fi
++if [[ -e "$D_ROOT/fail-https" && "$url" == https://* ]]; then exit 35; fi
++exec "$(dirname "$0")/curl-c2" "$@"
++SH
++  mv "$TMP/bin/journalctl" "$TMP/bin/journalctl-c1"
++  cat > "$TMP/bin/journalctl" <<SH
++#!/bin/bash
++[[ ! -e "\$D_ROOT/hang-journalctl" ]] || $hang
++exec "\$(dirname "\$0")/journalctl-c1" "\$@"
++SH
++  # ss: honour the "sport = :PORT" filter the manager uses (the C1 model prints everything).
++  mv "$TMP/bin/ss" "$TMP/bin/ss-d"
++  cat > "$TMP/bin/ss" <<'SH'
++#!/bin/bash
++if [[ "$*" =~ sport\ =\ :([0-9]+) ]]; then
++  port="${BASH_REMATCH[1]}"
++  [[ "$port" != 80 && "$port" != 443 ]] || exec "$(dirname "$0")/ss-d" "$@"
++  "$(dirname "$0")/ss-c1" "$@" | awk -v p=":$port" '$4 ~ (p "$")'
++  exit 0
++fi
++exec "$(dirname "$0")/ss-d" "$@"
++SH
++  cat > "$TMP/bin/tar" <<'SH'
++#!/bin/bash
++"$D_ROOT/bin/d-barrier" "${E_AT_TAR:-}"
++exec /usr/bin/tar "$@"
++SH
++  chmod 0755 "$TMP"/bin/*
++}
+diff --git a/tests/stagee/run-stage-e-suite.sh b/tests/stagee/run-stage-e-suite.sh
+new file mode 100644
+index 0000000..1d3ef28
+--- /dev/null
++++ b/tests/stagee/run-stage-e-suite.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage E cases are model tests (tests/stagee/ops-harness.sh): they change no
++# system state and need no lab host. Scope: e-scope-invariants.sh <v0.2.18 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "E operations: TUI input, bounded/truthful diagnostics, reports (MODEL)" "$ROOT/tests/stagee/operations-fixture.sh" 1500 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-e-suite: PASS (all mandatory model checks executed)';;
++  77) echo 'stage-e-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-e-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 8f3672c..bd65f93 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.18-beta
++# TWebProxy Manager v0.2.19-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.18"
+-MANAGER_RELEASE_VERSION="0.2.18-beta"
++MANAGER_VERSION="0.2.19"
++MANAGER_RELEASE_VERSION="0.2.19-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -97,6 +97,10 @@ MANAGER_UPDATE_HINT_ATTEMPTED=0
+ OUTPUT_MODE="human"
+ OUTPUT_NO_COLOR=0
+ UI_LANGUAGE="ru"
++# Upper bound (seconds) for one read-only diagnostic probe (systemctl, nft,
++# journalctl, dig, ...); see diag_run.
++DIAG_TIMEOUT="${TWEBPROXY_DIAG_TIMEOUT:-10}"
++LOGS_STAGING=""; LOGS_PARTIAL=""
+ 
+ # Stage X-FixUI localization catalog. Human presentation resolves all labels
+ # through this single catalog; typed JSON/raw identifiers remain stable English.
+@@ -440,6 +444,7 @@ ui_naturalize_ru_legacy() {
+   text="${text//Caddy auto/автоматически через Caddy}"
+   text="${text//AUDIT RESULT: FAIL/ИТОГ АУДИТА: ОШИБКА}"
+   text="${text//AUDIT RESULT: PASS/ИТОГ АУДИТА: ПРОЙДЕН}"
++  text="${text//AUDIT RESULT: INCOMPLETE/ИТОГ АУДИТА: НЕПОЛНЫЙ}"
+   text="${text//AUDIT FAIL:/ОШИБКА АУДИТА:}"
+   text="${text//AUDIT WARN:/ПРЕДУПРЕЖДЕНИЕ АУДИТА:}"
+   text="${text// critical/ критических ошибок}"
+@@ -520,6 +525,15 @@ ui_localize_legacy() {
+     'Обновление relay прервано; восстанавливаю прежний relay binary.') printf 'The relay update was interrupted; restoring the previous relay binary.'; return;;
+     'Откат relay неполный: прежний binary восстановлен, но не ready: '*) value="${text#*но не ready: }"; printf "Relay rollback incomplete: the previous binary was restored, but these relays are not ready: %s. Check them and run 'twebproxy restart <hostname>'." "${value%%. Проверь*}"; return;;
+     'Откат relay не удался: прежний binary не восстановлен, его копия: '*) value="${text#*его копия: }"; value2="${text#*новым binary: }"; printf 'Relay rollback failed: the previous binary was not restored; its copy: %s. Relays restarted with the new binary: %s.' "${value%%. Relays*}" "${value2%.}"; return;;
++    # Stage E operations / diagnostics messages.
++    'Ввод закрыт (EOF); операция отменена.') printf 'Input closed (EOF); the operation was cancelled.'; return;;
++    'Ввод закрыт (EOF); ответ: нет.') printf 'Input closed (EOF); answering no.'; return;;
++    'AUDIT WARN: состояние backend firewall неизвестно (systemd или nftables не ответили)') printf 'AUDIT WARN: backend firewall state is unknown (systemd or nftables did not answer)'; return;;
++    'AUDIT WARN: состояние '*' неизвестно (systemd недоступен или не ответил)') value="${text#AUDIT WARN: состояние }"; printf 'AUDIT WARN: state of %s is unknown (systemd unavailable or not answering)' "${value%% неизвестно*}"; return;;
++    'AUDIT WARN: публичный сертификат недоступен, совпадение с локальным не проверено') printf 'AUDIT WARN: public certificate unavailable; the match with the local certificate was not verified'; return;;
++    'AUDIT RESULT: INCOMPLETE ('*) printf '%s' "$text"; return;;
++    'Не удалось записать пакет логов в '*) value="${text#Не удалось записать пакет логов в }"; printf 'Could not write the log bundle in %s.' "${value%.}"; return;;
++    'Сбор пакета логов прерван; временные файлы удалены.') printf 'Log bundle collection was interrupted; temporary files were removed.'; return;;
+     # Stage D frontend / TLS messages.
+     'Конфигурацию frontend сейчас меняет другая операция; повтори позже.') printf 'Another operation is changing the frontend configuration (frontend lock busy); retry later.'; return;;
+     'Не удалось записать конфигурацию Nginx для '*) value="${text#Не удалось записать конфигурацию Nginx для }"; printf 'Could not write the Nginx configuration for %s; its previous configuration was restored.' "${value%%;*}"; return;;
+@@ -833,7 +847,7 @@ ui_select_language() {
+   local choice
+   printf '%s\n\n[1] English\n[2] Русский\n\n' "$(ui_msg select_language)"
+   while true; do
+-    read -r -p "$(ui_msg choice): " choice
++    if ! read -r -p "$(ui_msg choice): " choice && [[ -z "$choice" ]]; then ui_input_closed; return 130; fi
+     case "$choice" in
+       1) ui_language_store en && return 0;;
+       2) ui_language_store ru && return 0;;
+@@ -869,7 +883,9 @@ redact_sensitive_stream() {
+     -e 's/(MTPROXY_SECRET=)[^[:space:]]+/\1[REDACTED]/g' \
+     -e 's/(-S[[:space:]]+)(dd)?[0-9A-Fa-f]{32}/\1[REDACTED]/g' \
+     -e 's/(SECRET=)(dd)?[0-9A-Fa-f]{32}/\1[REDACTED]/g' \
+-    -e 's/("secret"[[:space:]]*:[[:space:]]*")(dd)?[0-9A-Fa-f]{32}(")/\1[REDACTED]\3/g'
++    -e 's/("secret"[[:space:]]*:[[:space:]]*")(dd)?[0-9A-Fa-f]{32}(")/\1[REDACTED]\3/g' \
++    -e 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/@[:space:]:]+:[^/@[:space:]]*@#\1[REDACTED]@#g' \
++    -e '/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/,/-----END [A-Z0-9 ]*PRIVATE KEY-----/c [REDACTED PRIVATE KEY]'
+ }
+ 
+ sanitize_log_stream() {
+@@ -1056,6 +1072,9 @@ setup_logging() {
+ 
+ on_error() {
+   local rc="$1" line="$2" command="$3" snap=""
++  # 130: a prompt was cancelled (EOF) or the command was interrupted; the reason
++  # is already on screen, nothing failed.
++  [[ "$rc" != 130 ]] || exit 130
+   if [[ "$UI_LANGUAGE" == en ]]; then
+     printf "\n%b[x]%b Error at line %s. Command: %s (code %s)\n" "$C_RED" "$C_RESET" "$line" "$command" "$rc" >&2
+     [[ -n "${CURRENT_LOG:-}" ]] && printf "%b[i]%b Full invocation log: %s\n" "$C_BLUE" "$C_RESET" "$CURRENT_LOG" >&2
+@@ -1090,55 +1109,71 @@ banner() {
+ need_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Запусти от root: sudo $0"; }
+ need_systemd() { command -v systemctl >/dev/null 2>&1 || die "Нужен systemd."; }
+ 
++# End of input (Ctrl-D, closed or exhausted stdin) never confirms or selects
++# anything: a yes/no prompt answers NO, a value or selection prompt cancels the
++# command with status 130 (on_error exits quietly on it), a menu goes back. A
++# last line without a newline still counts as an answer.
++ui_input_closed() { printf '\n' >&2; warn "Ввод закрыт (EOF); операция отменена." >&2; }
++
++# A menu number: 1-4 decimal digits (leading zeros are decimal, never octal) in $2..$3.
++ui_number_in_range() { # $1=input $2=min $3=max -> the number
++  [[ "$1" =~ ^[0-9]{1,4}$ ]] || return 1
++  local n=$((10#$1))
++  (( n >= $2 && n <= $3 )) || return 1
++  printf '%s' "$n"
++}
++
+ ask() {
+-  local prompt="$1" default="${2:-}" value
++  local prompt="$1" default="${2:-}" value=""
+   prompt="$(ui_localize_legacy "$prompt")"
+   if [[ -n "$default" ]]; then
+-    read -r -p "$prompt [$default]: " value
++    if ! read -r -p "$prompt [$default]: " value && [[ -z "$value" ]]; then ui_input_closed; return 130; fi
+     printf '%s' "${value:-$default}"
+   else
+-    read -r -p "$prompt: " value
++    if ! read -r -p "$prompt: " value && [[ -z "$value" ]]; then ui_input_closed; return 130; fi
+     printf '%s' "$value"
+   fi
+ }
+ 
+ yesno() {
+-  local prompt="$1" default="${2:-y}" reply
++  local prompt="$1" default="${2:-y}" reply="" hint="[y/N]"
+   prompt="$(ui_localize_legacy "$prompt")"
++  [[ "$default" == "y" ]] && hint="[Y/n]"
++  if ! read -r -p "$prompt $hint: " reply && [[ -z "$reply" ]]; then
++    printf '\n' >&2; warn "Ввод закрыт (EOF); ответ: нет." >&2; return 1
++  fi
+   if [[ "$default" == "y" ]]; then
+-    read -r -p "$prompt [Y/n]: " reply
+     [[ -z "$reply" || "$reply" =~ ^[YyДд]$ ]]
+   else
+-    read -r -p "$prompt [y/N]: " reply
+     [[ "$reply" =~ ^[YyДд]$ ]]
+   fi
+ }
+ 
+ choose() {
+   local prompt="$1"; shift
+-  local options=("$@") i choice
++  local options=("$@") i choice n
+   echo "$(ui_localize_legacy "$prompt")" >&2
+   for i in "${!options[@]}"; do printf "  [%d] %s\n" "$((i+1))" "$(ui_localize_legacy "${options[$i]}")" >&2; done
+   while true; do
+-    read -r -p "> " choice
++    if ! read -r -p "> " choice && [[ -z "$choice" ]]; then ui_input_closed; return 130; fi
+     [[ "$choice" =~ ^[0-9]+$ ]] || { warn "$(ui_msg enter_number)" >&2; continue; }
+-    (( choice >= 1 && choice <= ${#options[@]} )) || { warn "$(ui_msg unknown_option)" >&2; continue; }
+-    printf '%s' "$choice"
++    n="$(ui_number_in_range "$choice" 1 "${#options[@]}")" || { warn "$(ui_msg unknown_option)" >&2; continue; }
++    printf '%s' "$n"
+     return 0
+   done
+ }
+ 
+ menu_choose() {
+   local prompt="$1" zero="$2"; shift 2
+-  local options=("$@") i choice
++  local options=("$@") i choice n
+   printf '%s\n' "$prompt" >&2
+   for i in "${!options[@]}"; do printf '  [%d] %s\n' "$((i+1))" "${options[$i]}" >&2; done
+   printf '  [0] %s\n' "$zero" >&2
+   while true; do
+-    read -r -p "> " choice
++    if ! read -r -p "> " choice && [[ -z "$choice" ]]; then printf '\n' >&2; printf '0'; return 0; fi
+     [[ "$choice" =~ ^[0-9]+$ ]] || { warn "$(ui_msg enter_number)" >&2; continue; }
+-    (( choice >= 0 && choice <= ${#options[@]} )) || { warn "$(ui_msg unknown_option)" >&2; continue; }
+-    printf '%s' "$choice"; return 0
++    n="$(ui_number_in_range "$choice" 0 "${#options[@]}")" || { warn "$(ui_msg unknown_option)" >&2; continue; }
++    printf '%s' "$n"; return 0
+   done
+ }
+ 
+@@ -4403,7 +4438,7 @@ next_free_port() {
+ ask_internal_port() {
+   local label="$1" default="$2" p
+   while true; do
+-    p="$(ask "$label" "$default")"
++    p="$(ask "$label" "$default")" || return $?
+     is_valid_port "$p" || { warn "Некорректный порт."; continue; }
+     (( 10#$p >= 1024 )) || { warn "Внутренние сервисы работают без root; используй порт >= 1024."; continue; }
+     port_available "$p" || { warn "Порт $p уже занят или зарегистрирован TWebProxy."; continue; }
+@@ -4430,7 +4465,7 @@ carrier_choose() {
+     'https — консервативный baseline' \
+     'https-lanes — отдельные HTTP/2 lanes' \
+     'websocket — один мультиплексированный WSS' \
+-    'websocket-lanes — отдельный WSS на поток')"
++    'websocket-lanes — отдельный WSS на поток')" || return $?
+   case "$cm" in 1) printf https;; 2) printf https-lanes;; 3) printf websocket;; 4) printf websocket-lanes;; esac
+ }
+ 
+@@ -5524,7 +5559,7 @@ collect_instance_settings() {
+ collect_profile_settings() {
+   local host="$1" suggested="${2:-default}" auto bdef sdef
+   while true; do
+-    PROFILE_NAME="$(ask 'Имя профиля/секрета' "$suggested")"; PROFILE_NAME="${PROFILE_NAME,,}"
++    PROFILE_NAME="$(ask 'Имя профиля/секрета' "$suggested")" || return $?; PROFILE_NAME="${PROFILE_NAME,,}"
+     is_valid_profile_name "$PROFILE_NAME" || { warn "Имя: a-z, 0-9, _ и -, максимум 32 символа."; continue; }
+     [[ ! -f "$(profile_env "$host" "$PROFILE_NAME")" ]] || { warn "Профиль уже существует."; continue; }
+     break
+@@ -5818,7 +5853,8 @@ select_instance() {
+   while read -r h; do [[ -n "$h" ]] && hosts+=("$h"); done < <(list_hosts_array)
+   ((${#hosts[@]} > 0)) || die "$(ui_msg no_hostnames)"
+   if ((${#hosts[@]} == 1)); then printf '%s' "${hosts[0]}"; return; fi
+-  n="$(choose "$(ui_msg select_hostname):" "${hosts[@]}")"; printf '%s' "${hosts[$((n-1))]}"
++  n="$(choose "$(ui_msg select_hostname):" "${hosts[@]}")" || return $?
++  printf '%s' "${hosts[$((n-1))]}"
+ }
+ 
+ select_profile() {
+@@ -5826,7 +5862,8 @@ select_profile() {
+   while read -r p; do [[ -n "$p" ]] && profiles+=("$p"); done < <(list_profiles_array "$host")
+   ((${#profiles[@]} > 0)) || die "$(ui_msgf no_profiles "$host")"
+   if ((${#profiles[@]} == 1)); then printf '%s' "${profiles[0]}"; return; fi
+-  n="$(choose "$(ui_msg select_profile):" "${profiles[@]}")"; printf '%s' "${profiles[$((n-1))]}"
++  n="$(choose "$(ui_msg select_profile):" "${profiles[@]}")" || return $?
++  printf '%s' "${profiles[$((n-1))]}"
+ }
+ 
+ list_cmd() {
+@@ -5864,6 +5901,36 @@ profiles_list_cmd() {
+   done < <(list_profiles_array "$host")
+ }
+ 
++# Read-only probes are bounded: an external command runs at most $1 seconds and
++# 124 (or 137) means it timed out; a shell function, as fixtures provide, runs as is.
++diag_run() { # $1=seconds, rest=command
++  local t="$1"; shift
++  if [[ "$(type -t "$1")" == file ]]; then timeout --foreground -k 2 "$t" "$@"; else "$@"; fi
++}
++
++# The same for a transcript section: output as is plus a note when the probe
++# timed out or the tool is missing; never fails.
++diag_show() {
++  local rc=0
++  diag_run "$DIAG_TIMEOUT" "$@" || rc=$?
++  case "$rc" in
++    124|137) printf '[%s: timed out after %ss]\n' "$1" "$DIAG_TIMEOUT";;
++    127) printf '[%s: not available]\n' "$1";;
++  esac
++  return 0
++}
++
++# Observed state of a systemd unit, or "unknown" when systemd could not be
++# asked (missing, timed out, no bus): never mistaken for an inactive unit.
++diag_unit_state() { # $1=unit
++  local state=""
++  state="$(diag_run "$DIAG_TIMEOUT" systemctl is-active "$1" 2>/dev/null)" || true
++  case "$state" in
++    active|inactive|failed|activating|deactivating|reloading|maintenance|refreshing) printf '%s' "$state";;
++    *) printf unknown;;
++  esac
++}
++
+ collect_overview() {
+   local host p unit state tls_mode frontend_unit host_count=0 profile_count=0 current_profiles
+   tcore_reset overview global
+@@ -5896,10 +5963,13 @@ collect_overview() {
+     load_instance "$host"
+     tls_mode="$TLS_MODE"
+     unit="twebproxy@$host.service"
+-    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
++    state="$(diag_unit_state "$unit")"
+     if [[ "$state" == active ]]; then
+       tcore_add_check "relay.service.active" OK critical "hostname:$host" systemd active active \
+         "Relay service is active" none
++    elif [[ "$state" == unknown ]]; then
++      tcore_add_check "relay.service.active" UNKNOWN warning "hostname:$host" systemd unknown active \
++        "Relay service state could not be determined" none
+     else
+       tcore_add_check "relay.service.active" ERROR critical "hostname:$host" systemd "${state:-unknown}" active \
+         "Relay service is not active" none
+@@ -5915,10 +5985,13 @@ collect_overview() {
+       tcore_add_check "frontend.service.active" DISABLED info "hostname:$host" configuration external external \
+         "Frontend is managed externally" none
+     elif [[ -n "$frontend_unit" ]]; then
+-      state="$(systemctl is-active "$frontend_unit" 2>/dev/null || true)"
++      state="$(diag_unit_state "$frontend_unit")"
+       if [[ "$state" == active ]]; then
+         tcore_add_check "frontend.service.active" OK critical "hostname:$host" systemd active active \
+           "Managed frontend service is active" none
++      elif [[ "$state" == unknown ]]; then
++        tcore_add_check "frontend.service.active" UNKNOWN warning "hostname:$host" systemd unknown active \
++          "Managed frontend service state could not be determined" none
+       else
+         tcore_add_check "frontend.service.active" ERROR critical "hostname:$host" systemd "${state:-unknown}" active \
+           "Managed frontend service is not active" none
+@@ -5942,10 +6015,13 @@ collect_overview() {
+     while read -r p; do
+       [[ -n "$p" ]] || continue
+       load_profile "$host" "$p"
+-      state="$(systemctl is-active "twebproxy-mtproxy@$(backend_id "$host" "$p").service" 2>/dev/null || true)"
++      state="$(diag_unit_state "twebproxy-mtproxy@$(backend_id "$host" "$p").service")"
+       if [[ "$state" == active ]]; then
+         tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd active active \
+           "MTProxy backend service is active" none
++      elif [[ "$state" == unknown ]]; then
++        tcore_add_check "profile.backend.service.active" UNKNOWN warning "profile:$host/$p" systemd unknown active \
++          "MTProxy backend service state could not be determined" none
+       else
+         tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "${state:-unknown}" active \
+           "MTProxy backend service is not active" none
+@@ -6353,11 +6429,14 @@ collect_status() {
+   fi
+ 
+   unit="twebproxy@$host.service"
+-  state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+-  evidence="$(systemctl --no-pager --full status "$unit" 2>&1 || true)"
++  state="$(diag_unit_state "$unit")"
++  evidence="$(diag_run "$DIAG_TIMEOUT" systemctl --no-pager --full status "$unit" 2>&1 || true)"
+   if [[ "$state" == active ]]; then
+     tcore_add_check "relay.service.active" OK critical "hostname:$host" systemd "$state" active \
+       "Relay service is active" service "" "$evidence"
++  elif [[ "$state" == unknown ]]; then
++    tcore_add_check "relay.service.active" UNKNOWN warning "hostname:$host" systemd unknown active \
++      "Relay service state could not be determined" service "" "$evidence"
+   else
+     tcore_add_check "relay.service.active" ERROR critical "hostname:$host" systemd "${state:-unknown}" active \
+       "Relay service is not active" service "" "$evidence"
+@@ -6366,25 +6445,28 @@ collect_status() {
+   while read -r p; do
+     [[ -n "$p" ]] || continue
+     unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
+-    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+-    evidence="$(systemctl --no-pager --full status "$unit" 2>&1 || true)"
++    state="$(diag_unit_state "$unit")"
++    evidence="$(diag_run "$DIAG_TIMEOUT" systemctl --no-pager --full status "$unit" 2>&1 || true)"
+     if [[ "$state" == active ]]; then
+       tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd "$state" active \
+         "MTProxy backend service is active" service "" "$evidence"
++    elif [[ "$state" == unknown ]]; then
++      tcore_add_check "profile.backend.service.active" UNKNOWN warning "profile:$host/$p" systemd unknown active \
++        "MTProxy backend service state could not be determined" service "" "$evidence"
+     else
+       tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "${state:-unknown}" active \
+         "MTProxy backend service is not active" service "" "$evidence"
+     fi
+   done < <(list_profiles_array "$host")
+ 
+-  if health="$(curl -fsS "http://127.0.0.1:$ADMIN_PORT/healthz" 2>/dev/null)"; then
++  if health="$(curl -fsS --connect-timeout 2 --max-time 3 "http://127.0.0.1:$ADMIN_PORT/healthz" 2>/dev/null)"; then
+     tcore_add_check "relay.healthz" OK critical "hostname:$host" http "$health" success \
+       "Relay health endpoint responded" health healthz
+   else
+     tcore_add_check "relay.healthz" ERROR critical "hostname:$host" http unavailable success \
+       "Relay health endpoint did not respond" health healthz
+   fi
+-  if health="$(curl -fsS "http://127.0.0.1:$ADMIN_PORT/readyz" 2>/dev/null)"; then
++  if health="$(curl -fsS --connect-timeout 2 --max-time 3 "http://127.0.0.1:$ADMIN_PORT/readyz" 2>/dev/null)"; then
+     tcore_add_check "relay.readyz" OK critical "hostname:$host" http "$health" success \
+       "Relay readiness endpoint responded" ready readyz
+   else
+@@ -6555,9 +6637,10 @@ port_has_only_loopback_listeners() {
+   (( seen == 1 ))
+ }
+ 
+-firewall_has_backend_port() {
+-  local port="$1" rules guard
+-  rules="$(nft list table inet twebproxy_backend 2>/dev/null || true)"
++firewall_has_backend_port() { # 0 covered; 1 not covered or table absent; 2 nftables did not answer
++  local port="$1" rules guard rc=0
++  rules="$(diag_run "$DIAG_TIMEOUT" nft list table inet twebproxy_backend 2>/dev/null)" || rc=$?
++  [[ "$rc" != 124 && "$rc" != 137 ]] || return 2
+   [[ -n "$rules" ]] || return 1
+   guard="$(grep -F 'iifname != "lo" tcp dport' <<<"$rules" || true)"
+   [[ -n "$guard" ]] || return 1
+@@ -6566,7 +6649,7 @@ firewall_has_backend_port() {
+ 
+ collect_audit() {
+   local host="$1" p unit spec label port addrs cert_tmp cert_days cert_local
+-  local cert_public_fp cert_local_fp renew_source
++  local cert_public_fp cert_local_fp renew_source state rules nft_rc public_cert=0 fw_rc
+   tcore_reset audit "hostname:$host"
+   TCORE_HOST="$host"
+   if ! instance_exists "$host"; then
+@@ -6581,11 +6664,15 @@ collect_audit() {
+   tcore_add_check "instance.state.present" OK critical "hostname:$host" state present present \
+     "Instance state exists" none
+ 
+-  if systemctl is-active --quiet "twebproxy@$host.service"; then
++  state="$(diag_unit_state "twebproxy@$host.service")"
++  if [[ "$state" == active ]]; then
+     tcore_add_check "relay.service.active" OK critical "hostname:$host" systemd active active \
+       "Relay service is active" ok "relay service active"
++  elif [[ "$state" == unknown ]]; then
++    tcore_add_check "relay.service.active" UNKNOWN warning "hostname:$host" systemd unknown active \
++      "Relay service state could not be determined" warn "AUDIT WARN: состояние twebproxy@$host.service неизвестно (systemd недоступен или не ответил)"
+   else
+-    tcore_add_check "relay.service.active" ERROR critical "hostname:$host" systemd inactive active \
++    tcore_add_check "relay.service.active" ERROR critical "hostname:$host" systemd "$state" active \
+       "Relay service is not active" warn "AUDIT FAIL: relay service не active"
+   fi
+ 
+@@ -6604,9 +6691,14 @@ collect_audit() {
+     fi
+   done
+ 
+-  if systemctl is-active --quiet twebproxy-firewall.service && nft list table inet twebproxy_backend >/dev/null 2>&1; then
++  state="$(diag_unit_state twebproxy-firewall.service)"
++  nft_rc=0; rules="$(diag_run "$DIAG_TIMEOUT" nft list table inet twebproxy_backend 2>/dev/null)" || nft_rc=$?
++  if [[ "$state" == active && "$nft_rc" == 0 ]]; then
+     tcore_add_check "firewall.backend.boundary" OK critical global nftables active active \
+       "Backend firewall service and table are active" ok "backend firewall service/table active"
++  elif [[ "$state" == unknown || "$nft_rc" == 124 || "$nft_rc" == 137 ]]; then
++    tcore_add_check "firewall.backend.boundary" UNKNOWN warning global nftables unknown active \
++      "Backend firewall state could not be determined" warn "AUDIT WARN: состояние backend firewall неизвестно (systemd или nftables не ответили)"
+   else
+     tcore_add_check "firewall.backend.boundary" ERROR critical global nftables missing active \
+       "Backend firewall service or table is missing" warn "AUDIT FAIL: backend firewall service/table отсутствует"
+@@ -6625,15 +6717,19 @@ collect_audit() {
+     load_profile "$host" "$p"
+     unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
+ 
+-    if systemctl is-active --quiet "$unit"; then
++    state="$(diag_unit_state "$unit")"
++    if [[ "$state" == active ]]; then
+       tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd active active \
+         "MTProxy backend is active" ok "$p: MTProxy backend active"
++    elif [[ "$state" == unknown ]]; then
++      tcore_add_check "profile.backend.service.active" UNKNOWN warning "profile:$host/$p" systemd unknown active \
++        "MTProxy backend state could not be determined" warn "AUDIT WARN: состояние $unit неизвестно (systemd недоступен или не ответил)"
+     else
+-      tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd inactive active \
++      tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "$state" active \
+         "MTProxy backend is not active" warn "AUDIT FAIL: $p backend service не active"
+     fi
+ 
+-    if systemctl cat "$unit" 2>/dev/null | grep -Eq '^RestrictAddressFamilies=.*AF_NETLINK'; then
++    if diag_run "$DIAG_TIMEOUT" systemctl cat "$unit" 2>/dev/null | grep -Eq '^RestrictAddressFamilies=.*AF_NETLINK'; then
+       tcore_add_check "profile.backend.sandbox.af_netlink" OK warning "profile:$host/$p" systemd present present \
+         "MTProxy sandbox allows AF_NETLINK" ok "$p: MTProxy sandbox включает AF_NETLINK"
+     else
+@@ -6650,9 +6746,13 @@ collect_audit() {
+         continue
+       fi
+ 
+-      if firewall_has_backend_port "$port"; then
++      fw_rc=0; firewall_has_backend_port "$port" || fw_rc=$?
++      if (( fw_rc == 0 )); then
+         tcore_add_check "profile.$label.firewall.coverage" OK critical "profile:$host/$p" nftables "$port" covered \
+           "$label port is covered by the backend firewall" ok "$p: $label port $port покрыт nftables"
++      elif (( fw_rc == 2 )); then
++        tcore_add_check "profile.$label.firewall.coverage" UNKNOWN warning "profile:$host/$p" nftables unknown covered \
++          "$label port coverage could not be determined" warn "AUDIT WARN: состояние backend firewall неизвестно (systemd или nftables не ответили)"
+       else
+         tcore_add_check "profile.$label.firewall.coverage" ERROR critical "profile:$host/$p" nftables "$port" covered \
+           "$label port is missing from the backend firewall" warn "AUDIT FAIL: $p $label port $port не найден в backend firewall rule"
+@@ -6678,7 +6778,8 @@ collect_audit() {
+ 
+   cert_tmp="$(mktemp /tmp/twebproxy-audit-cert.XXXXXX.pem)"
+   if fetch_public_leaf_cert "$host" "$cert_tmp"; then
+-    cert_days="$(cert_days_remaining_file "$cert_tmp" 2>/dev/null || echo -9999)"
++    public_cert=1
++    cert_days="$(cert_days_remaining_file "$cert_tmp" 2>/dev/null || true)"
+     if [[ "$cert_days" =~ ^-?[0-9]+$ ]]; then
+       if (( cert_days < 0 )); then
+         tcore_add_check "tls.public.certificate.validity" ERROR critical "hostname:$host" tls "$cert_days" ">=7 days" \
+@@ -6711,7 +6812,10 @@ collect_audit() {
+       if [[ -r "$cert_local" ]]; then
+         cert_local_fp="$(cert_fingerprint_file "$cert_local" 2>/dev/null || true)"
+         cert_public_fp="$(cert_fingerprint_file "$cert_tmp" 2>/dev/null || true)"
+-        if [[ -n "$cert_local_fp" && -n "$cert_public_fp" && "$cert_local_fp" == "$cert_public_fp" ]]; then
++        if (( ! public_cert )); then
++          tcore_add_check "tls.certificate.match" UNKNOWN warning "hostname:$host" tls unverified match \
++            "Public certificate unavailable; local/public match not verified" warn "AUDIT WARN: публичный сертификат недоступен, совпадение с локальным не проверено"
++        elif [[ -n "$cert_local_fp" && -n "$cert_public_fp" && "$cert_local_fp" == "$cert_public_fp" ]]; then
+           tcore_add_check "tls.certificate.match" OK critical "hostname:$host" tls match match \
+             "Local and public Let's Encrypt certificates match" ok "Let's Encrypt local/public certificate MATCH"
+         else
+@@ -6732,9 +6836,13 @@ collect_audit() {
+       fi
+       ;;
+     caddy)
+-      if systemctl is-active --quiet caddy.service; then
++      state="$(diag_unit_state caddy.service)"
++      if [[ "$state" == active ]]; then
+         tcore_add_check "tls.manager.active" OK critical "hostname:$host" systemd active active \
+           "Caddy automatic TLS manager is active" ok "Caddy automatic TLS manager active"
++      elif [[ "$state" == unknown ]]; then
++        tcore_add_check "tls.manager.active" UNKNOWN warning "hostname:$host" systemd unknown active \
++          "Caddy service state could not be determined" warn "AUDIT WARN: состояние caddy.service неизвестно (systemd недоступен или не ответил)"
+       else
+         tcore_add_check "tls.manager.active" ERROR critical "hostname:$host" systemd inactive active \
+           "Caddy service is inactive" warn "AUDIT FAIL: Caddy service inactive"
+@@ -6745,7 +6853,10 @@ collect_audit() {
+       if [[ -n "$cert_local" && -r "$cert_local" ]]; then
+         cert_local_fp="$(cert_fingerprint_file "$cert_local" 2>/dev/null || true)"
+         cert_public_fp="$(cert_fingerprint_file "$cert_tmp" 2>/dev/null || true)"
+-        if [[ -n "$cert_local_fp" && -n "$cert_public_fp" && "$cert_local_fp" == "$cert_public_fp" ]]; then
++        if (( ! public_cert )); then
++          tcore_add_check "tls.certificate.match" UNKNOWN warning "hostname:$host" tls unverified match \
++            "Public certificate unavailable; local/public match not verified" warn "AUDIT WARN: публичный сертификат недоступен, совпадение с локальным не проверено"
++        elif [[ -n "$cert_local_fp" && -n "$cert_public_fp" && "$cert_local_fp" == "$cert_public_fp" ]]; then
+           tcore_add_check "tls.certificate.match" OK critical "hostname:$host" tls match match \
+             "Local and public custom certificates match" ok "custom TLS local/public certificate MATCH"
+         else
+@@ -6783,8 +6894,9 @@ collect_audit() {
+ }
+ 
+ render_audit_human() {
+-  local i failures warnings
++  local i failures warnings status unknown=0
+   failures="$(tcore_error_count)"; warnings="$(tcore_warning_count)"
++  for status in "${TCORE_STATUSES[@]}"; do [[ "$status" == UNKNOWN ]] && unknown=$((unknown+1)); done
+   if [[ "${TCORE_IDS[0]:-}" == "instance.state.present" && "${TCORE_STATUSES[0]:-}" == ERROR ]]; then
+     warn "${TCORE_HUMAN_TEXTS[0]}"
+     return 0
+@@ -6799,6 +6911,8 @@ render_audit_human() {
+   done
+   if (( failures > 0 )); then
+     warn "AUDIT RESULT: FAIL ($failures critical, $warnings warnings)"
++  elif (( unknown > 0 )); then
++    warn "AUDIT RESULT: INCOMPLETE ($unknown not verified, $warnings warnings)"
+   else
+     ok "AUDIT RESULT: PASS ($warnings warnings)"
+   fi
+@@ -6831,8 +6945,8 @@ diagnose_cmd() {
+   local host="${1:-}" p
+   [[ -n "$host" ]] || host="$(select_instance)"; load_instance "$host"
+   echo "== systemd =="
+-  systemctl is-active "twebproxy@$host.service" || true
+-  while read -r p; do [[ -n "$p" ]] && systemctl is-active "twebproxy-mtproxy@$(backend_id "$host" "$p").service" || true; done < <(list_profiles_array "$host")
++  printf '%s\n' "$(diag_unit_state "twebproxy@$host.service")"
++  while read -r p; do [[ -n "$p" ]] && printf '%s\n' "$(diag_unit_state "twebproxy-mtproxy@$(backend_id "$host" "$p").service")"; done < <(list_profiles_array "$host")
+   echo; printf '== %s ==\n' "$(ui_msg diag_listeners)"
+   ss -lntp | grep -E ":(80|443|${RELAY_PORT}|${ADMIN_PORT})([[:space:]]|$)" || true
+   while read -r p; do
+@@ -6845,21 +6959,21 @@ diagnose_cmd() {
+   echo; printf '== %s ==\n' "$(ui_msg diag_public_surface)"
+   curl -I --max-time 5 -H "Host: $host" "http://127.0.0.1:$RELAY_PORT/" || true
+   echo; echo "== DNS =="
+-  dig +short A "$host" || true; dig +short AAAA "$host" || true
++  diag_show dig +time=2 +tries=1 +short A "$host"; diag_show dig +time=2 +tries=1 +short AAAA "$host"
+   echo; printf '== %s ==\n' "$(ui_msg diag_public_https)"
+   curl -I --max-time 10 "https://$host/" || true
+   echo; printf '== %s ==\n' "$(ui_msg diag_certificate)"
+   timeout 10 openssl s_client -connect "$host:443" -servername "$host" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates || true
+   echo; printf '== %s ==\n' "$(ui_msg diag_backend_firewall)"
+-  nft list table inet twebproxy_backend || true
++  diag_show nft list table inet twebproxy_backend
+   echo; printf '== %s ==\n' "$(ui_msg dpi_title)"
+-  "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" || true
+-  systemctl --no-pager --full status "$DPI_FIREWALL_UNIT" "$DPI_NFQWS_UNIT" || true
++  diag_show "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE"
++  diag_show systemctl --no-pager --full status "$DPI_FIREWALL_UNIT" "$DPI_NFQWS_UNIT"
+   echo
+   audit_instance_impl "$host" || true
+   echo; printf '== %s ==\n' "$(ui_msg diag_recent_logs)"
+-  journalctl -u "twebproxy@$host.service" --since '20 minutes ago' --no-pager -n 120 || true
+-  while read -r p; do [[ -n "$p" ]] && journalctl -u "twebproxy-mtproxy@$(backend_id "$host" "$p").service" --since '20 minutes ago' --no-pager -n 60 || true; done < <(list_profiles_array "$host")
++  diag_show journalctl -u "twebproxy@$host.service" --since '20 minutes ago' --no-pager -n 120
++  while read -r p; do [[ -n "$p" ]] && diag_show journalctl -u "twebproxy-mtproxy@$(backend_id "$host" "$p").service" --since '20 minutes ago' --no-pager -n 60; done < <(list_profiles_array "$host")
+ }
+ 
+ delete_instance_cmd() {
+@@ -6990,11 +7104,11 @@ latest_manager_log() {
+ 
+ journal_current_unit() {
+   local unit="$1" max_lines="${2:-200}" since
+-  since="$(systemctl show "$unit" -p ActiveEnterTimestamp --value 2>/dev/null || true)"
++  since="$(diag_run "$DIAG_TIMEOUT" systemctl show "$unit" -p ActiveEnterTimestamp --value 2>/dev/null || true)"
+   if [[ -n "$since" && "$since" != "n/a" ]]; then
+-    journalctl -u "$unit" --since "$since" -n "$max_lines" --no-pager -o short-iso-precise || true
++    diag_show journalctl -u "$unit" --since "$since" -n "$max_lines" --no-pager -o short-iso-precise
+   else
+-    journalctl -u "$unit" -n "$max_lines" --no-pager -o short-iso-precise || true
++    diag_show journalctl -u "$unit" -n "$max_lines" --no-pager -o short-iso-precise
+   fi
+ }
+ 
+@@ -7030,12 +7144,12 @@ collect_history_snapshot() {
+       echo "HOST HISTORY: $host"
+       echo "################################################################"
+       echo "-- relay journal: last 24h / max 160 --"
+-      journalctl -u "twebproxy@$host.service" --since '24 hours ago' -n 160 --no-pager -o short-iso-precise || true
++      diag_show journalctl -u "twebproxy@$host.service" --since '24 hours ago' -n 160 --no-pager -o short-iso-precise
+       while read -r p; do
+         [[ -n "$p" ]] || continue
+         unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
+         echo "-- backend journal: $p / last 24h / max 120 --"
+-        journalctl -u "$unit" --since '24 hours ago' -n 120 --no-pager -o short-iso-precise || true
++        diag_show journalctl -u "$unit" --since '24 hours ago' -n 120 --no-pager -o short-iso-precise
+       done < <(list_profiles_array "$host")
+       echo
+     done < <(list_hosts_array)
+@@ -7044,8 +7158,20 @@ collect_history_snapshot() {
+   printf '%s' "$out"
+ }
+ 
+-copy_recent_files() {
+-  local src="$1" dst="$2" pattern="$3" limit="$4" exclude1="${5:-}" exclude2="${6:-}" f count=0
++# Copies $1 to $2 (0600); "redact" re-applies the current redaction (safe
++# bundles), anything else copies as is. Fails, leaving nothing, when the source
++# vanished or cannot be read.
++logs_copy_file() { # $1=src $2=dst $3=redact|""
++  if [[ "$3" == redact ]]; then
++    if cat -- "$1" | sanitize_log_stream > "$2" && chmod 0600 -- "$2"; then return 0; fi
++  elif cp -a -- "$1" "$2"; then
++    return 0
++  fi
++  rm -f -- "$2"; return 1
++}
++
++copy_recent_files() { # $1=src $2=dst $3=pattern $4=limit [$5 $6=excluded files] [$7=redact]
++  local src="$1" dst="$2" pattern="$3" limit="$4" exclude1="${5:-}" exclude2="${6:-}" filter="${7:-}" f count=0
+   local files=()
+   [[ -d "$src" ]] || return 0
+   install -d -m 0700 "$dst"
+@@ -7054,7 +7180,11 @@ copy_recent_files() {
+     [[ -n "$f" ]] || continue
+     [[ -n "$exclude1" && "$f" == "$exclude1" ]] && continue
+     [[ -n "$exclude2" && "$f" == "$exclude2" ]] && continue
+-    cp -a "$f" "$dst/"
++    # A log can be rotated away or unreadable meanwhile: note it and go on.
++    if ! logs_copy_file "$f" "$dst/${f##*/}" "$filter"; then
++      printf 'skipped %s: removed or unreadable\n' "${f##*/}" >> "$dst/SKIPPED.txt"
++      continue
++    fi
+     count=$((count+1))
+     (( count >= limit )) && break
+   done
+@@ -7095,40 +7225,40 @@ collect_runtime_snapshot() {
+     echo
+     echo "== time / hostname =="
+     date -Is || true
+-    hostnamectl 2>/dev/null || hostname || true
++    diag_run "$DIAG_TIMEOUT" hostnamectl 2>/dev/null || hostname || true
+     echo
+     echo "== network addresses/routes =="
+     ip -br addr 2>/dev/null || true
+-    ip route show table all 2>/dev/null || true
+-    ip -6 route show table all 2>/dev/null || true
++    ip route show 2>/dev/null || true
++    ip -6 route show 2>/dev/null || true
+     echo
+     echo "== listeners =="
+-    ss -lntup 2>/dev/null || ss -lntp || true
++    ss -lntp 2>/dev/null || true
+     echo
+     echo "== firewall =="
+-    nft list table inet twebproxy_backend || true
+-    "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" || true
++    diag_show nft list table inet twebproxy_backend
++    diag_show "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE"
+     echo
+     echo "== optional network compatibility =="
+     find "$DPI_STATE_DIR" -maxdepth 1 -type f -name '*.env' -print -exec sed -n '1,20p' {} \; 2>/dev/null || true
+-    systemctl --no-pager --full status "$DPI_FIREWALL_UNIT" "$DPI_NFQWS_UNIT" || true
++    diag_show systemctl --no-pager --full status "$DPI_FIREWALL_UNIT" "$DPI_NFQWS_UNIT"
+     [[ -f "$DPI_NFQWS_BIN" ]] && sha256sum "$DPI_NFQWS_BIN" || true
+-    command -v ufw >/dev/null 2>&1 && ufw status verbose || true
++    command -v ufw >/dev/null 2>&1 && diag_show ufw status verbose
+     echo
+     echo "== binaries / source =="
+     [[ -x "$TPROXY_BIN" ]] && { ls -l "$TPROXY_BIN"; sha256sum "$TPROXY_BIN"; } || true
+     [[ -x "$MTPROXY_BIN" ]] && { ls -l "$MTPROXY_BIN"; sha256sum "$MTPROXY_BIN"; } || true
+     [[ -e "$MTPROXY_SRC/objs/bin/mtproto-proxy" ]] && { echo "-- MTProxy build artifact (source tree) --"; ls -l "$MTPROXY_SRC/objs/bin/mtproto-proxy"; } || true
+     stat "$MTPROXY_DATA_DIR" "$MTPROXY_DATA_DIR/proxy-secret" "$MTPROXY_DATA_DIR/proxy-multi.conf" 2>/dev/null || true
+-    [[ -d "$TPROXY_SRC/.git" ]] && { git -C "$TPROXY_SRC" status --short --branch; git -C "$TPROXY_SRC" rev-parse HEAD; } || true
+-    [[ -d "$MTPROXY_SRC/.git" ]] && { git -C "$MTPROXY_SRC" status --short --branch; git -C "$MTPROXY_SRC" rev-parse HEAD; } || true
++    [[ -d "$TPROXY_SRC/.git" ]] && { diag_show git -C "$TPROXY_SRC" status --short --branch; diag_show git -C "$TPROXY_SRC" rev-parse HEAD; } || true
++    [[ -d "$MTPROXY_SRC/.git" ]] && { diag_show git -C "$MTPROXY_SRC" status --short --branch; diag_show git -C "$MTPROXY_SRC" rev-parse HEAD; } || true
+     echo
+     echo "== systemd templates =="
+-    systemctl cat twebproxy@.service 2>/dev/null || true
+-    systemctl cat twebproxy-mtproxy@.service 2>/dev/null || true
+-    systemctl cat twebproxy-firewall.service 2>/dev/null || true
+-    systemctl cat twebproxy-refresh-mtproxy.service 2>/dev/null || true
+-    systemctl cat twebproxy-refresh-mtproxy.timer 2>/dev/null || true
++    diag_show systemctl cat twebproxy@.service 2>/dev/null
++    diag_show systemctl cat twebproxy-mtproxy@.service 2>/dev/null
++    diag_show systemctl cat twebproxy-firewall.service 2>/dev/null
++    diag_show systemctl cat twebproxy-refresh-mtproxy.service 2>/dev/null
++    diag_show systemctl cat twebproxy-refresh-mtproxy.timer 2>/dev/null
+     echo
+ 
+     while read -r host; do
+@@ -7137,17 +7267,17 @@ collect_runtime_snapshot() {
+       echo "HOST: $host"
+       echo "################################################################"
+       echo "-- DNS --"
+-      getent ahosts "$host" 2>/dev/null || true
+-      command -v dig >/dev/null 2>&1 && { dig +short A "$host"; dig +short AAAA "$host"; } || true
++      diag_show getent ahosts "$host" 2>/dev/null
++      command -v dig >/dev/null 2>&1 && { diag_show dig +time=2 +tries=1 +short A "$host"; diag_show dig +time=2 +tries=1 +short AAAA "$host"; } || true
+       echo "-- isolation audit --"
+       audit_instance_impl "$host" || true
+       echo
+       echo "-- certificate status --"
+       cert_status_impl "$host" || true
+       echo "-- relay status --"
+-      systemctl --no-pager --full status "twebproxy@$host.service" || true
++      diag_show systemctl --no-pager --full status "twebproxy@$host.service"
+       echo "-- relay properties --"
+-      systemctl show "twebproxy@$host.service" -p Id -p LoadState -p ActiveState -p SubState -p MainPID -p ExecMainStatus -p FragmentPath -p DropInPaths -p User -p Group -p LimitNOFILE -p Restart || true
++      diag_show systemctl show "twebproxy@$host.service" -p Id -p LoadState -p ActiveState -p SubState -p MainPID -p ExecMainStatus -p FragmentPath -p DropInPaths -p User -p Group -p LimitNOFILE -p Restart
+       echo "-- relay journal (current activation / max 220) --"
+       journal_current_unit "twebproxy@$host.service" 220
+       if instance_exists "$host"; then
+@@ -7186,8 +7316,8 @@ collect_runtime_snapshot() {
+         [[ -n "$p" ]] || continue
+         unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
+         echo "-- profile: $p / $unit --"
+-        systemctl --no-pager --full status "$unit" || true
+-        systemctl show "$unit" -p Id -p LoadState -p ActiveState -p SubState -p MainPID -p ExecMainStatus -p FragmentPath -p User -p Group -p LimitNOFILE -p Restart || true
++        diag_show systemctl --no-pager --full status "$unit"
++        diag_show systemctl show "$unit" -p Id -p LoadState -p ActiveState -p SubState -p MainPID -p ExecMainStatus -p FragmentPath -p User -p Group -p LimitNOFILE -p Restart
+         echo "-- backend journal (current activation / max 180) --"
+         journal_current_unit "$unit" 180
+         if [[ "$mode" == "full" ]]; then
+@@ -7268,11 +7398,11 @@ field_collect_journal_window() {
+         [[ -n "$unit" ]] || continue
+         echo "== $unit =="
+         if [[ -n "$until_ts" ]]; then
+-          journalctl -u "$unit" --since "$since" --until "$until_ts" \
+-            -n 2000 --no-pager -o short-iso-precise 2>&1 || true
++          diag_show journalctl -u "$unit" --since "$since" --until "$until_ts" \
++            -n 2000 --no-pager -o short-iso-precise 2>&1
+         else
+-          journalctl -u "$unit" --since "$since" \
+-            -n 2000 --no-pager -o short-iso-precise 2>&1 || true
++          diag_show journalctl -u "$unit" --since "$since" \
++            -n 2000 --no-pager -o short-iso-precise 2>&1
+         fi
+         echo
+       done < <(field_units_for_host "$host")
+@@ -7294,12 +7424,12 @@ field_collect_nft() {
+       echo "nft_unavailable=yes"
+     else
+       echo "== table inet twebproxy_backend =="
+-      if "$DPI_NFT_BIN" -a list table inet twebproxy_backend 2>/dev/null; then :; else
++      if diag_run "$DIAG_TIMEOUT" "$DPI_NFT_BIN" -a list table inet twebproxy_backend 2>/dev/null; then :; else
+         echo "table_absent_or_unreadable=yes"
+       fi
+       echo
+       echo "== table ip $DPI_NFT_TABLE =="
+-      if "$DPI_NFT_BIN" -a list table ip "$DPI_NFT_TABLE" 2>/dev/null; then :; else
++      if diag_run "$DIAG_TIMEOUT" "$DPI_NFT_BIN" -a list table ip "$DPI_NFT_TABLE" 2>/dev/null; then :; else
+         echo "table_absent_or_unreadable=yes"
+       fi
+     fi
+@@ -7641,15 +7771,34 @@ EOF
+   chmod 0600 "$path"
+ }
+ 
++logs_pack_cleanup() {
++  if [[ -n "${LOGS_STAGING:-}" && -d "${LOGS_STAGING:-}" ]]; then
++    rm -rf --one-file-system -- "$LOGS_STAGING" 2>/dev/null || true
++  fi
++  LOGS_STAGING=""
++  # An archive interrupted mid-write must not be left looking like a report.
++  if [[ -n "${LOGS_PARTIAL:-}" && -f "${LOGS_PARTIAL:-}" ]]; then rm -f -- "$LOGS_PARTIAL" 2>/dev/null || true; fi
++  LOGS_PARTIAL=""
++  return 0
++}
++
++logs_pack_on_signal() {
++  trap - EXIT INT TERM
++  logs_pack_cleanup
++  warn "Сбор пакета логов прерван; временные файлы удалены."
++  exit "$1"
++}
++
+ logs_pack_cmd() {
+   need_root; banner
+-  local mode="safe" snap history ts bundle staging upstream_commit="unknown"
+-  [[ "${1:-}" == "--full" ]] && mode="full"
++  local mode="safe" filter=redact snap history ts bundle staging building upstream_commit="unknown"
++  [[ "${1:-}" == "--full" ]] && { mode="full"; filter=""; }
+   [[ -z "${1:-}" || "${1:-}" == "--full" ]] || die "Использование: twebproxy logs-pack [--full]"
+   snap="$(collect_runtime_snapshot "$mode" current)"
+   history="$(collect_history_snapshot "$mode" history)"
+   log "Current runtime snapshot: $snap"
+   log "Bounded history snapshot: $history"
++  install -d -o root -g root -m 0700 "$LOG_BUNDLE_DIR" || die "Не удалось записать пакет логов в $LOG_BUNDLE_DIR."
+   ts="$(date '+%Y%m%d-%H%M%S')"
+   if [[ "$mode" == "full" ]]; then
+     bundle="$LOG_BUNDLE_DIR/twebproxy-FULL-report-${ts}.tar.gz"
+@@ -7657,23 +7806,33 @@ logs_pack_cmd() {
+     bundle="$LOG_BUNDLE_DIR/twebproxy-logs-${ts}.tar.gz"
+   fi
+ 
+-  staging="$(mktemp -d /tmp/twebproxy-bundle.XXXXXX)"
++  # Staging and a half-written archive are removed on any exit or signal.
++  LOGS_STAGING="$(mktemp -d /tmp/twebproxy-bundle.XXXXXX)" || die "Не удалось записать пакет логов в $LOG_BUNDLE_DIR."
++  staging="$LOGS_STAGING"
++  trap 'logs_pack_cleanup' EXIT
++  trap 'logs_pack_on_signal 130' INT
++  trap 'logs_pack_on_signal 143' TERM
+   install -d -m 0700 \
+     "$staging/current" \
+     "$staging/history" \
+     "$staging/history/manager" \
+     "$staging/history/runtime"
+ 
+-  cp -a "$snap" "$staging/current/runtime.log"
+-  cp -a "$history" "$staging/history/service-history.log"
++  # A safe bundle re-applies the current redaction to everything it carries,
++  # including logs written by older versions.
++  logs_copy_file "$snap" "$staging/current/runtime.log" "$filter" ||
++    printf 'skipped runtime.log: removed or unreadable\n' >> "$staging/current/SKIPPED.txt"
++  logs_copy_file "$history" "$staging/history/service-history.log" "$filter" ||
++    printf 'skipped service-history.log: removed or unreadable\n' >> "$staging/history/SKIPPED.txt"
+   if [[ -n "${CURRENT_LOG:-}" && -f "$CURRENT_LOG" ]]; then
+-    cp -a "$CURRENT_LOG" "$staging/current/manager.log"
++    logs_copy_file "$CURRENT_LOG" "$staging/current/manager.log" "$filter" ||
++      printf 'skipped manager.log: removed or unreadable\n' >> "$staging/current/SKIPPED.txt"
+   fi
+ 
+   # Keep reports compact and useful: persistent /opt logs retain everything, while
+   # the shareable bundle carries recent context plus an activation-bounded current state.
+-  copy_recent_files "$LOG_MANAGER_DIR" "$staging/history/manager" '*.log' 12 "${CURRENT_LOG:-}"
+-  copy_recent_files "$LOG_RUNTIME_DIR" "$staging/history/runtime" '*.log' 6 "$snap" "$history"
++  copy_recent_files "$LOG_MANAGER_DIR" "$staging/history/manager" '*.log' 12 "${CURRENT_LOG:-}" "" "$filter"
++  copy_recent_files "$LOG_RUNTIME_DIR" "$staging/history/runtime" '*.log' 6 "$snap" "$history" "$filter"
+   if [[ "$mode" == "full" ]]; then
+     install -d -m 0700 "$staging/history/full"
+     copy_recent_files "$LOG_FULL_DIR" "$staging/history/full" '*.log' 4 "$snap" "$history"
+@@ -7699,9 +7858,13 @@ logs_pack_cmd() {
+ 
+   (cd "$staging" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256)
+   chmod 0600 "$staging/MANIFEST.sha256"
+-  tar -czf "$bundle" -C "$staging" .
+-  chmod 0600 "$bundle"
+-  rm -rf "$staging"
++  building="$LOG_BUNDLE_DIR/.${bundle##*/}.partial"
++  LOGS_PARTIAL="$building"
++  tar -czf "$building" -C "$staging" . && chmod 0600 "$building" && mv -f "$building" "$bundle" ||
++    die "Не удалось записать пакет логов в $LOG_BUNDLE_DIR."
++  LOGS_PARTIAL=""
++  logs_pack_cleanup
++  trap - EXIT INT TERM
+   ok "Пакет логов готов: $bundle"
+   if [[ "$mode" == "full" ]]; then
+     warn "FULL TEST REPORT содержит WEB/MTProxy secrets. Приватные TLS/SSH ключи и root/sudo credentials не включаются."
+@@ -7911,9 +8074,15 @@ tui_render_dashboard() {
+           [[ "${TCORE_STATUSES[$i]}" == OK ]] || backend="${TCORE_STATUSES[$i]}";;
+       esac
+     done
+-    for state in "$relay" "$frontend" "$backend"; do
+-      [[ "$state" == ERROR ]] && break
+-      [[ "$state" == WARNING || "$state" == UNKNOWN ]] && break
++    # The host's worst observed state across all of its checks (DISABLED aside).
++    state=OK
++    for i in "${!TCORE_IDS[@]}"; do
++      case "${TCORE_SCOPES[$i]}" in "$scope"|"profile:$host"/*) ;; *) continue;; esac
++      case "${TCORE_STATUSES[$i]}" in
++        ERROR) state=ERROR;;
++        WARNING) [[ "$state" == ERROR ]] || state=WARNING;;
++        UNKNOWN) [[ "$state" == ERROR || "$state" == WARNING ]] || state=UNKNOWN;;
++      esac
+     done
+     printf '%b%-30s%b %s\n' "$C_BOLD" "$host" "$C_RESET" "$(tui_state_text "$state")"
+     tui_text "  $(ui_msg profiles_count): $profiles  TLS: $tls  $(ui_msg dpi_mode): $dpi"
+@@ -8085,7 +8254,7 @@ menu_logs() {
+ }
+ 
+ menu_profiles() {
+-  local host; host="$(select_instance)"
++  local host p; host="$(select_instance)" || return 0
+   while true; do
+     clear 2>/dev/null || true
+     collect_profiles_state "$host"; tui_render_profiles "$host"; echo
+@@ -8094,17 +8263,17 @@ menu_profiles() {
+       "$(ui_msg carrier_profile)" "$(ui_msg delete_profile)")"
+     case "$c" in
+       1) profile_add_cmd "$host"; pause;;
+-      2) warn "$(ui_msg secret_warning)"; show_profile_cmd "$host" "$(select_profile "$host")"; pause;;
+-      3) profile_rotate_cmd "$host" "$(select_profile "$host")"; pause;;
+-      4) profile_carrier_cmd "$host" "$(select_profile "$host")"; pause;;
+-      5) profile_delete_cmd "$host" "$(select_profile "$host")"; pause;;
++      2) p="$(select_profile "$host")" && { warn "$(ui_msg secret_warning)"; show_profile_cmd "$host" "$p"; }; pause;;
++      3) p="$(select_profile "$host")" && profile_rotate_cmd "$host" "$p"; pause;;
++      4) p="$(select_profile "$host")" && profile_carrier_cmd "$host" "$p"; pause;;
++      5) p="$(select_profile "$host")" && profile_delete_cmd "$host" "$p"; pause;;
+       0) return;;
+     esac
+   done
+ }
+ 
+ menu_certificates() {
+-  local host; host="$(select_instance)"
++  local host; host="$(select_instance)" || return 0
+   while true; do
+     clear 2>/dev/null || true
+     collect_audit "$host"; tui_render_tls "$host"
+@@ -8143,7 +8312,7 @@ menu_web_proxy() {
+ }
+ 
+ menu_status_statistics() {
+-  local host; host="$(select_instance)"
++  local host; host="$(select_instance)" || return 0
+   while true; do
+     clear 2>/dev/null || true; collect_status "$host"; tui_render_status "$host"; echo
+     local c; c="$(menu_choose "$(ui_msg status_stats):" "$(ui_msg back)" \
+@@ -8193,11 +8362,11 @@ menu_diagnostics() {
+       "$(ui_msg full_diagnose)" "$(ui_msg isolation_audit)" "$(ui_msg typed_json)" \
+       "$(ui_msg typed_raw)" "$(ui_msg field_diagnostics)" "$(ui_msg logs_reports)")"
+     case "$c" in
+-      1) host="$(select_instance)"; diagnose_cmd "$host"; pause;;
+-      2) host="$(select_instance)"; audit_cmd "$host"; pause;;
+-      3) host="$(select_instance)"; collect_audit "$host"; tcore_render_json; pause;;
+-      4) host="$(select_instance)"; collect_audit "$host"; tcore_render_raw; pause;;
+-      5) host="$(select_instance)"; field_report_cmd "$host"; pause;;
++      1) host="$(select_instance)" && { ( diagnose_cmd "$host" ) || true; }; pause;;
++      2) host="$(select_instance)" && { ( audit_cmd "$host" ) || true; }; pause;;
++      3) host="$(select_instance)" && { ( collect_audit "$host"; tcore_render_json ) || true; }; pause;;
++      4) host="$(select_instance)" && { ( collect_audit "$host"; tcore_render_raw ) || true; }; pause;;
++      5) host="$(select_instance)" && { ( field_report_cmd "$host" ) || true; }; pause;;
+       6) menu_logs;;
+       0) return;;
+     esac
+@@ -8242,10 +8411,10 @@ menu_network_compatibility() {
+       "$(ui_msg dpi_status)" "$(ui_msg dpi_methods)" \
+       "$(ui_msg dpi_enable)" "$(ui_msg dpi_disable)")" || return 0
+     case "$c" in
+-      1) host="$(select_instance)"; dpi_status_cmd "$host"; pause;;
++      1) host="$(select_instance)" && { ( dpi_status_cmd "$host" ) || true; }; pause;;
+       2) dpi_list_methods_cmd; pause;;
+       3)
+-        host="$(select_instance)"
++        host="$(select_instance)" || continue
+         selected="$(dpi_tui_choose "$(ui_msg dpi_enable):" "$(ui_msg back)" window1152 mss88 nfqws window1152_nfqws mss88_nfqws)" || return 0
+         case "$selected" in
+           0) continue;;
+@@ -8261,7 +8430,7 @@ menu_network_compatibility() {
+           log "$(ui_msg dpi_tui_cancelled)"
+         fi
+         pause;;
+-      4) host="$(select_instance)"; dpi_disable_cmd "$host"; pause;;
++      4) host="$(select_instance)" && dpi_disable_cmd "$host"; pause;;
+       0) return;;
+     esac
+   done
+@@ -8274,7 +8443,7 @@ menu_settings() {
+       "$(ui_msg change_language)" "$(ui_msg enable_color)" "$(ui_msg disable_color)" \
+       "$(ui_msg network_compatibility)")"
+     case "$c" in
+-      1) lang="$(choose "$(ui_msg change_language):" "$(ui_msg english)" "$(ui_msg russian)")";
++      1) lang="$(choose "$(ui_msg change_language):" "$(ui_msg english)" "$(ui_msg russian)")" || continue
+          [[ "$lang" == 1 ]] && ui_language_store en || ui_language_store ru
+          ok "$(ui_msg language_saved)";;
+       2) enable_colors;;

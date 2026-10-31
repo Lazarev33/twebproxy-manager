@@ -244,8 +244,11 @@ if begin g3-metadata-symlink-not-followed; then
   f_update
   printf 'MANAGER_VERSION=9.9.9\n' > "$F_CASE/elsewhere.env"; chmod 0600 "$F_CASE/elsewhere.env"
   mv "$F_CASE/etc/global.env" "$F_CASE/etc/global.env.real"; ln -s "$F_CASE/elsewhere.env" "$F_CASE/etc/global.env"
-  "$F_CASE/libexec/restore-update-backup" restore-latest > "$F_CASE/restore.out" 2>&1
-  check "$CASE_ID.restore" 'the executables are still restored' grep -q '^RESTORE_SUCCESS' "$F_CASE/restore.out"
+  "$F_CASE/libexec/restore-update-backup" restore-latest > "$F_CASE/restore.out" 2>&1; rc=$?
+  # v0.2.23 (P1-G-01): executables restored, metadata not -> partial, never success.
+  check "$CASE_ID.restore" 'the executables are still restored' f_copies_are "$F_OLD_HASH"
+  check "$CASE_ID.partial" "reported as RESTORE_PARTIAL with status 3 (rc=$rc)" \
+    eval "grep -q '^RESTORE_PARTIAL .* metadata=stale' '$F_CASE/restore.out' && ! grep -q '^RESTORE_SUCCESS' '$F_CASE/restore.out' && test $rc -eq 3"
   check "$CASE_ID.not-followed" 'a symlinked global.env is not written through' grep -qx 'MANAGER_VERSION=9.9.9' "$F_CASE/elsewhere.env"
   check "$CASE_ID.link-kept" 'and the link itself is left alone' test -L "$F_CASE/etc/global.env"
   case_end

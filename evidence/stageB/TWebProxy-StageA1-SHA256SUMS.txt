@@ -1,0 +1,2 @@
+45f1fb7f83c02be0293d81fe0bd472e55c5c4d7a454eed47ce9566cd5c118d29  TWebProxy-Manager-v0.2.11-dpi-beta-stageA1.zip
+100c5cd2d1945ebce449c4d12297ae202d3da7f770ad0e0cf939917eb167e49d  TWebProxy-StageA1-Correction-Report.md

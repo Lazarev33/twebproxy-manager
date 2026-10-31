@@ -1,0 +1,5 @@
+S1-repair-mount-fail	RED	rc=1 readable=4
+S2-restart-mount-fail	RED	rc=0 readable=4
+S3-repair-stacked	RED	rc=0 readable=4
+S4-systemd-start-unprotected	RED	unit_restart_rc=0 b1=active/pid1437223 fw_restart_rc=0 readers_after_fw=12/12 active_after_fw=2 audit_procfs_error=1 untouched_backend_readers_before=12/12
+S5-explicit-opt-out	GREEN	disable_rc=0 start=active journal_warning=0 audit_warning=1 policy=off enable_rc=0

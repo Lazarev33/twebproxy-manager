@@ -1,0 +1,4 @@
+name	rc	last_line
+relay-lifecycle-on-v0.2.16	1	c2-relay-lifecycle: pass=65 fail=35
+relay-lifecycle-on-mutant-no-final-verify	1	c2-relay-lifecycle: pass=95 fail=5
+relay-lifecycle-on-mutant-no-interrupt-trap	1	c2-relay-lifecycle: pass=97 fail=3

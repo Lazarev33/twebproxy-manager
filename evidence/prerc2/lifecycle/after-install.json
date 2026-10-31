@@ -1,0 +1,34 @@
+{
+ "paths_exist": {
+  "/etc/twebproxy": true,
+  "/usr/local/libexec/twebproxy/firewall-guard": true,
+  "/usr/local/libexec/twebproxy/apply-firewall": true,
+  "/usr/local/libexec/twebproxy/backend-start-check": true,
+  "/usr/local/bin/tproxy-server": true,
+  "/etc/systemd/system/nftables.service.d/twebproxy-reassert.conf": true,
+  "/etc/systemd/system/twebproxy-mtproxy@.service": true
+ },
+ "unitfiles": [
+  "twebproxy-firewall.service",
+  "twebproxy-mtproxy@.service",
+  "twebproxy-refresh-mtproxy.service",
+  "twebproxy-refresh-mtproxy.timer",
+  "twebproxy@.service"
+ ],
+ "wants_links": 2,
+ "dangling_links": 0,
+ "loaded_units": [
+  "twebproxy-firewall.service",
+  "twebproxy-refresh-mtproxy.service",
+  "twebproxy-refresh-mtproxy.timer"
+ ],
+ "nft_tables": [
+  "twebproxy_guard",
+  "twebproxy_backend"
+ ],
+ "mtproxy_pids": 0,
+ "proc_options_top": [
+  "rw,nosuid,nodev,noexec,relatime,gid=985,hidepid=invisible"
+ ],
+ "caddy_active": "active"
+}

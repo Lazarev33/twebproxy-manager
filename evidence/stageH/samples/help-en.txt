@@ -1,0 +1,48 @@
+TWebProxy Manager v0.2.22-beta
+
+Usage: twebproxy [--json|--raw] [--no-color] [command] [args]
+
+Quick start: run "sudo twebproxy" and choose Quick setup, or "sudo twebproxy add".
+Then "twebproxy show HOSTNAME" prints the Telegram links and connection help,
+and "twebproxy status HOSTNAME" the state. Guide: docs/SETUP.md
+
+Manager / Core:
+  check-update                 check for a new Manager version
+  manager-update [--force] [--sha256 HEX]
+                               verified release, backup, health gate and exact rollback
+  manager-backup-list          list verified local update backups
+  manager-rollback [latest|id] restore both Manager copies from a local backup
+  core-install                 install dependencies, relay and MTProxy
+  update                       update tproxy-server with config-check and rollback
+  core-uninstall               remove the core when no instances exist
+
+Instances:
+  overview                     read-only overview; supports --json/--raw
+  add | list | show [hostname] | manual-snippet [hostname]
+  restart [hostname] | repair [hostname] | delete [hostname]
+  status [hostname] [--verbose]  compact status; verbose keeps detailed evidence
+  stats [hostname] [--verbose]   compact trusted sources; verbose keeps raw live data
+  cert-status [hostname]
+  cert-renew [hostname] [--dry-run|--force]
+  audit [hostname] | diagnose [hostname]
+
+Optional network compatibility (IPv4; STOCK remains default):
+  dpi status [hostname] | dpi list-methods
+  dpi set HOST MODE [--accept-shared-scope] | dpi disable HOST
+
+Profiles:
+  profile-list | profile-add | profile-show | profile-rotate
+  profile-carrier | profile-delete
+
+Logs:
+  logs | logs-tail [lines] | logs-collect [--full]
+  logs-pack [--full] | report
+  field-report HOST [--instant] [--keep-pcap]
+                               one-shot field diagnostics archive
+
+Interactive:
+  menu                         bilingual task-oriented interface
+
+Output options may precede or follow the command. --json and --raw are mutually
+exclusive, non-interactive and intentionally use stable, non-localized fields.
+Telegram WEB Proxy always uses public HTTPS port 443.

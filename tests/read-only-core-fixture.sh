@@ -59,6 +59,16 @@ EOF
 # Fixture adapters: the read-only core sees the same facts it would obtain from
 # systemd, ss, nftables, local HTTP endpoints and TLS helpers on a healthy host.
 need_root() { :; }
+# v0.2.23: the owned guard and the procfs policy are real-host behaviour
+# (tests/prerc); here the guard mirrors the modelled backend state and procfs
+# is modelled as hardened, so the fixture never depends on the host's /proc.
+fw_guard_live() { BF_BACKENDS="$BACKENDS_DIR" backend_fw_collect; }
+proc_hardening_state() { printf hidden; }
+proc_hidepid_value() { printf invisible; }
+# v0.2.24: the backend socket filter (PID 1 cgroup filter) and the DC egress
+# allowlist are real-host behaviour (tests/prerc2); modelled as enforced here.
+backend_socket_filter_check() { printf enforced; }
+dc_addresses_outside_allowlist() { :; }
 need_systemd() { :; }
 
 systemctl() {

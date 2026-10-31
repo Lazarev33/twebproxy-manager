@@ -81,3 +81,28 @@ lab_gate_allows() {
   printf '%s' "$reason"
   return 1
 }
+
+# v0.2.23 pre-RC harnesses (tests/prerc) need the opposite of a clean lab: an
+# INSTALLED TWebProxy on a host the owner marked disposable. They run only with
+# TWEBPROXY_PRERC_REAL=installed-test-host, as root, with the same machine-bound
+# lab marker and an installed instance directory; otherwise NOT_EXECUTED (77).
+installed_host_gate_check() { # $1 = filesystem root ("" for the real host)
+  local root="$1" id
+  [[ "${TWEBPROXY_PRERC_REAL:-}" == installed-test-host ]] ||
+    { printf 'TWEBPROXY_PRERC_REAL=installed-test-host is not set'; return 1; }
+  [[ -f "$root$LAB_GATE_MARKER" && ! -L "$root$LAB_GATE_MARKER" && "$(stat -c '%u' -- "$root$LAB_GATE_MARKER" 2>/dev/null)" == 0 ]] ||
+    { printf 'lab marker %s missing or not root-owned' "$LAB_GATE_MARKER"; return 1; }
+  id="$(head -n1 -- "$root/etc/machine-id" 2>/dev/null)" || id=""
+  [[ "$id" =~ ^[0-9a-f]{32}$ && "$(head -n1 -- "$root$LAB_GATE_MARKER")" == "$id" ]] ||
+    { printf 'lab marker does not contain this host machine-id'; return 1; }
+  [[ -d "$root/etc/twebproxy/instances" ]] || { printf 'no installed TWebProxy instance directory'; return 1; }
+  [[ "${EUID:-$(id -u)}" == 0 ]] || { printf 'needs root'; return 1; }
+}
+
+installed_host_gate_or_exit() { # $1 = test name
+  local reason
+  if ! reason="$(installed_host_gate_check "")"; then
+    printf 'NOT_EXECUTED_ENVIRONMENT_LIMITATION %s: %s\n' "$1" "$reason"; exit 77
+  fi
+  printf 'INSTALLED_HOST_GATE: authorized disposable installed test host for %s\n' "$1"
+}

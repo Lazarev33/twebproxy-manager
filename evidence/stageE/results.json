@@ -1,0 +1,259 @@
+{
+ "stage": "E",
+ "version": "0.2.19-beta",
+ "verdict": "STAGE E DEVELOPMENT_COMPLETE / NEXT: F (updater / supply chain), pending independent review and the separate production RC lab gates",
+ "baseline": {
+  "commit": "d3bf510828f65a350d235642236a43791b705607",
+  "tree": "a765b88223718021296e6730deeb947ea595916c",
+  "manager_sha256": "3d4416d5e5c1e8b0af6b72bbbae074f4cb00343dcbc0ef4684becd1cba2a0122",
+  "input_zip_sha256": "02ad7511dfefa596e7b6655072aad618c37153db85071650aa54ffb296d9625f"
+ },
+ "github_publication": {
+  "status": "NOT_EXECUTED (blocked)",
+  "detail": "repository reachable read-only; no GitHub credentials in the environment; push dry-run failed with 'could not read Username'; nothing pushed; README/ROADMAP taken from main afa45d9"
+ },
+ "result_protocol": "0=PASS 1=FAIL 77=NOT_EXECUTED; NOT_EXECUTED is never counted as PASS",
+ "environment": "production host: model/static tests only; sentinel stubs (incl. nft/ip/systemctl/journalctl/hostnamectl/tcpdump/apt) first in PATH; DPI_NFT_BIN rebound to a model; 0 sentinel calls; host canary unchanged",
+ "summary": {
+  "PASS": 30,
+  "FAIL": 0,
+  "NOT_EXECUTED": 2
+ },
+ "red": {
+  "operations-on-v0.2.18": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=14 fail=34"
+  },
+  "operations-on-mutant-select-no-propagation": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=47 fail=1"
+  },
+  "operations-on-mutant-unbounded-probes": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=42 fail=6"
+  },
+  "operations-on-mutant-no-incomplete-verdict": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=46 fail=2"
+  },
+  "operations-on-mutant-no-reredaction": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=45 fail=3"
+  },
+  "operations-on-mutant-eof-answers-default": {
+   "exit_status": 1,
+   "last_line": "e-operations: pass=46 fail=2"
+  }
+ },
+ "red_notes": [
+  "operations fixture on v0.2.18: 34 of 48 checks FAIL (the 14 passing are guards).",
+  "P0 (secret exposure, conditional): the safe log bundle copied manager logs verbatim; a historic log holding a WEB/MTProxy secret, a PEM private key block or URL credentials (seeded in the fixture as an older version or another process could have written it) reached the shareable archive unredacted. Also P1: EOF at a default-yes prompt answered yes (with stdin closed, 'rotate' generated and applied a new secret).",
+  "P1 reproduced: choose/menu/select/language prompts loop forever on EOF (TUI spin, delete/add wizards hang); '010' selected option 8 (octal); EOF in ask returned the default; status/overview/audit/diagnose/snapshot hang on a stalled relay endpoint, systemd, nft, journalctl, dig or hostnamectl; systemd/nft unavailability reported as 'not active'/'missing' (ERROR); missing public certificate reported as local/public MISMATCH; unparseable certificate reported as expired; an audit with unverified checks printed PASS; dashboard showed a host without profiles as OK; logs-pack aborted on an unreadable log and left its staging directory (also when interrupted); snapshot collected all routing tables.",
+  "Mutants of the Stage E manager: selection without failure propagation -> 1 FAIL; unbounded probes -> 6 FAIL; no INCOMPLETE verdict -> 2 FAIL; no re-redaction -> 3 FAIL; EOF answering the default -> 2 FAIL."
+ ],
+ "green": [
+  {
+   "name": "git-diff-check",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "git diff --check d3bf510 (excluding captured evidence): clean"
+  },
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "e-operations",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "e-operations: pass=48 fail=0"
+  },
+  {
+   "name": "suite-stage-e",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-e-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "e-scope-vs-v0218",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS e-scope unchanged=358 modified=34 added=8"
+  },
+  {
+   "name": "d-frontend-tls",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "d-frontend-tls: pass=122 fail=0"
+  },
+  {
+   "name": "suite-stage-d",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-d-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c2",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c2-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "audit-c11-cross-instance-orphan",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS"
+  },
+  {
+   "name": "audit-c11-backend-id-collision",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS: existing B/x backend env preserved"
+  },
+  {
+   "name": "audit-c1-failed-backend-stop",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "FW collection ports=[23980,23981,28980,28981]"
+  },
+  {
+   "name": "audit-c1-orphan-backend",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "API profiles=[alpha]"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 382 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 382 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "tui-presentation",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tui-presentation-fixture: PASS"
+  },
+  {
+   "name": "stage-x-fixui",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set"
+  }
+ ],
+ "contracts": "--json/--raw schema twebproxy.output.v1 and healthy check sets unchanged (read-only-core fixture); status always exits 0 and audit exits 1 only on ERROR, as before",
+ "not_executed_gates": [
+  "Real systemd/D-Bus stalls and timeouts against the bounded probes (timeout --foreground semantics).",
+  "Real TTY behaviour: Ctrl-D at each prompt type, Ctrl-C during prompts and during bounded probes.",
+  "journald on large journals; real nftables/ss output shapes; real tcpdump field captures.",
+  "Report bundles on a real installation with long-lived historic logs.",
+  "GitHub publication of stage-d/v0.2.18 and stage-e/v0.2.19 (no write credentials).",
+  "Stage A/B lab-only cases (exit 77), unchanged."
+ ]
+}

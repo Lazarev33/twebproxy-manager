@@ -1,0 +1,12 @@
+audit-pre-1	rc=0	3s
+audit-pre-2	rc=0	3s
+delete-1	rc=0	5s
+delete-2	rc=0	5s
+core-uninstall	rc=0	4s
+core-install	rc=0	55s
+restore-repair-1	rc=0	14s
+restore-repair-2	rc=0	17s
+audit-final-1	rc=0	4s
+https-1	200 0
+audit-final-2	rc=0	4s
+https-2	200 0

@@ -1,0 +1,212 @@
+{
+ "version": "0.2.13-beta",
+ "baseline": "v0.2.12-beta manager 805a574911a1448c8e07d22c7466636e3e8eee63b8329b3799547cd4b61a53b6",
+ "environment": "PRODUCTION host: model/static only; sentinel nft/unshare/mount/systemctl/ss/journalctl/ps first in PATH; 0 sentinel calls",
+ "safe_tests": [
+  {
+   "name": "bash-n-manager",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": ""
+  },
+  {
+   "name": "F1-libexec-permissions",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stageb-libexec-permissions: pass=30 fail=0 not_executed=0"
+  },
+  {
+   "name": "R3-apply-ambiguity",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stageb-apply-ambiguity: pass=28 fail=0"
+  },
+  {
+   "name": "R1-firewall-unit",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stageb-firewall-unit: pass=16 fail=0"
+  },
+  {
+   "name": "R5-lab-gate",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "lab-gate: pass=49 fail=0"
+  },
+  {
+   "name": "stageb-transaction",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stageb-model: pass=47 fail=0"
+  },
+  {
+   "name": "stageb-json-verifier",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS backend-json-empty-chain"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "INCOMPLETE_NOT_EXECUTED_PARTS",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "INCOMPLETE_NOT_EXECUTED_PARTS",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "b1-scope-vs-v0212",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS b1-scope unchanged=327 modified=4 added=1"
+  },
+  {
+   "name": "stageb-scope-vs-A1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS scope unchanged=317 modified=3 added=12"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set"
+  }
+ ],
+ "red_before_fix": {
+  "F1-libexec-permissions": "rc=1, 11 FAIL (mode 755->700, unprivileged exec denied, symlink target chmodded)",
+  "R3-apply-ambiguity": "rc=1, 10 FAIL (no truthful classification; committed rules not converged)",
+  "R1-firewall-unit": "rc=1, 1 FAIL (no ReloadPropagatedFrom)",
+  "R5-lab-gate": "rc=1, 15 FAIL (no gate in 6 scripts; fieldgate runner without 0/1/77 protocol)",
+  "R5-dynamic-baseline": "default runs invoked: unshare --net true (2 scripts), mount -t tmpfs in host ns (SA3), 12x real nft -c -f (tg1); tg3 not executed (TG3_INNER would overwrite host /usr/local/sbin/twebproxy)",
+  "protocol-meta": "old protocol counted NOT_EXECUTED_ENVIRONMENT_LIMITATION + exit 0 as PASS"
+ },
+ "not_executed_lab": [
+  {
+   "name": "tests/stageb/real-nft-validation.sh",
+   "result": "NOT_EXECUTED",
+   "why": "production host; disposable VM not provided"
+  },
+  {
+   "name": "tests/stageb/real-systemd-validation.sh",
+   "result": "NOT_EXECUTED",
+   "why": "production host"
+  },
+  {
+   "name": "tests/stagea/sa1-real-nft-validation.sh",
+   "result": "NOT_EXECUTED",
+   "why": "production host"
+  },
+  {
+   "name": "tests/stagea/sa3-state-publication.sh (genuine ENOSPC section)",
+   "result": "NOT_EXECUTED",
+   "why": "production host"
+  },
+  {
+   "name": "tests/fieldgate/tg1-real-nft-six-mode-gate.sh",
+   "result": "NOT_EXECUTED",
+   "why": "production host"
+  },
+  {
+   "name": "tests/fieldgate/tg3-installed-manager-lifecycle.sh",
+   "result": "NOT_EXECUTED",
+   "why": "production host"
+  },
+  {
+   "name": "F1 under real systemd (User=mtproxy start)",
+   "result": "NOT_EXECUTED",
+   "why": "needs VM"
+  },
+  {
+   "name": "R1 ReloadPropagatedFrom behaviour",
+   "result": "NOT_EXECUTED",
+   "why": "needs VM"
+  },
+  {
+   "name": "R2 dependency propagation measurement",
+   "result": "NOT_EXECUTED",
+   "why": "needs VM"
+  }
+ ],
+ "not_run_on_this_host": [
+  {
+   "name": "tests/fieldgate/fd1-field-report.sh",
+   "why": "field-report collectors may read live process/socket lists with secrets; code unchanged (scope identity)"
+  },
+  {
+   "name": "Stage 4 / X-DPI / FixUI / localization suites",
+   "why": "code unchanged (327 functions byte-identical); not needed for B.1 and not separately reviewed for host safety"
+  }
+ ],
+ "findings": {
+  "F1": "CONFIRMED (model + unprivileged execution) -> FIXED",
+  "R1": "CONFIRMED_STATIC (nftables deb unit/conffile; systemd 249/252/255 atoms) -> FIXED in unit, behaviour NEEDS_VM",
+  "R2": "CONFIRMED_STATIC (RequiredBy PROPAGATE_STOP/RESTART, recursive try-restart; nftables postinst try-restart) -> fail-closed; no topology change in B.1; NEEDS_VM; backlog",
+  "R3": "REPRODUCED_MODEL (no false success, but ambiguous state and no truthful message) -> FIXED narrowly",
+  "R5": "CONFIRMED (dynamic, sentinel) -> FIXED; plus tg1/tg3/fieldgate runner and NOT_EXECUTED_ENVIRONMENT_LIMITATION false-PASS",
+  "df3-modes": "FALSE_POSITIVE of environment: exec bits lost in handoff ZIP/extraction; restored from Stage B ZIP"
+ }
+}

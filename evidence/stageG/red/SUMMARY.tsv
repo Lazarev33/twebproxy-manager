@@ -1,0 +1,15 @@
+name	rc	seconds	last_line
+process-fixture-on-v0.2.20	1	373	process-fixture: 37 pass, 10 fail
+real-process-oracle-on-v0.2.20	1	74	real-process-oracle: 12 pass, 6 fail
+acme-webroot-on-v0.2.20	1	3	acme-webroot-fixture: pass=9 fail=3
+input-validation-on-v0.2.20	1	8	input-validation-fixture: pass=20 fail=21
+mutant-probe-through-pipe-process	1	81	process-fixture: 4 pass, 1 fail
+mutant-probe-through-pipe-oracle	1	44	real-process-oracle: 3 pass, 3 fail
+mutant-no-probe-group-kill	1	37	process-fixture: 18 pass, 3 fail
+mutant-curl-inherits-lock-process	1	6	process-fixture: 5 pass, 2 fail
+mutant-curl-inherits-lock-oracle	1	9	real-process-oracle: 4 pass, 3 fail
+mutant-release-query-holds-lock	1	5	process-fixture: 0 pass, 2 fail
+mutant-health-helper-holds-lock	1	8	process-fixture: 2 pass, 1 fail
+mutant-no-metadata-sync	1	3	process-fixture: 8 pass, 1 fail
+mutant-acme-no-traversal	1	4	acme-webroot-fixture: pass=9 fail=3
+mutant-no-hostname-validation	1	8	input-validation-fixture: pass=20 fail=21

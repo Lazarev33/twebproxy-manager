@@ -1,0 +1,66 @@
+<   local host="$1" cf="${2:-/etc/caddy/Caddyfile}" tmp
+>   local host="$1" cf="${2:-<CADDYFILE>}" tmp
+<   local host="$1" relay="$2" cf=/etc/caddy/Caddyfile family candidate block backup
+>   local host="$1" relay="$2" cf=<CADDYFILE> family candidate block backup
+<   install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
+<   cat > /etc/nginx/conf.d/twebproxy-map.conf <<'EOF'
+>   install -d -m 0755 <NGINX_DIR>/sites-available <NGINX_DIR>/sites-enabled
+>   cat > <NGINX_DIR>/conf.d/twebproxy-map.conf <<'EOF'
+<   local host="$1" own="/etc/nginx/sites-available/twebproxy-$host.conf"
+<   if grep -RqsE "server_name[[:space:]]+${host//./\\.}([[:space:];]|$)" /etc/nginx 2>/dev/null; then
+>   local host="$1" own="<NGINX_DIR>/sites-available/twebproxy-$host.conf"
+>   if grep -RqsE "server_name[[:space:]]+${host//./\\.}([[:space:];]|$)" <NGINX_DIR> 2>/dev/null; then
+<   local host="$1" relay="$2" cert="$3" key="$4" f="/etc/nginx/sites-available/twebproxy-$host.conf"
+>   local host="$1" relay="$2" cert="$3" key="$4" f="<NGINX_DIR>/sites-available/twebproxy-$host.conf"
+<     location /.well-known/acme-challenge/ { root /var/lib/twebproxy/acme; }
+>     location /.well-known/acme-challenge/ { root <ACME_WEBROOT>; }
+<   ln -sfn "$f" "/etc/nginx/sites-enabled/twebproxy-$host.conf"
+>   ln -sfn "$f" "<NGINX_DIR>/sites-enabled/twebproxy-$host.conf"
+<   install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+<   cat > /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload <<'EOF'
+>   install -d -m 0755 <LE_DIR>/renewal-hooks/deploy
+>   cat > <LE_DIR>/renewal-hooks/deploy/twebproxy-nginx-reload <<'EOF'
+<   chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload
+>   chmod 0755 <LE_DIR>/renewal-hooks/deploy/twebproxy-nginx-reload
+<   install -d -m 0755 /var/lib/twebproxy/acme
+<   local f="/etc/nginx/sites-available/twebproxy-$host.conf"
+>   install -d -m 0755 <ACME_WEBROOT>
+>   local f="<NGINX_DIR>/sites-available/twebproxy-$host.conf"
+<     location /.well-known/acme-challenge/ { root /var/lib/twebproxy/acme; }
+>     location /.well-known/acme-challenge/ { root <ACME_WEBROOT>; }
+<   ln -sfn "$f" "/etc/nginx/sites-enabled/twebproxy-$host.conf"
+>   ln -sfn "$f" "<NGINX_DIR>/sites-enabled/twebproxy-$host.conf"
+<   certbot certonly --webroot -w /var/lib/twebproxy/acme --cert-name "$host" -d "$host" --non-interactive --agree-tos --email "$email" --keep-until-expiring
+>   certbot certonly --webroot -w <ACME_WEBROOT> --cert-name "$host" -d "$host" --non-interactive --agree-tos --email "$email" --keep-until-expiring
+<   write_nginx_tls_conf "$host" "$relay" "/etc/letsencrypt/live/$host/fullchain.pem" "/etc/letsencrypt/live/$host/privkey.pem"
+>   write_nginx_tls_conf "$host" "$relay" "<LE_DIR>/live/$host/fullchain.pem" "<LE_DIR>/live/$host/privkey.pem"
+<       [[ -f /etc/caddy/Caddyfile ]] || return 0
+>       [[ -f <CADDYFILE> ]] || return 0
+<       backup="/etc/caddy/Caddyfile.before-twebproxy-remove.$(date +%Y%m%d%H%M%S)"
+>       backup="<CADDYFILE>.before-twebproxy-remove.$(date +%Y%m%d%H%M%S)"
+<       cp -a /etc/caddy/Caddyfile "$backup"
+<       cp -a /etc/caddy/Caddyfile "$candidate"
+>       cp -a <CADDYFILE> "$backup"
+>       cp -a <CADDYFILE> "$candidate"
+<         cat "$candidate" > /etc/caddy/Caddyfile
+>         cat "$candidate" > <CADDYFILE>
+<           cat "$backup" > /etc/caddy/Caddyfile
+>           cat "$backup" > <CADDYFILE>
+<       rm -f "/etc/nginx/sites-enabled/twebproxy-$host.conf" "/etc/nginx/sites-available/twebproxy-$host.conf"
+>       rm -f "<NGINX_DIR>/sites-enabled/twebproxy-$host.conf" "<NGINX_DIR>/sites-available/twebproxy-$host.conf"
+<       local_cert="/etc/letsencrypt/live/$host/fullchain.pem"
+>       local_cert="<LE_DIR>/live/$host/fullchain.pem"
+<       cert_local="/etc/letsencrypt/live/$host/fullchain.pem"
+>       cert_local="<LE_DIR>/live/$host/fullchain.pem"
+<   rm -f /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload
+>   rm -f <LE_DIR>/renewal-hooks/deploy/twebproxy-nginx-reload
+<         if [[ -f /etc/caddy/Caddyfile ]]; then
+>         if [[ -f <CADDYFILE> ]]; then
+<           ' /etc/caddy/Caddyfile || true
+>           ' <CADDYFILE> || true
+<         [[ -f "/etc/nginx/sites-enabled/twebproxy-$host.conf" ]] && { echo "### /etc/nginx/sites-enabled/twebproxy-$host.conf"; cat "/etc/nginx/sites-enabled/twebproxy-$host.conf"; } || true
+<         [[ -f "/etc/nginx/sites-available/twebproxy-$host.conf" ]] && { echo "### /etc/nginx/sites-available/twebproxy-$host.conf"; cat "/etc/nginx/sites-available/twebproxy-$host.conf"; } || true
+>         [[ -f "<NGINX_DIR>/sites-enabled/twebproxy-$host.conf" ]] && { echo "### <NGINX_DIR>/sites-enabled/twebproxy-$host.conf"; cat "<NGINX_DIR>/sites-enabled/twebproxy-$host.conf"; } || true
+>         [[ -f "<NGINX_DIR>/sites-available/twebproxy-$host.conf" ]] && { echo "### <NGINX_DIR>/sites-available/twebproxy-$host.conf"; cat "<NGINX_DIR>/sites-available/twebproxy-$host.conf"; } || true
+<         command -v caddy >/dev/null 2>&1 && [[ -f /etc/caddy/Caddyfile ]] && { echo "### caddy validate"; caddy validate --config /etc/caddy/Caddyfile 2>&1 || true; } || true
+>         command -v caddy >/dev/null 2>&1 && [[ -f <CADDYFILE> ]] && { echo "### caddy validate"; caddy validate --config <CADDYFILE> 2>&1 || true; } || true

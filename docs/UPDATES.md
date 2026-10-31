@@ -148,10 +148,12 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
   `restore <id>`). It needs no network and does not use the installed manager.
   It also sets `MANAGER_VERSION` in `global.env` to the restored version (only
   that line; a symlinked or unsafe `global.env` is left alone and reported).
-  Known pre-RC limitation (P1-G-01): `RESTORE_SUCCESS` and exit status 0 prove
-  the restored executables, not that this metadata update worked. If it could
-  not be written (for example an immutable `global.env`), the helper says so on
-  stderr; run `twebproxy repair` to rewrite the metadata.
+  Outcomes (v0.2.23): `RESTORE_SUCCESS` (status 0) only when the executables
+  and the metadata agree; `RESTORE_PARTIAL … metadata=stale` (status 3) when the
+  executables were restored but `global.env` could not be written (for example
+  immutable or read-only) - make it writable and run `twebproxy repair`.
+  `twebproxy manager-rollback` prints `ROLLBACK_NOT_PERFORMED reason=declined`
+  (status 1) or `reason=eof` (status 130) when nothing was restored.
   The next `manager-update` then works again; it removes the stale staging and
   temp files itself.
 - A busy lock after a crash cannot happen (flock); a lock file with a wrong

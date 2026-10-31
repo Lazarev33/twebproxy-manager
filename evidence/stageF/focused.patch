@@ -1,0 +1,2593 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 39f4446..247c6cb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,58 @@
+ # Changelog
+ 
++## 0.2.20-beta — 2026-10-28 — Stage F: обновление менеджера и supply chain
++
++- Источник обновлений:
++  - кандидат — только последний опубликованный стабильный GitHub Release (не
++    draft, не prerelease, тег `vX.Y.Z` этого репозитория); ветки разработки
++    (`main`, `stage-*`), их `VERSION` и `SHA256SUMS` больше не являются
++    источником — ни для `manager-update`, ни для `check-update` и подсказки
++    в меню (раньше `manager-update --force` ставил код из `main`, сейчас это
++    откат до 0.2.9, а более новый `VERSION` в `main` предлагался всем как
++    обновление);
++  - подлинность: манифест релиза, подписанный Ed25519-ключом, закреплённым в
++    менеджере, либо (пока ключ не закреплён) `--sha256` от оператора из
++    независимого источника. `SHA256SUMS` из того же источника подлинность не
++    подтверждает. Ключа подписи у проекта ещё нет, поэтому `manager-update`
++    без `--sha256` отказывает (`UPDATE_REFUSED reason=no-trust-anchor`);
++    требования к публикации релизов — `docs/UPDATES.md`;
++  - загрузки: только HTTPS, ограничение размера, без переадресаций (для
++    метаданных релиза — только на хосты ассетов GitHub); строгая проверка
++    ответа API и манифеста; скрипт загружается по подписанному commit;
++    проверяются SHA-256, размер, `bash -n`, ровно один `MANAGER_VERSION` и
++    `MANAGER_RELEASE_VERSION`, согласованные с релизом;
++  - кэш проверки обновлений разбирается как данные, а не исполняется.
++- Блокировка и очистка:
++  - ожидание блокировки ограничено (`TWEBPROXY_UPDATE_LOCK_WAIT`, 30 с);
++    блокировка освобождается при любом завершении (также в TUI) и не
++    наследуется процессами проверки работоспособности — оставленный
++    кандидатом процесс больше не блокирует следующие обновления;
++  - синхронизация копий менеджера в `add`/`repair`/`update` не выполняется во
++    время обновления или отката и заменяет копии атомарно;
++  - кандидат хранится в закрытом каталоге `/var/lib/twebproxy/update-staging`
++    и удаляется при любом исходе (раньше оставался в `/tmp`); остатки
++    прерванного обновления удаляются следующим запуском.
++- Установка и откат:
++  - от первой копии до проверенного результата SIGINT/SIGTERM/SIGHUP/SIGPIPE
++    игнорируются — прерывание больше не оставляет разные копии;
++  - проверки работоспособности ограничены по времени (SIGKILL через 5 с после
++    таймаута), без stdin;
++  - результат отката проверяется самим менеджером; новый итог
++    `UPDATE_FAILED_UNCHANGED`, если ничего не установлено; при неудачном
++    откате печатается команда офлайн-восстановления, старые резервные копии
++    не удаляются; при смешанном состоянии `manager-update` называет команду
++    `restore-update-backup restore-latest`;
++  - `MANAGER_VERSION` в `global.env` записывается атомарно (сбой записи больше
++    не стирает остальные значения);
++  - офлайн-помощник отката обновляется до версии работающего менеджера.
++- Формат резервных копий v1, `manager-rollback`, `manager-backup-list` и
++  офлайн-помощник совместимы. CLI: добавлен `manager-update --sha256 HEX`,
++  неизвестные параметры отклоняются. Затронуты только функции обновления
++  менеджера (бывший защищённый набор Stage 4, хэши — в отчёте Stage F) и
++  `install_manager_copy`; C1–E, firewall, DPI/nfqws, relay, frontend/TLS и
++  профили не изменены. Статус: F завершён по модельным тестам разработки;
++  следующий этап — G (Security Hardening).
++
+ ## 0.2.19-beta — 2026-10-28 — Stage E: эксплуатация и диагностика
+ 
+ - TUI и ввод:
+diff --git a/README.md b/README.md
+index 3f4e42f..e7543d1 100644
+--- a/README.md
++++ b/README.md
+@@ -7,22 +7,21 @@
+ 
+ ## Статус разработки
+ 
+-**Последний независимо принятый checkpoint: Stage D — v0.2.18-beta.**
+-В Stage D реализовано безопасное применение и восстановление конфигураций Caddy/Nginx
+-и обработка ошибок TLS/Let's Encrypt. Изолированные модельные проверки Stage D
+-приняты; обязательные испытания на отдельной Linux VM ещё впереди.
+-**Stage E — Operations & Diagnostics (v0.2.19-beta) реализован в отдельной
+-development-ветке и ожидает независимой проверки** (безопасное TUI, ограниченные
+-read-only диагностики, достоверные status/log/report). **Следующий этап — Stage F —
+-Updater & Supply Chain.**
++**Последний независимо принятый checkpoint: Stage E — v0.2.19-beta.**
++В Stage E исправлена обработка EOF в меню и подтверждениях, ограничено ожидание
++в read-only диагностике, добавлены достоверные UNKNOWN/INCOMPLETE статусы и
++повторное скрытие секретов при сборке безопасных журналов.
++**Stage F — Updater & Supply Chain (v0.2.20-beta): разработка завершена по
++модельным тестам, ожидает независимой проверки.** После принятия F следующий
++этап — **Stage G — Security Hardening**.
+ 
+ | Ветка / артефакт | Состояние |
+ | --- | --- |
+ | `main` | Опубликованный ранее исходный baseline `v0.2.9-dpi-beta` |
+ | C2 `v0.2.17-beta` | Development accepted; входит в историю Stage D |
+ | D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
+-| E `v0.2.19-beta` | Development complete (модели 48/48, регрессии C1–D зелёные); ожидает независимой проверки; ветка исходников не загружена в GitHub из среды разработки (нет прав на запись), передан единый ZIP с Git bundle |
+-| F | Следующий этап: Updater & Supply Chain |
++| E `v0.2.19-beta` | **Development accepted** (независимые 48/48 модельных проверок; цельный ZIP, Git bundle; исходники ещё не загружены в GitHub) |
++| F `v0.2.20-beta` | **Development complete** (модельные тесты; ожидает независимой проверки). `manager-update` ставит только опубликованный стабильный GitHub Release с подписанным манифестом (закреплённый Ed25519-ключ) или с `--sha256` из независимого источника; ключ ещё не создан, поэтому автообновление отключено (fail closed) — см. [docs/UPDATES.md](docs/UPDATES.md) |
+ 
+ **Внимание:** development accepted не означает production-ready. Для RC
+ по-прежнему нужны независимые испытания на disposable Linux VM, включая
+diff --git a/VERSION b/VERSION
+index 6bf5ecb..3bfb9a4 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.19
++0.2.20
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 32fae41..720086a 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -63,3 +63,11 @@ fetch -> go test -> build candidate -> config check all instances
+ ```
+ 
+ MTProxy is separately pinned; it is not silently advanced together with relay.
++
++Manager self-update (`manager-update`, [UPDATES.md](UPDATES.md)):
++
++```text
++lock -> staging -> helper/preflight -> latest stable release -> trust
++(signed manifest or operator SHA-256) -> download + verify -> verified backup
++-> install both copies -> bounded health -> success | unchanged | exact rollback
++```
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 65fcd17..e29f770 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -26,10 +26,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.16 Stage C1.2 | Development accepted (model gates) | Backend identity/ownership fixed; lab gates remain |
+ | v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
+ | v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
+-| v0.2.19 Stage E | **Development complete (model gates) — pending independent review** | Safe TUI EOF/default-no and decimal menu input, bounded read-only probes reporting UNKNOWN for unobservable state, truthful audit/dashboard, bounded redacted report bundles; real systemd/TTY/journald gates remain for RC; source branch not uploaded from the development environment (no GitHub write credentials) |
+-| Stage F | **NEXT** | Updater / supply chain |
++| v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
++| v0.2.20 Stage F | **Development complete (model gates), pending independent acceptance** | Stable-release-only update source, signed-manifest / operator-pinned SHA-256 trust (fails closed: no signing key exists yet, see `docs/UPDATES.md`), bounded and released update lock, interruption-safe install with verified rollback; source pending GitHub branch publication |
+ 
+-**Current development stage: E — operations / diagnostics, development complete and pending independent review.** Stage D is development-accepted as an isolated/model checkpoint, not a production release. Stage F — updater / supply-chain — is next after approval.
++**Current development stage: F — updater / supply chain (development complete, awaiting independent acceptance).** Stage E is independently development-accepted, not a production release. Stage G — security hardening — follows F.
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+@@ -45,15 +45,17 @@ All development checkpoints are **not authorized for production deployment**. Th
+ - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
+ - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
+ 
+-## Immediate work: Stage E — operations / diagnostics
++## Immediate work: Stage F — updater / supply chain
+ 
+-Stage D (`v0.2.18-beta`) is **DEVELOPMENT_ACCEPTED**, not production-ready. Independently repeated: Stage D model 122/122 PASS, C2 regression 100/100 PASS, Stage 4 protected hash unchanged, and source tree matches the bundled Git commit exactly. Real privileged/network checks are postponed to the isolated pre-RC lab.
++Stage E (`v0.2.19-beta`) is **DEVELOPMENT_ACCEPTED**. Independent verification: Stage E 48/48 PASS, project SHA-256 manifests and bundled Git tree matched, Stage 4 protected hash unchanged, and scope 358 unchanged / 34 modified / 8 added. Real TTY, systemd, nftables, TLS and related lab gates are still mandatory before RC.
+ 
+-Stage E implementation is **complete as a model checkpoint (`v0.2.19-beta`)** and awaits independent development review. Scope: safe TUI EOF/default-no handling, bounded non-destructive diagnostics, truthful status and error propagation, reliable logs/report output, retention and secret redaction. Confirm any issue with a focused fixture before changing behavior. Preserve all accepted C1–D invariants and do not revive the rejected generalized recovery architecture.
++Stage F (`v0.2.20-beta`) is **DEVELOPMENT_COMPLETE on model gates and awaits independent acceptance**. Automatic manager updates now fail closed until the project creates a release-signing key and publishes signed release manifests (`docs/UPDATES.md`). Scope: explicitly authorized modifications to the old Stage 4 *manager self-updater only*, update lock lifecycle/cleanup, trustworthy release provenance and artifact verification (signatures or secure pinned identities), reliable rollback to the preceding installed version with bounded post-update checks and truthful failure reporting. Keep operation-local backup → update → health → rollback; do not revive rejected Stage 3 advanced recovery. Do not rework relay updates or unrelated subsystem lifecycles.
+ 
+-Acceptance: relevant RED/GREEN regression fixtures, no known reproducible critical diagnostics/operations blocker, existing regressions green, coherent version+hashes, one complete ZIP, and independent development review. After approval proceed to Stage F; do not treat a development checkpoint as a production release.
++Stage F changes may alter the previously protected Stage 4 function hash, but MUST document the before/after hashes, the exact updater-function scope, and specific RED/GREEN and regressions. No production deployment, no unreviewed merge/release.
+ 
+-Current GitHub `main` still contains the older `v0.2.9` source baseline. Updating this roadmap and README does not publish Stage D source. The complete Stage D commit and Git bundle must be uploaded to a separate development branch before claiming source publication. The Stage D/E commits could not be pushed from the development environment (no GitHub write credentials); they are delivered as Git bundles inside the checkpoint ZIPs.
++Acceptance: tested self-update success/failure/rollback and lock release, independent model verification, no known reproducible critical blocker, versioned complete single ZIP and honest NOT_EXECUTED lab gates. After acceptance proceed to Stage G — hardening; do not treat a development checkpoint as production-ready.
++
++The GitHub `main` source still contains `v0.2.9`. The accepted Stage D/E source commits (`d3bf510`, `a3a2bf4`) are carried in the verified Stage E Git bundle and are **not yet published as source branches**. Updating README/ROADMAP does not publish source; publication must be verified separately.
+ 
+ ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
+ 
+diff --git a/docs/SECURITY.md b/docs/SECURITY.md
+index 67106a1..bdb416b 100644
+--- a/docs/SECURITY.md
++++ b/docs/SECURITY.md
+@@ -38,7 +38,7 @@ Managed Caddy/Nginx access logs are disabled for the WEB hostname. Do not add ra
+ For Manual mode, forward the complete hostname to `tproxy-server`; splitting special locations around the relay changes the public surface and is unsupported by this manager.
+ ## Manager self-update
+ 
+-`manager-update` downloads only over HTTPS from the configured GitHub repository, requires a SHA-256 entry from `SHA256SUMS`, validates Bash syntax and checks that the embedded manager version matches the remote release metadata before installation. The previous installed manager is retained as `/opt/twebproxy-manager/twebproxy-manager.previous.sh`.
++`manager-update` considers only the latest stable GitHub Release (never a development branch) and installs it only when its signed release manifest verifies against an Ed25519 key pinned in the manager, or, while no key is pinned, when the operator passes the expected SHA-256 from an independent channel (`--sha256`). A `SHA256SUMS` file from the same source is not authentication. No release-signing key exists yet, so this build pins none and automatic updates fail closed. Downloads are HTTPS-only, size-bounded, and redirects are refused except from GitHub release downloads to GitHub asset hosts; the artifact's SHA-256, Bash syntax and embedded version identity are checked before a verified backup is taken and before the candidate ever runs.
+ 
+-The checksum protects against transfer/caching corruption; it does not protect against compromise of the GitHub repository itself.
++Installation replaces both manager copies atomically under the update lock, with signals deferred until a verified outcome: success, unchanged, or rollback to the verified backup (also restorable offline with `/usr/local/libexec/twebproxy/restore-update-backup`). Policy, result lines and the release-publishing requirements: [UPDATES.md](UPDATES.md).
+ 
+diff --git a/docs/UPDATES.md b/docs/UPDATES.md
+new file mode 100644
+index 0000000..fbbd6e1
+--- /dev/null
++++ b/docs/UPDATES.md
+@@ -0,0 +1,159 @@
++# Manager self-update: trust policy and release publishing
++
++This describes `twebproxy check-update` / `twebproxy manager-update` from
++v0.2.20 (Stage F) on. The relay update (`twebproxy update`) is unrelated.
++
++## Policy
++
++- **Only a stable GitHub Release is an update candidate.** The manager asks
++  `GET https://api.github.com/repos/Lazarev33/twebproxy-manager/releases/latest`
++  (the newest published release that is neither a draft nor a prerelease) and
++  validates the answer: a tag of the form `vX.Y.Z`, `draft == false`,
++  `prerelease == false`, and `html_url` belonging to this repository. Redirects
++  are not followed. Development branches (`main`, `stage-*`), their `VERSION`
++  files and their `SHA256SUMS` are never update sources, also not for the
++  automatic hint or `check-update`.
++- **Authentication comes from one of two trust anchors:**
++  1. a **signed release manifest** that verifies against an Ed25519 public key
++     pinned in the manager source (`MANAGER_UPDATE_TRUSTED_KEYS`). As soon as at
++     least one key is pinned, a valid signature is mandatory;
++  2. while no key is pinned, an **operator-pinned SHA-256**:
++     `manager-update --sha256 <64 hex>`. The digest must come from an
++     independent channel (for example a reviewed source tree, a signed
++     announcement, or a check on a trusted machine). The output labels this
++     `trust=operator-sha256`; it is the operator's assertion.
++- A `SHA256SUMS` file downloaded from the same place as the script is integrity
++  information only. It is never accepted as authentication.
++- **This build pins no key.** The project has no release-signing key yet, and
++  Stage F deliberately does not invent one. `manager-update` without `--sha256`
++  therefore refuses before downloading anything:
++  `UPDATE_REFUSED reason=no-trust-anchor`. Automatic updates stay disabled until
++  the publishing requirements below are met.
++
++## What `manager-update` does
++
++1. Options: `--force` (also install a version that is not newer), `--sha256 HEX`.
++   Anything else: `UPDATE_REFUSED reason=usage`.
++2. Update lock `/run/lock/twebproxy-manager-update.lock` (flock). Another update,
++   offline rollback or manager-copy synchronisation is waited for at most
++   `TWEBPROXY_UPDATE_LOCK_WAIT` seconds (default 30), then the update is refused.
++   The kernel releases the lock with its holder; the lock file is never
++   deleted. The lock is released on every return (also inside the TUI) and is
++   never inherited by health probes, so a process left behind by a candidate
++   cannot block later updates.
++3. Private staging `/var/lib/twebproxy/update-staging` (root, 0700). Staging and
++   install temp files left by a killed update are removed here, under the lock.
++4. The offline restore helper is verified and refreshed to the running
++   manager's rendering (an unsafe or invalid helper is never replaced: the
++   update is refused).
++5. Preflight: both installed copies identical, root-owned 0755, healthy. A mixed
++   state (for example after a killed update) is refused with the recovery
++   command.
++6. Latest stable release, version comparison.
++7. Trust:
++   - signed: `twebproxy-manager-release.json` and `.sig` from
++     `https://github.com/Lazarev33/twebproxy-manager/releases/download/<tag>/`
++     (HTTP 200; at most 3 redirects, only to `objects.githubusercontent.com` or
++     `release-assets.githubusercontent.com`; 64 KiB / 4 KiB), Ed25519 signature
++     with a pinned key, strict manifest validation (below). The artifact is then
++     fetched by the signed **commit**:
++     `https://raw.githubusercontent.com/Lazarev33/twebproxy-manager/<commit>/twebproxy-manager.sh`;
++   - operator-pinned: the artifact is fetched by the release tag.
++8. Artifact: HTTPS, no redirect, at most 8 MiB; SHA-256 (and, signed, size) equal
++   to the trusted value; `bash -n`; exactly one `MANAGER_VERSION="X.Y.Z"` equal to
++   the release; exactly one `MANAGER_RELEASE_VERSION` equal to `X.Y.Z` or
++   `X.Y.Z-<label>` (signed: equal to the manifest's `release_version`). The
++   candidate has not run at this point.
++9. Verified pre-update backup (format `twebproxy.update-backup.v1`, unchanged).
++10. Both copies are installed (each by an atomic rename) and the bounded health
++    gate runs (`--help`, `--json overview`; 15/20 s, SIGKILL 5 s later, no stdin,
++    no lock descriptor). From the first copy until a verified outcome, SIGINT,
++    SIGTERM, SIGHUP and SIGPIPE are ignored, so an interruption cannot leave the
++    copies mixed. SIGKILL or power loss can; see Recovery.
++11. Result lines:
++
++| Line | Meaning |
++| --- | --- |
++| `UPDATE_SUCCESS backup_id=…` | both copies verified by SHA-256 and health gate |
++| `UPDATE_FAILED_UNCHANGED backup_id=…` | nothing was installed (copies verified unchanged) |
++| `UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=…` | previous manager restored, verified by the manager itself (not only the helper's status) |
++| `UPDATE_FAILED_ROLLBACK_FAILED backup_id=…` (stderr) | not verified; the offline recovery command is printed; older backups are not pruned |
++| `UPDATE_REFUSED reason=…` (stderr) | refused before any change: `usage`, `release`, `no-trust-anchor`, `download`, `signature`, `manifest`, `digest`, `identity` |
++
++After success, `MANAGER_VERSION` in `global.env` is updated atomically (a failed
++write leaves the old file intact and is reported; `repair` rewrites it), the
++update cache is removed and verified backups are pruned to 4.
++
++## Release-publishing requirements (owner)
++
++Automatic updates need all of the following. None of it exists yet.
++
++1. **Create an Ed25519 release-signing key offline** and keep the private key
++   off the repository and off servers:
++   `openssl genpkey -algorithm ed25519 -out twebproxy-release-signing.pem`.
++   Back it up securely.
++2. **Pin the public key** in the manager source through a reviewed commit:
++   `openssl pkey -in twebproxy-release-signing.pem -pubout -outform DER | base64 -w0`
++   becomes one entry of `MANAGER_UPDATE_TRUSTED_KEYS=( "…" )`. Installations
++   trust it only once they run a build that contains it, so that first build is
++   installed out of band (manually, or with `--sha256`).
++3. **For every stable release `X.Y.Z`:**
++   - set `VERSION` and `MANAGER_VERSION` to `X.Y.Z` and `MANAGER_RELEASE_VERSION`
++     to `X.Y.Z` or `X.Y.Z-<label>`; commit; note the 40-hex commit id `C`;
++   - tag `vX.Y.Z` at `C` and publish a GitHub Release from it, neither draft nor
++     prerelease; enable GitHub immutable releases if available, so tag and
++     assets cannot change afterwards;
++   - write `twebproxy-manager-release.json` with exactly these keys:
++     ```json
++     {"format":"twebproxy.manager-release.v1","repository":"Lazarev33/twebproxy-manager","channel":"stable","version":"X.Y.Z","release_version":"X.Y.Z-beta","tag":"vX.Y.Z","commit":"C","artifact":{"name":"twebproxy-manager.sh","size":12345,"sha256":"…"}}
++     ```
++     `size` and `sha256` are those of `twebproxy-manager.sh` at commit `C`;
++   - sign the exact file bytes:
++     `openssl pkeyutl -sign -inkey twebproxy-release-signing.pem -rawin -in twebproxy-manager-release.json -out sig.bin`
++     and `base64 -w0 sig.bin > twebproxy-manager-release.json.sig`;
++   - verify before uploading (`openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in twebproxy-manager-release.json -sigfile sig.bin`;
++     compare `sha256sum` / `stat -c %s` of the script fetched from
++     `raw.githubusercontent.com/…/C/twebproxy-manager.sh`);
++   - upload `twebproxy-manager-release.json` and
++     `twebproxy-manager-release.json.sig` as release assets with exactly these
++     names.
++4. **Development checkpoints stay separate:** stage branches are never published
++   as stable releases (a draft or prerelease is ignored by the updater) and
++   never get a signed stable manifest.
++5. **Rotation:** pin the new key in a release signed with the old key, and drop
++   the old key in a later release. A compromised key stays trusted by an
++   installation until it runs a release that no longer pins it.
++
++## Operator use
++
++```sh
++sudo twebproxy check-update                  # latest stable release and trust status
++sudo twebproxy manager-update                # signed release (once a key is pinned)
++sudo twebproxy manager-update --sha256 HEX   # while no key is pinned: independent digest
++sudo twebproxy manager-backup-list
++sudo twebproxy manager-rollback [latest|<id>]
++sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|restore <id>   # offline
++```
++
++## Recovery
++
++- `UPDATE_FAILED_ROLLBACK_FAILED`, or a killed update that left the two copies
++  different: run the offline helper,
++  `/usr/local/libexec/twebproxy/restore-update-backup restore-latest` (or
++  `restore <id>`). It needs no network and does not use the installed manager.
++  The next `manager-update` then works again; it removes the stale staging and
++  temp files itself.
++- A busy lock after a crash cannot happen (flock); a lock file with a wrong
++  owner or mode is refused and must be fixed by the administrator.
++
++## Limitations
++
++- No protection against freeze or replay of an older signed "latest" release
++  (no timestamp service); `--force` can deliberately reinstall an older signed
++  release.
++- The trust anchor is the installed manager build; the first build that pins a
++  key must be installed out of band.
++- A running TUI keeps executing the old in-memory code after a successful
++  update; restart `twebproxy`.
++- Model-tested only (`tests/stagef`); the real-host gates are reported as
++  NOT_EXECUTED in the Stage F report.
+diff --git a/tests/localization-flow-fixture.sh b/tests/localization-flow-fixture.sh
+index 6d88415..4ff1141 100755
+--- a/tests/localization-flow-fixture.sh
++++ b/tests/localization-flow-fixture.sh
+@@ -56,7 +56,8 @@ Caddy — автоматический сертификат	Caddy|automatic cert
+ MTProxy backend alpha/default не стал ready.	MTProxy backend|alpha/default|did not become ready
+ Инстанс alpha.example создан и прошёл isolation audit.	alpha.example|created|isolation audit
+ Профиль default добавлен.	Profile|default|added
+-Не удалось проверить обновление manager на https://example.test/releases	Failed|Manager update|https://example.test/releases
++Не удалось получить последний стабильный релиз TWebProxy Manager с https://example.test/releases: релиз не опубликован, ответ некорректен или сеть недоступна.	Could not obtain|latest stable TWebProxy Manager release|https://example.test/releases
++Откат не подтверждён. Восстанови TWebProxy Manager без сети: /usr/local/libexec/twebproxy/restore-update-backup restore update-20260825T120000Z-abcdef123456 (или restore-latest; список: /usr/local/libexec/twebproxy/restore-update-backup list).	Rollback was not confirmed|offline|/usr/local/libexec/twebproxy/restore-update-backup restore update-20260825T120000Z-abcdef123456|restore-latest
+ Установка или bounded health-check не завершились. Выполняю один exact rollback: update-20260825T120000Z-abcdef123456	bounded health check|exact rollback|update-20260825T120000Z-abcdef123456
+ Offline rollback helper отсутствует или небезопасен: /usr/local/libexec/twebproxy/restore-update-backup	offline rollback helper|unsafe|/usr/local/libexec/twebproxy/restore-update-backup
+ Сертификат не читается: /etc/ssl/example/fullchain.pem	Certificate|not readable|/etc/ssl/example/fullchain.pem
+diff --git a/tests/localization-static-audit.sh b/tests/localization-static-audit.sh
+index 2086d9d..ea65b37 100755
+--- a/tests/localization-static-audit.sh
++++ b/tests/localization-static-audit.sh
+@@ -69,6 +69,8 @@ while IFS= read -r sample; do
+ done < <({
+   sed -nE 's/.*\b(log|ok|warn|die|ask|yesno|choose)[[:space:]]+"([^"\\]*(\\.[^"\\]*)*)".*/\2/p' "$SCRIPT"
+   sed -nE "s/.*\\b(log|ok|warn|die|ask|yesno|choose)[[:space:]]+'([^']*)'.*/\\2/p" "$SCRIPT"
++  # Stage F: refusals print UPDATE_REFUSED and then go through die.
++  sed -nE 's/.*\bstage4_update_refuse[[:space:]]+[a-z-]+[[:space:]]+"([^"\\]*(\\.[^"\\]*)*)".*/\1/p' "$SCRIPT"
+ } | sort -u)
+ (( audited >= 200 )) || fail "too few presentation call-sites audited: $audited"
+ 
+diff --git a/tests/stage-x-dpi-installed-asset-fixture.sh b/tests/stage-x-dpi-installed-asset-fixture.sh
+index 795f40e..6aef639 100755
+--- a/tests/stage-x-dpi-installed-asset-fixture.sh
++++ b/tests/stage-x-dpi-installed-asset-fixture.sh
+@@ -61,6 +61,9 @@ LOG_MANAGER_DIR="$LOG_DIR/manager"
+ LOG_RUNTIME_DIR="$LOG_DIR/runtime"
+ LOG_BUNDLE_DIR="$LOG_DIR/bundles"
+ LOG_FULL_DIR="$LOG_DIR/full"
++# install_manager_copy takes the manager update lock (Stage F): keep it in the sandbox.
++install -d -m 0700 "$install_root/run/lock"
++UPDATE_LOCK_FILE="$install_root/run/lock/twebproxy-manager-update.lock"
+ install_manager_copy
+ 
+ assert installed_usr_local_manager test -x "$MANAGER_BIN"
+diff --git a/tests/stage4-update-backup-fixture.sh b/tests/stage4-update-backup-fixture.sh
+index bf6a01f..c7ac866 100755
+--- a/tests/stage4-update-backup-fixture.sh
++++ b/tests/stage4-update-backup-fixture.sh
+@@ -27,6 +27,7 @@ make_fake_manager() {
+ #!/usr/bin/env bash
+ set -Eeuo pipefail
+ MANAGER_VERSION="$version"
++MANAGER_RELEASE_VERSION="$version-beta"
+ [[ -z $(printf '%q' "$marker") ]] || : > $(printf '%q' "$marker")
+ if [[ "\${1:-}" == "--help" ]]; then
+   printf 'TWebProxy Manager v%s\\n' "\$MANAGER_VERSION"
+@@ -100,6 +101,8 @@ mock_update_network() {
+     else
+       cp -- "$CANDIDATE" "$out"
+     fi
++    # Stage F: the updater reads the transfer status line (-w).
++    for arg in "$@"; do [[ "$arg" != -w ]] || { printf '200 0 %s' "$url"; break; }; done
+   }
+   set_global_manager_version() { printf '%s\n' "$1" > "$CASE_DIR/global-version-written"; }
+ }
+@@ -107,7 +110,9 @@ mock_update_network() {
+ run_update_capture() {
+   local out_file="$1"
+   set +e
+-  ( manager_update_cmd --force ) > "$out_file" 2>&1
++  # Stage F trust policy: no release-signing key is pinned, so the update needs
++  # the operator-pinned SHA-256 of the candidate.
++  ( manager_update_cmd --force --sha256 "$(sha256sum "$CANDIDATE" | awk '{print $1}')" ) > "$out_file" 2>&1
+   UPDATE_RC=$?
+   set -e
+ }
+diff --git a/tests/stagef/README.md b/tests/stagef/README.md
+new file mode 100644
+index 0000000..c83c7c8
+--- /dev/null
++++ b/tests/stagef/README.md
+@@ -0,0 +1,34 @@
++# Stage F verification
++
++Manager self-update and supply chain: only a stable GitHub Release is a
++candidate (never a development branch); authenticity from a signed release
++manifest (pinned Ed25519 key) or an operator-pinned SHA-256, never from a
++same-source `SHA256SUMS`; strict release/manifest/artifact validation, refused
++redirects, interrupted and truncated downloads; a bounded update lock that is
++released on every return, never inherited by health probes and shared with the
++manager-copy synchronisation of add/repair/update; staging cleanup; signals
++deferred between the two installed copies; verified success, unchanged and
++rollback outcomes; offline recovery. Model tests only; no system state changes.
++
++```sh
++bash tests/stagef/run-stage-f-suite.sh              # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stagef/updater-fixture.sh [<manager>] [<case regex>]
++bash tests/stagef/f-scope-invariants.sh <v0.2.19 source tree>
++bash tests/stagef/updater-function-hashes.sh <manager>   # per-function SHA-256 (heredoc-aware)
++```
++
++`updater-harness.sh` runs each command against the unmodified manager in a
++separate `bash` with production `set -Eeuo pipefail` and its ERR trap; only paths
++are rebound into a temporary case directory. The real lock, staging, backup,
++install, health gate, rollback, offline helper, `flock`, `jq` and `openssl` run;
++installed managers and releases are small fake managers answering the health
++probes. A curl model serves a modeled GitHub (API, raw, release downloads and
++asset hosts) with redirect, partial/truncated-transfer and offline faults; `mv`
++and `install` layers inject a failed rename, a failed backup write and a barrier
++between the two copies. Release-signing keys are ephemeral Ed25519 keys created
++per run; they are never pinned in the shipped manager. Needs root (sandboxed
++`chown`/`flock`), otherwise exit 77.
++
++Not proven here: real GitHub (API answers, asset redirects, rate limits), a real
++signed release, SSH-session loss and power loss on a real host, real
++`/run/lock` and `/usr/local/sbin` — disposable-VM gates before an RC.
+diff --git a/tests/stagef/f-scope-invariants.sh b/tests/stagef/f-scope-invariants.sh
+new file mode 100755
+index 0000000..cd2d597
+--- /dev/null
++++ b/tests/stagef/f-scope-invariants.sh
+@@ -0,0 +1,143 @@
++#!/usr/bin/env bash
++# Stage F scope against the exact v0.2.19 (Stage E, a3a2bf4) tree. Only the
++# manager self-updater may change: eleven functions of the former Stage 4
++# protected set, install_manager_copy (update lock, atomic copy), the CLI
++# dispatch and help line of manager-update, and the localization adapter
++# (updater messages). The other 17 Stage 4 functions and every other function
++# are byte-identical. New top-level variables are the trust policy and the lock
++# wait; MANAGER_DEFAULT_BRANCH (the development-branch source) is gone.
++# README and ROADMAP carry the owner's newer text from GitHub main.
++# Usage: f-scope-invariants.sh <v0.2.19 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.19 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-f-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++STAGE4_MODIFIED=(stage4_render_restore_helper stage4_install_restore_helper stage4_prepare_backup_root
++  stage4_acquire_update_lock stage4_install_candidate_target load_manager_update_cache fetch_manager_update_info
++  manager_check_update_impl set_global_manager_version manager_update_cmd fetch_manager_update_hint_info)
++MODIFIED=("${STAGE4_MODIFIED[@]}" install_manager_copy main usage ui_localize_legacy)
++ADDED=(stage4_restore_helper_valid stage4_backup_parent_ready stage4_release_update_lock stage4_manager_copies_match
++  stage4_update_prepare stage4_update_end stage4_update_abort stage4_update_refuse
++  manager_release_tag_from_json manager_latest_release_tag manager_release_download
++  manager_release_signature_ok manager_release_manifest_fields manager_candidate_identity_ok)
++REMOVED=()
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS README.md docs/ROADMAP.md
++  docs/SECURITY.md docs/ARCHITECTURE.md
++  tests/stage4-update-backup-fixture.sh tests/stage-x-dpi-installed-asset-fixture.sh
++  tests/localization-static-audit.sh tests/localization-flow-fixture.sh)
++ADDED_FILES=(docs/UPDATES.md tests/stagef/README.md tests/stagef/updater-harness.sh
++  tests/stagef/updater-fixture.sh tests/stagef/run-stage-f-suite.sh tests/stagef/f-scope-invariants.sh
++  tests/stagef/updater-function-hashes.sh)
++NEW_VARS=(MANAGER_UPDATE_TRUSTED_KEYS MANAGER_RELEASE_MANIFEST MANAGER_RELEASE_FORMAT
++  MANAGER_ARTIFACT_MAX_BYTES UPDATE_LOCK_WAIT_SECONDS)
++REMOVED_VARS=(MANAGER_DEFAULT_BRANCH)
++# Documented protected-set hashes (legacy extractor, tests/fieldgate/stage4-function-set-hash.sh).
++STAGE4_LEGACY_BEFORE=fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb
++STAGE4_LEGACY_AFTER=c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  if [[ -z "$new" ]]; then
++    in_list "$fn" "${REMOVED[@]}" || { echo "FAIL removed function: $fn"; exit 1; }
++    continue
++  fi
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter (source text): removed lines may only be translations of
++# the removed updater messages (same-source checksum, development-branch check,
++# old first-copy and preflight texts).
++l10n() { awk '/^ui_localize_legacy\(\) \{/{i=1} i{print} i&&/^\}$/{exit}' "$1/twebproxy-manager.sh"; }
++cat > "$TMP/l10n-removable" <<'LIST'
++    'Не удалось проверить обновление manager на '*)
++    'Не удалось получить информацию об обновлении с '*)
++    В\ *\ нет\ SHA256SUMS.*)
++    'SHA256SUMS не содержит корректный hash для twebproxy-manager.sh')
++    'SHA-256 manager candidate не совпал с SHA256SUMS')
++    'Скачанный manager не проходит bash -n')
++    'Не удалось подготовить/установить первую manager-копию; проверенный backup сохранён:'*)
++    'Текущие manager-копии не образуют точное безопасное состояние; обновление остановлено до создания backup.')
++LIST
++diff <(l10n "$BASE") <(l10n "$PROJECT") | sed -n 's/^< //p' > "$TMP/l10n-removed" || true
++if grep -vF -f "$TMP/l10n-removable" "$TMP/l10n-removed" | grep -q .; then
++  echo 'FAIL ui_localize_legacy lost unrelated lines:'; grep -vF -f "$TMP/l10n-removable" "$TMP/l10n-removed"; exit 1
++fi
++echo "PASS ui_localize_legacy: $(grep -c . "$TMP/l10n-removed") obsolete updater lines removed, $(diff <(l10n "$BASE") <(l10n "$PROJECT") | grep -c '^>') added"
++
++# Each Stage 4 function outside the modified list is byte-identical in its full
++# text (heredoc-aware extraction, not the legacy extractor).
++paste <(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$BASE/twebproxy-manager.sh") \
++      <(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$PROJECT/twebproxy-manager.sh") > "$TMP/hashes"
++same4=0
++while read -r old name new name2; do
++  [[ "$name" == "$name2" ]] || { echo "FAIL hash listing mismatch"; exit 1; }
++  case "$name" in stage4-protected-function-set-full) continue;; esac
++  if [[ "$old" == "$new" ]]; then
++    in_list "$name" "${STAGE4_MODIFIED[@]}" && { echo "FAIL listed as modified but identical: $name"; exit 1; }
++    same4=$((same4+1))
++  else
++    in_list "$name" "${STAGE4_MODIFIED[@]}" "${ADDED[@]}" install_manager_copy || { echo "FAIL Stage 4 function changed: $name"; exit 1; }
++  fi
++done < "$TMP/hashes"
++echo "PASS Stage 4 set: $same4 functions byte-identical, ${#STAGE4_MODIFIED[@]} authorized modifications"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${NEW_VARS[*]}"))=" "$TMP/candidate.vars" > "$TMP/candidate.vars.old"
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${REMOVED_VARS[*]}"))=" "$TMP/baseline.vars" > "$TMP/baseline.vars.kept"
++diff -u "$TMP/baseline.vars.kept" "$TMP/candidate.vars.old"
++echo "PASS top-level variables unchanged except release identity, ${#NEW_VARS[@]} trust/lock variables and the removed branch source"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageF/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (assets, other docs, other tests and evidence included)"
++
++before="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$BASE/twebproxy-manager.sh")"
++after="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${before%% *}" == "$STAGE4_LEGACY_BEFORE" ]] || { echo "FAIL baseline protected hash: $before"; exit 1; }
++[[ "${after%% *}" == "$STAGE4_LEGACY_AFTER" ]] || { echo "FAIL candidate protected hash (update the documented value): $after"; exit 1; }
++echo "PASS Stage 4 legacy protected-set hash: ${before%% *} -> ${after%% *} (documented)"
++printf 'PASS f-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagef/run-stage-f-suite.sh b/tests/stagef/run-stage-f-suite.sh
+new file mode 100755
+index 0000000..f53356d
+--- /dev/null
++++ b/tests/stagef/run-stage-f-suite.sh
+@@ -0,0 +1,20 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage F cases are model tests (tests/stagef/updater-harness.sh plus the Stage 4
++# update fixtures): sandboxed paths, a modeled GitHub, ephemeral test keys; they
++# change no system state and need no lab host (root for sandboxed chown/flock).
++# Scope: f-scope-invariants.sh <v0.2.19 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "F updater: provenance, locking, install/rollback (MODEL)" "$ROOT/tests/stagef/updater-fixture.sh" 1500 "$MGR"
++stage_a_run_case "Stage 4 update/backup fixture A-P under the Stage F trust policy (MODEL)" "$ROOT/tests/stage4-update-backup-fixture.sh" 900
++stage_a_run_case "Stage 4 corrections fixture U-V (MODEL)" "$ROOT/tests/stage4-corrections-fixture.sh" 600
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-f-suite: PASS (all mandatory model checks executed)';;
++  77) echo 'stage-f-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-f-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/tests/stagef/updater-fixture.sh b/tests/stagef/updater-fixture.sh
+new file mode 100755
+index 0000000..67ff6c7
+--- /dev/null
++++ b/tests/stagef/updater-fixture.sh
+@@ -0,0 +1,577 @@
++#!/usr/bin/env bash
++# Stage F regressions: manager self-update provenance (F1), locking and cleanup
++# (F2), backup -> candidate -> install -> health -> success/rollback (F3).
++#
++# Every case drives the real manager-update / helper / install_manager_copy code
++# of the manager under test inside tests/stagef/updater-harness.sh: a sandbox in
++# a temporary directory, a modeled GitHub and ephemeral test signing keys. It
++# needs root (real chown/flock), never touches system paths and never uses the
++# network. Exit: 0 all PASS, 1 any FAIL.
++#
++# Usage: updater-fixture.sh [path/to/twebproxy-manager.sh] [case-filter-regex]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++FILTER="${2:-.}"
++# shellcheck source=updater-harness.sh
++source "$ROOT/tests/stagef/updater-harness.sh"
++[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'updater-fixture: needs root (sandboxed chown/flock)'; exit 77; }
++f_init "$MGR" || { echo 'updater-fixture: setup failed'; exit 1; }
++trap 'f_case_cleanup 2>/dev/null; f_fini' EXIT
++# No failure snapshot: it probes host services (blocked by the sentinels anyway).
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 TWEBPROXY_UPDATE_LOCK_WAIT=2
++NEW=0.2.90
++
++pass=0; fail=0
++check() { # check ID description command...
++  local id="$1" what="$2"; shift 2
++  if "$@"; then printf 'PASS %s: %s\n' "$id" "$what"; pass=$((pass + 1))
++  else printf 'FAIL %s: %s\n' "$id" "$what"; fail=$((fail + 1)); fi
++}
++want() { [[ "$CASE_ID" =~ $FILTER ]]; }
++begin() { CASE_ID="$1"; want || return 1; export F_PIN_KEY="${2:-A}"; f_case "$1"; }
++# Negative checks are never vacuous: the output file must exist and be non-empty.
++no_success() { [[ -s "$F_OUT" ]] && ! grep -q '^UPDATE_SUCCESS' "$F_OUT"; }
++absent_in() { [[ -s "$2" ]] && ! grep -q -- "$1" "$2"; }
++unchanged() { f_copies_are "$F_OLD_HASH"; }
++installed_new() { f_copies_are "$F_CANDIDATE_HASH"; }
++no_backup() { [[ "$(f_backup_count)" == 0 ]]; }
++no_leftovers() { [[ -z "$(f_leftovers)" ]]; }
++artifact_not_fetched() { [[ -s "$F_REMOTE/requests" ]] && ! grep -q '/twebproxy-manager\.sh$' "$F_REMOTE/requests"; }
++out_has() { grep -Eq -- "$1" "$F_OUT"; }
++refused_untouched() { # common outcome of a refused update: nothing installed, nothing backed up
++  check "$CASE_ID.rc" 'manager-update fails' test "$F_RC" -ne 0
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' no_success
++  check "$CASE_ID.unchanged" 'installed copies unchanged' unchanged
++  check "$CASE_ID.no-backup" 'no backup or mutation started' no_backup
++  check "$CASE_ID.no-leftovers" 'no candidate or staging leftovers' no_leftovers
++}
++
++# ============================== F1 provenance ===============================
++
++if begin f1-branch-not-a-source; then
++  f_publish_branch main "$NEW"          # newer VERSION on main, no release at all
++  f_update
++  refused_untouched
++  check "$CASE_ID.branch-artifact" 'the development-branch manager is never downloaded' \
++    eval '! f_requested "/main/twebproxy-manager.sh"'
++  f_case_cleanup
++fi
++
++if begin f1-branch-forced-downgrade; then
++  f_publish_branch main 0.2.9           # the real public main today: older VERSION
++  f_update --force
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-same-source-checksum-is-not-authentication none; then
++  f_publish "$NEW" sign=none            # release + SHA256SUMS from the same source only
++  f_update
++  refused_untouched
++  check "$CASE_ID.not-downloaded" 'artifact not downloaded without a trust anchor' artifact_not_fetched
++  check "$CASE_ID.reason" 'refusal names the missing trust anchor' out_has '^UPDATE_REFUSED reason=no-trust-anchor'
++  f_case_cleanup
++fi
++
++if begin f1-refusal-in-english none; then
++  f_publish "$NEW" sign=none
++  F_LANG=en f_update
++  refused_untouched
++  check "$CASE_ID.english" 'the refusal is fully translated' \
++    perl -CSD -ne 'BEGIN { $c = 0 } $c = 1 if /\p{Cyrillic}/; END { exit $c }' "$F_OUT"
++  check "$CASE_ID.explains" 'and explains the missing trust anchor' out_has 'pins no release-signing key'
++  f_case_cleanup
++fi
++
++if begin f1-no-pinned-key-signed-release none; then
++  f_publish "$NEW"                      # signed, but this build pins no key
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-signed-release-installs; then
++  f_publish "$NEW"
++  f_update
++  check "$CASE_ID.rc" 'signed release installs' test "$F_RC" -eq 0
++  check "$CASE_ID.success" 'UPDATE_SUCCESS reported' out_has '^UPDATE_SUCCESS backup_id=update-'
++  check "$CASE_ID.installed" 'both copies are the signed artifact' installed_new
++  check "$CASE_ID.immutable-ref" 'artifact fetched by the signed commit, not a mutable ref' \
++    f_requested "/$F_COMMIT/twebproxy-manager.sh"
++  check "$CASE_ID.asset-redirect" 'signed metadata followed the GitHub asset redirect' \
++    f_requested 'redirect-> https://release-assets.githubusercontent.com/'
++  check "$CASE_ID.trust-label" 'output names the trust basis' out_has 'trust=signed-release'
++  f_case_cleanup
++fi
++
++if begin f1-wrong-signing-key; then
++  f_publish "$NEW" sign=B
++  f_update
++  refused_untouched
++  check "$CASE_ID.reason" 'signature refusal' out_has '^UPDATE_REFUSED reason=signature'
++  f_case_cleanup
++fi
++
++if begin f1-manifest-tampered; then
++  f_publish "$NEW" tamper=1
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-artifact-tampered; then
++  evil="$F_CASE/evil.sh"; f_fake_manager "$evil" "$NEW" good "$NEW-beta" '# attacker payload'
++  f_publish "$NEW" artifact="$evil"     # SHA256SUMS on the same ref matches the evil file
++  f_update
++  refused_untouched
++  check "$CASE_ID.reason" 'digest refusal' out_has '^UPDATE_REFUSED reason=digest'
++  f_case_cleanup
++fi
++
++for variant in \
++  'extra-key|.unsigned_note = "x"' \
++  'other-repository|.repository = "someone/else"' \
++  'development-channel|.channel = "development"' \
++  'tag-mismatch|.tag = "v0.2.91" | .version = "0.2.91"' \
++  'version-mismatch|.version = "0.2.91"' \
++  'size-mismatch|.artifact.size = 1' \
++  'label-mismatch|.release_version = "0.2.91-beta"' \
++  'not-an-object|[.]'; do
++  name="${variant%%|*}"; filter="${variant#*|}"
++  if begin "f1-manifest-$name"; then
++    f_publish "$NEW" "manifest=$filter"
++    f_update
++    refused_untouched
++    f_case_cleanup
++  fi
++done
++
++for variant in 'prerelease|prerelease=true' 'draft|draft=true' 'foreign-html|html_repo=someone/else' \
++               'rc-tag|tag=v0.2.90-rc1'; do
++  name="${variant%%|*}"; opt="${variant#*|}"
++  if begin "f1-release-$name"; then
++    f_publish "$NEW" "$opt"
++    f_update
++    refused_untouched
++    f_case_cleanup
++  fi
++done
++
++if begin f1-release-not-json; then
++  printf '<html>rate limited</html>\n' > "$F_CASE/api.txt"
++  f_publish "$NEW" api="$F_CASE/api.txt"
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++for variant in 'embedded-version|embedded=0.2.91' 'release-label|label=0.2.91-beta' \
++               'duplicate-version|extra=MANAGER_VERSION="0.2.91"'; do
++  name="${variant%%|*}"; opt="${variant#*|}"
++  if begin "f1-identity-$name"; then
++    f_publish "$NEW" "$opt"
++    f_update
++    refused_untouched
++    f_case_cleanup
++  fi
++done
++
++if begin f1-redirect-metadata-foreign-host; then
++  f_publish "$NEW" asset_host=assets.example.net
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-redirect-artifact-foreign-host; then
++  f_publish "$NEW" raw_redirect=https://mirror.example.net/pkg
++  f_update
++  refused_untouched
++  check "$CASE_ID.reason" 'redirect refusal before backup' out_has '^UPDATE_REFUSED reason=download'
++  f_case_cleanup
++fi
++
++if begin f1-operator-digest none; then
++  f_publish "$NEW" sign=none
++  f_update --sha256 "$F_CANDIDATE_HASH"
++  check "$CASE_ID.rc" 'operator-pinned SHA-256 installs' test "$F_RC" -eq 0
++  check "$CASE_ID.installed" 'both copies are the pinned artifact' installed_new
++  check "$CASE_ID.trust-label" 'output names the operator-pinned trust' out_has 'trust=operator-sha256'
++  f_case_cleanup
++fi
++
++if begin f1-operator-digest-mismatch none; then
++  f_publish "$NEW" sign=none
++  f_update --sha256 "$(printf 'other' | sha256sum | awk '{print $1}')"
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-operator-digest-invalid none; then
++  f_publish "$NEW" sign=none
++  f_update --sha256 not-a-digest
++  refused_untouched
++  f_update --sha256=
++  check "$CASE_ID.empty" 'an empty --sha256= is a usage error, not "no digest"' out_has '^UPDATE_REFUSED reason=usage'
++  check "$CASE_ID.empty-unchanged" 'installed copies unchanged' unchanged
++  f_case_cleanup
++fi
++
++if begin f1-pinned-key-requires-signature; then
++  f_publish "$NEW" sign=none            # this build pins a key: the digest alone is not enough
++  f_update --sha256 "$F_CANDIDATE_HASH"
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-interrupted-download; then
++  f_publish "$NEW"
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/$F_COMMIT/twebproxy-manager.sh" partial
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/v$NEW/twebproxy-manager.sh" partial
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-truncated-download; then
++  f_publish "$NEW"
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/$F_COMMIT/twebproxy-manager.sh" truncate
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/v$NEW/twebproxy-manager.sh" truncate
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-corrupted-candidate; then
++  f_publish "$NEW" behavior=bad-syntax  # authentic bytes that are not a valid script
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f1-check-update-ignores-branch; then
++  f_publish_branch main "$NEW"
++  F_OUT="$F_CASE/check.out"; f_run manager_check_update_cmd > "$F_OUT" 2>&1; F_RC=$?
++  check "$CASE_ID.no-claim" 'check-update does not offer a development-branch version' absent_in "$NEW" "$F_OUT"
++  f_case_cleanup
++fi
++
++if begin f1-hint-ignores-branch; then
++  f_publish_branch main "$NEW"
++  F_OUT="$F_CASE/hint.out"; f_run manager_update_hint > "$F_OUT" 2>&1
++  check "$CASE_ID.ran" 'the hint ran (non-vacuous)' test -f "$F_OUT"
++  check "$CASE_ID.no-hint" 'automatic hint does not advertise a branch version' eval "! grep -q '$NEW' '$F_OUT'"
++  f_case_cleanup
++fi
++
++if begin f1-hint-stable-release; then
++  f_publish "$NEW"
++  F_OUT="$F_CASE/hint.out"; f_run manager_update_hint > "$F_OUT" 2>&1
++  check "$CASE_ID.hint" 'automatic hint reports the newer stable release' grep -q "$NEW" "$F_OUT"
++  f_case_cleanup
++fi
++
++if begin f1-cache-is-data; then
++  printf 'REMOTE_MANAGER_VERSION=%s\nREMOTE_MANAGER_REF=v%s\nREMOTE_MANAGER_SOURCE=release\ntouch %q\n' \
++    "$NEW" "$NEW" "$F_CASE/cache-executed" > "$F_CASE/opt/update-check.env"
++  f_run manager_update_hint > "$F_CASE/hint.out" 2>&1
++  check "$CASE_ID.not-executed" 'update cache is parsed, never executed' test ! -e "$F_CASE/cache-executed"
++  f_case_cleanup
++fi
++
++if begin f1-cache-branch-entry-ignored; then
++  printf 'REMOTE_MANAGER_VERSION=%s\nREMOTE_MANAGER_REF=main\nREMOTE_MANAGER_SOURCE=branch\n' "$NEW" > "$F_CASE/opt/update-check.env"
++  F_OUT="$F_CASE/hint.out"; f_run manager_update_hint > "$F_OUT" 2>&1
++  check "$CASE_ID.ran" 'the hint ran (non-vacuous)' test -f "$F_OUT"
++  check "$CASE_ID.no-hint" 'a cached development-branch entry is not trusted' eval "! grep -q '$NEW' '$F_OUT'"
++  f_case_cleanup
++fi
++
++# ============================== F2 locking ==================================
++
++if begin f2-concurrent-update-refused; then
++  f_publish "$NEW"
++  f_hold_lock 30
++  start=$SECONDS; f_update
++  refused_untouched
++  check "$CASE_ID.bounded" 'refusal comes after a bounded wait' test "$((SECONDS - start))" -lt 20
++  f_case_cleanup
++fi
++
++if begin f2-bounded-wait-for-finishing-holder; then
++  f_publish "$NEW"
++  f_hold_lock 1
++  TWEBPROXY_UPDATE_LOCK_WAIT=15 f_update
++  check "$CASE_ID.waited" 'an update waits for a briefly held lock' test "$F_RC" -eq 0
++  check "$CASE_ID.installed" 'and then installs' installed_new
++  f_case_cleanup
++fi
++
++if begin f2-lock-released-on-return; then
++  # One long-lived process (the TUI): an up-to-date answer, a rolled-back update
++  # and a successful update, each followed by a lock probe from another process.
++  F_OUT="$F_CASE/tui.out"
++  f_eval '
++    probe() { ( exec 9>&-; flock -n "$UPDATE_LOCK_FILE" true ) && echo "LOCK_FREE_AFTER_$1" || echo "LOCK_HELD_AFTER_$1"; }
++    f_publish "$F_LOCAL_VERSION"; manager_update_cmd || true; probe CURRENT
++    f_publish 0.2.90 behavior=bad-overview; manager_update_cmd || true; probe ROLLBACK
++    f_publish 0.2.91; manager_update_cmd || true; probe SUCCESS
++  ' > "$F_OUT" 2>&1
++  check "$CASE_ID.after-current" 'a long-lived process (TUI) releases the lock after an up-to-date answer' grep -q LOCK_FREE_AFTER_CURRENT "$F_OUT"
++  check "$CASE_ID.after-rollback" 'after a rolled-back update' grep -q LOCK_FREE_AFTER_ROLLBACK "$F_OUT"
++  check "$CASE_ID.after-success" 'and after a successful update' grep -q LOCK_FREE_AFTER_SUCCESS "$F_OUT"
++  f_case_cleanup
++fi
++
++if begin f2-lock-not-inherited-by-candidate; then
++  f_publish "$NEW" behavior=linger      # leaves a background process, fails health
++  f_update
++  check "$CASE_ID.rolled-back" 'health failure rolled back' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS'
++  check "$CASE_ID.lock-free" 'a process left by the candidate does not keep the update lock' f_lock_free
++  f_publish 0.2.91
++  f_update
++  check "$CASE_ID.next-update" 'the next legitimate update is not blocked' test "$F_RC" -eq 0
++  f_case_cleanup
++fi
++
++if begin f2-bounded-health-probe; then
++  f_publish "$NEW" behavior=hang-help   # ignores SIGTERM in the health probe
++  start=$SECONDS; F_TIMEOUT=70 f_update
++  check "$CASE_ID.finished" 'manager-update finishes despite a probe that ignores SIGTERM' test "$F_RC" -ne 124
++  check "$CASE_ID.rolled-back" 'and rolls back' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS'
++  check "$CASE_ID.unchanged" 'previous manager restored' unchanged
++  check "$CASE_ID.bounded" "within the bounded probe time ($((SECONDS - start)) s)" test "$((SECONDS - start))" -lt 60
++  f_case_cleanup
++fi
++
++if begin f2-ctrl-c-during-download; then
++  f_publish "$NEW"
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/$F_COMMIT/twebproxy-manager.sh" hang
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/v$NEW/twebproxy-manager.sh" hang
++  start=$SECONDS
++  ( f_update; exit "$F_RC" ) & bg=$!
++  for ((i = 0; i < 200; i++)); do grep -q '/twebproxy-manager\.sh$' "$F_REMOTE/requests" && break; sleep 0.05; done
++  sleep 0.3
++  pgid="$(awk '{print $5}' "/proc/$(<"$F_CASE/pid")/stat")"
++  kill -INT -- "-$pgid" 2>/dev/null       # Ctrl-C reaches the whole foreground group
++  wait "$bg"; rc=$?
++  F_OUT="$F_CASE/out.1"
++  check "$CASE_ID.interrupted" "Ctrl-C ends the update promptly (rc=$rc)" eval "(( rc != 0 && rc != 124 && SECONDS - start < 30 ))"
++  check "$CASE_ID.unchanged" 'installed copies unchanged' unchanged
++  check "$CASE_ID.no-backup" 'no backup started' no_backup
++  check "$CASE_ID.no-leftovers" 'candidate and staging removed' no_leftovers
++  check "$CASE_ID.lock" 'lock released' f_lock_free
++  f_case_cleanup
++fi
++
++if begin f2-overlapping-copy-waits-for-update; then
++  f_hold_lock 30                        # an update or rollback is in progress
++  F_OUT="$F_CASE/copy.out"
++  TWEBPROXY_UPDATE_LOCK_WAIT=1 f_eval 'install_manager_copy; echo "COPY_RC=$?"' > "$F_OUT" 2>&1
++  check "$CASE_ID.untouched" 'add/repair/update tails do not rewrite the copies during an update' unchanged
++  check "$CASE_ID.caller-continues" 'the calling command still completes' grep -q '^COPY_RC=0' "$F_OUT"
++  f_release_holder
++  f_eval 'install_manager_copy' > "$F_OUT" 2>&1
++  check "$CASE_ID.synced" 'without a concurrent update both copies are synchronised' f_copies_are "$(f_sha "$F_MGR")"
++  check "$CASE_ID.no-temp" 'no temporary copies left' no_leftovers
++  f_case_cleanup
++fi
++
++if begin f2-stale-lock-file; then
++  f_publish "$NEW"
++  : > "$F_CASE/run/lock/twebproxy-manager-update.lock"; chmod 0600 "$F_CASE/run/lock/twebproxy-manager-update.lock"
++  f_update
++  check "$CASE_ID.ok" 'a lock file left by an earlier run does not block' test "$F_RC" -eq 0
++  check "$CASE_ID.kept" 'the lock file itself is never deleted' test -f "$F_CASE/run/lock/twebproxy-manager-update.lock"
++  f_case_cleanup
++fi
++
++# ============================== F3 install / rollback =======================
++
++if begin f3-success-verified; then
++  f_publish "$NEW"
++  printf 'REMOTE_MANAGER_VERSION=%s\n' 0.0.1 > "$F_CASE/opt/update-check.env"
++  f_update
++  check "$CASE_ID.rc" 'update succeeds' test "$F_RC" -eq 0
++  check "$CASE_ID.token" 'UPDATE_SUCCESS with the backup id' out_has '^UPDATE_SUCCESS backup_id=update-'
++  check "$CASE_ID.installed" 'both copies verified new' installed_new
++  id="$(sed -nE 's/^UPDATE_SUCCESS backup_id=(update-[^ ]*)$/\1/p' "$F_OUT")"
++  check "$CASE_ID.backup" 'the pre-update backup verifies offline' \
++    bash -c 'source "$1"; s4_verify_backup_dir "$2/$3" "$3" published' _ "$F_CASE/libexec/restore-update-backup" \
++      "$F_CASE/var/lib/twebproxy/update-backups" "$id"
++  check "$CASE_ID.metadata" 'global.env records the new version, other keys kept' \
++    eval "grep -qx 'MANAGER_VERSION=$NEW' '$F_CASE/etc/global.env' && grep -qx 'TPROXY_UPSTREAM_COMMIT=0123abcd' '$F_CASE/etc/global.env'"
++  check "$CASE_ID.cache" 'update cache removed' test ! -e "$F_CASE/opt/update-check.env"
++  check "$CASE_ID.no-leftovers" 'no candidate, staging or temp leftovers' no_leftovers
++  check "$CASE_ID.lock" 'lock released' f_lock_free
++  f_case_cleanup
++fi
++
++if begin f3-backup-failure; then
++  f_publish "$NEW"
++  : > "$F_CASE/fail-install-backup"
++  f_update
++  check "$CASE_ID.rc" 'update fails' test "$F_RC" -ne 0
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' no_success
++  check "$CASE_ID.unchanged" 'installed copies unchanged' unchanged
++  check "$CASE_ID.no-leftovers" 'no candidate or staging leftovers' no_leftovers
++  f_case_cleanup
++fi
++
++if begin f3-shared-parent-with-acme-webroot; then
++  # /var/lib/twebproxy also holds the ACME webroot: install -d creates it 0755.
++  f_publish "$NEW"
++  install -d -m 0755 "$F_CASE/var/lib/twebproxy/acme"
++  f_update
++  check "$CASE_ID.rc" 'update works beside the ACME webroot (parent 0755)' test "$F_RC" -eq 0
++  check "$CASE_ID.installed" 'both copies verified new' installed_new
++  check "$CASE_ID.parent-kept" 'the shared parent keeps its traversable mode' \
++    test "$(stat -c %a "$F_CASE/var/lib/twebproxy" 2>/dev/null)" = 755
++  check "$CASE_ID.root-private" 'the backup root is private (0700)' \
++    test "$(stat -c %a "$F_CASE/var/lib/twebproxy/update-backups" 2>/dev/null)" = 700
++  f_case_cleanup
++fi
++
++if begin f3-new-parent-stays-traversable; then
++  f_publish "$NEW"
++  f_update
++  check "$CASE_ID.rc" 'update succeeds' test "$F_RC" -eq 0
++  check "$CASE_ID.parent" 'a parent created by the updater can still be traversed for the ACME webroot' \
++    test "$(stat -c %a "$F_CASE/var/lib/twebproxy" 2>/dev/null)" = 755
++  f_case_cleanup
++fi
++
++if begin f3-writable-parent-refused; then
++  f_publish "$NEW"
++  install -d -m 0777 "$F_CASE/var/lib/twebproxy"; chmod 0777 "$F_CASE/var/lib/twebproxy"
++  f_update
++  refused_untouched
++  f_case_cleanup
++fi
++
++if begin f3-first-copy-install-failure; then
++  f_publish "$NEW"
++  printf '%s\n' "$F_CASE/usr/twebproxy" > "$F_CASE/fail-mv-to"
++  f_update
++  check "$CASE_ID.rc" 'update fails' test "$F_RC" -ne 0
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' no_success
++  check "$CASE_ID.unchanged" 'installed copies unchanged' unchanged
++  check "$CASE_ID.no-leftovers" 'no candidate, staging or temp leftovers' no_leftovers
++  check "$CASE_ID.lock" 'lock released' f_lock_free
++  f_case_cleanup
++fi
++
++if begin f3-partial-install-rollback; then
++  f_publish "$NEW"
++  printf '%s\n' "$F_CASE/opt/twebproxy-manager.sh" > "$F_CASE/fail-mv-to"
++  f_update
++  check "$CASE_ID.token" 'partial install rolled back' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-'
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' no_success
++  check "$CASE_ID.restored" 'previous manager restored in both copies' unchanged
++  check "$CASE_ID.no-leftovers" 'no candidate, staging or temp leftovers' no_leftovers
++  f_case_cleanup
++fi
++
++if begin f3-health-failure-rollback; then
++  f_publish "$NEW" behavior=bad-overview
++  f_update
++  check "$CASE_ID.token" 'health failure rolled back' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-'
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' no_success
++  check "$CASE_ID.restored" 'previous manager restored' unchanged
++  f_case_cleanup
++fi
++
++if begin f3-rollback-failure-and-offline-recovery; then
++  f_eval 'stage4_create_backup 0.0.1 >/dev/null'   # an older verified backup
++  older="$(basename "$(find "$F_CASE/var/lib/twebproxy/update-backups" -mindepth 1 -maxdepth 1 -name 'update-*' | head -n1)")"
++  # Keep a pristine copy of the older backup: the candidate corrupts every backup.
++  cp -a "$F_CASE/var/lib/twebproxy/update-backups/$older" "$F_CASE/older-backup"
++  f_publish "$NEW" behavior=corrupt-backup
++  f_update
++  check "$CASE_ID.token" 'rollback failure reported' out_has '^UPDATE_FAILED_ROLLBACK_FAILED backup_id=update-'
++  check "$CASE_ID.no-success" 'neither success nor rollback success claimed' \
++    eval "test -s '$F_OUT' && ! grep -Eq '^(UPDATE_SUCCESS|UPDATE_FAILED_ROLLBACK_SUCCESS)' '$F_OUT'"
++  check "$CASE_ID.guidance" 'the operator is told how to recover offline' out_has 'restore-update-backup (restore|restore-latest)'
++  check "$CASE_ID.lock" 'lock released' f_lock_free
++  rm -rf "$F_CASE/var/lib/twebproxy/update-backups/$older"
++  cp -a "$F_CASE/older-backup" "$F_CASE/var/lib/twebproxy/update-backups/$older"
++  : > "$F_REMOTE/offline"; : > "$F_REMOTE/requests"
++  "$F_CASE/libexec/restore-update-backup" restore "$older" > "$F_CASE/restore.out" 2>&1
++  check "$CASE_ID.offline-restore" 'offline helper restores a verified backup' grep -q '^RESTORE_SUCCESS' "$F_CASE/restore.out"
++  check "$CASE_ID.offline-restored" 'both copies are the backed-up manager' unchanged
++  check "$CASE_ID.offline-no-network" 'restore made no network request' test ! -s "$F_REMOTE/requests"
++  f_case_cleanup
++fi
++
++if begin f3-signals-deferred-during-install; then
++  f_publish "$NEW"
++  printf '%s\n' "$F_CASE/opt" > "$F_CASE/park-install-dir"
++  f_update & bg=$!
++  for ((i = 0; i < 200; i++)); do [[ -e "$F_CASE/parked" ]] && break; sleep 0.05; done
++  pid="$(<"$F_CASE/pid")"
++  kill -TERM "$pid" 2>/dev/null; kill -INT "$pid" 2>/dev/null; kill -HUP "$pid" 2>/dev/null
++  sleep 0.3; : > "$F_CASE/release"; wait "$bg"
++  F_OUT="$F_CASE/out.1"
++  check "$CASE_ID.parked" 'the interruption hit the window between the two copies' test -e "$F_CASE/parked"
++  check "$CASE_ID.consistent" 'interrupted update ends in a verified state (both new)' installed_new
++  check "$CASE_ID.success" 'and reports it' out_has '^UPDATE_SUCCESS'
++  f_case_cleanup
++fi
++
++if begin f3-killed-update-recovery; then
++  f_publish "$NEW"
++  printf '%s\n' "$F_CASE/opt" > "$F_CASE/park-install-dir"
++  f_update & bg=$!
++  for ((i = 0; i < 200; i++)); do [[ -e "$F_CASE/parked" ]] && break; sleep 0.05; done
++  kill -KILL "$(<"$F_CASE/pid")" 2>/dev/null; wait "$bg" 2>/dev/null
++  : > "$F_CASE/release"; sleep 0.5
++  check "$CASE_ID.mixed" 'SIGKILL left mixed copies (precondition)' eval '! unchanged && ! installed_new'
++  check "$CASE_ID.lock-free" 'a killed update does not keep the lock' f_lock_free
++  f_update
++  check "$CASE_ID.refused" 'the next update refuses the mixed state' test "$F_RC" -ne 0
++  check "$CASE_ID.guidance" 'and names the offline recovery command' out_has 'restore-update-backup restore-latest'
++  "$F_CASE/libexec/restore-update-backup" restore-latest > "$F_CASE/restore.out" 2>&1
++  check "$CASE_ID.restored" 'restore-latest returns to the verified pre-update manager' unchanged
++  f_update
++  check "$CASE_ID.next-update" 'the next update succeeds' test "$F_RC" -eq 0
++  check "$CASE_ID.no-leftovers" 'stale staging and temp files cleaned' no_leftovers
++  f_case_cleanup
++fi
++
++if begin f3-metadata-write-failure; then
++  f_publish "$NEW"
++  cp "$F_CASE/etc/global.env" "$F_CASE/global.env.before"
++  F_OUT="$F_CASE/meta.out"
++  f_eval 'eval "f_real_sgmv() $(declare -f set_global_manager_version | tail -n +2)"
++          set_global_manager_version() { ( ulimit -f 0; trap "" XFSZ; f_real_sgmv "$@" ); }
++          manager_update_cmd' > "$F_OUT" 2>&1
++  check "$CASE_ID.kept" 'a failed metadata write leaves global.env intact' cmp -s "$F_CASE/global.env.before" "$F_CASE/etc/global.env"
++  check "$CASE_ID.warned" 'and is reported' out_has 'global\.env'
++  check "$CASE_ID.installed" 'the verified manager install stands' installed_new
++  f_case_cleanup
++fi
++
++if begin f3-helper-refreshed; then
++  f_publish "$NEW"
++  printf '# rendered by an older manager\n' >> "$F_CASE/libexec/restore-update-backup"
++  f_update
++  check "$CASE_ID.rc" 'update succeeds with an older valid helper' test "$F_RC" -eq 0
++  f_eval 'stage4_render_restore_helper' > "$F_CASE/rendered" 2>/dev/null
++  check "$CASE_ID.refreshed" 'the helper is refreshed to the running manager rendering' \
++    cmp -s "$F_CASE/rendered" "$F_CASE/libexec/restore-update-backup"
++  f_case_cleanup
++fi
++
++if begin f3-unsafe-helper-untouched; then
++  f_publish "$NEW"
++  chmod 0700 "$F_CASE/libexec/restore-update-backup"
++  before="$(f_sha "$F_CASE/libexec/restore-update-backup")"
++  f_update
++  refused_untouched
++  check "$CASE_ID.helper" 'an unsafe helper is not replaced' test "$(f_sha "$F_CASE/libexec/restore-update-backup")" = "$before"
++  f_case_cleanup
++fi
++
++printf '\nupdater-fixture: %s pass, %s fail\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagef/updater-function-hashes.sh b/tests/stagef/updater-function-hashes.sh
+new file mode 100755
+index 0000000..d93b0a7
+--- /dev/null
++++ b/tests/stagef/updater-function-hashes.sh
+@@ -0,0 +1,78 @@
++#!/usr/bin/env bash
++# Per-function SHA-256 of the manager self-updater (Stage F documentation and
++# scope evidence).
++#
++# Unlike tests/fieldgate/stage4-function-set-hash.sh (the legacy tool behind the
++# original protected hash fd0e123c…), the extraction here skips heredoc bodies:
++# the legacy extractor stops at the first "}" line inside a heredoc and so
++# covered only the first 30 lines of stage4_render_restore_helper. Text-based,
++# independent of the Bash version.
++#
++# Usage: updater-function-hashes.sh <twebproxy-manager.sh> [function...]
++#   default functions: the 28-function Stage 4 set, then the Stage F additions
++#   and install_manager_copy; prints "<sha256>  <name>" (or "ABSENT  <name>")
++#   and "<sha256>  stage4-protected-function-set-full" over the 28 bodies.
++set -Eeuo pipefail
++MGR="${1:?usage: updater-function-hashes.sh <twebproxy-manager.sh> [function...]}"; shift
++
++STAGE4=(
++  stage4_render_restore_helper stage4_no_symlink_components stage4_safe_root_file
++  stage4_install_restore_helper stage4_verify_backup stage4_prune_backups
++  stage4_prepare_backup_root stage4_acquire_update_lock stage4_current_manager_preflight
++  stage4_create_backup stage4_install_candidate_target stage4_manager_health
++  stage4_rollback_exact stage4_backup_tui_summary
++  manager_backup_list_cmd manager_restore_backup_cmd
++  valid_manager_version version_is_newer
++  manager_update_cache_fresh write_manager_update_cache load_manager_update_cache
++  fetch_manager_update_info manager_check_update_impl manager_check_update_cmd
++  set_global_manager_version manager_update_cmd
++  fetch_manager_update_hint_info manager_update_hint
++)
++STAGEF=(
++  stage4_restore_helper_valid stage4_backup_parent_ready stage4_release_update_lock stage4_manager_copies_match
++  stage4_update_prepare stage4_update_end stage4_update_abort stage4_update_refuse
++  manager_release_tag_from_json manager_latest_release_tag manager_release_download
++  manager_release_signature_ok manager_release_manifest_fields manager_candidate_identity_ok
++  install_manager_copy
++)
++
++extract() { # $1=file $2=function: "name() {" to the closing "}" at column 0, heredocs skipped
++  awk -v fn="$2" '
++    function heredoc_word(line,   rest, w) {
++      if (line ~ /^[ \t]*#/) return ""
++      while (match(line, /<<-?[ \t]*["\047]?[A-Za-z_][A-Za-z0-9_]*/)) {
++        if (substr(line, RSTART > 1 ? RSTART - 1 : 1, 1) == "<" && RSTART > 1) { line = substr(line, RSTART + RLENGTH); continue }
++        w = substr(line, RSTART, RLENGTH)
++        dash = (w ~ /^<<-/)
++        sub(/^<<-?[ \t]*["\047]?/, "", w)
++        if (substr(line, RSTART + RLENGTH, 1) == "<") { line = substr(line, RSTART + RLENGTH); continue }
++        return w
++      }
++      return ""
++    }
++    !inside && $0 ~ "^" fn "\\(\\) *\\{" { inside = 1; print; next }
++    inside {
++      print
++      if (term != "") {
++        cur = $0; if (dash) sub(/^\t+/, "", cur)
++        if (cur == term) term = ""
++        next
++      }
++      if ($0 == "}") exit
++      w = heredoc_word($0); if (w != "") term = w
++    }
++  ' "$1"
++}
++
++names=("$@")
++(( ${#names[@]} )) || names=("${STAGE4[@]}" "${STAGEF[@]}")
++for fn in "${names[@]}"; do
++  body="$(extract "$MGR" "$fn")"
++  if [[ -z "$body" ]]; then printf 'ABSENT  %s\n' "$fn"; continue; fi
++  printf '%s  %s\n' "$(printf '%s\n' "$body" | sha256sum | awk '{print $1}')" "$fn"
++done
++if (( $# == 0 )); then
++  for fn in "${STAGE4[@]}"; do
++    printf '### %s\n%s\n' "$fn" "$(extract "$MGR" "$fn")"
++  done | sha256sum | awk '{print $1 "  stage4-protected-function-set-full"}'
++fi
+diff --git a/tests/stagef/updater-harness.sh b/tests/stagef/updater-harness.sh
+new file mode 100755
+index 0000000..e7e34ca
+--- /dev/null
++++ b/tests/stagef/updater-harness.sh
+@@ -0,0 +1,392 @@
++#!/usr/bin/env bash
++# Behavioral sandbox for the Stage F updater and supply-chain regressions.
++#
++# Each command runs the unmodified manager under test in a separate bash process
++# with production `set -Eeuo pipefail` and its ERR trap (f_run / f_eval). Only
++# paths are rebound, all under the case directory: the real lock, staging,
++# backup, install, health gate, rollback, offline restore helper, flock, jq and
++# openssl run. The installed manager and every published release are small fake
++# managers that answer the health probes (--help, --json overview).
++#
++# Network boundary: a curl model ($F_CASE/bin/curl) answers only from
++# $F_CASE/remote, a modeled GitHub (api.github.com, raw.githubusercontent.com,
++# github.com release downloads and their asset hosts). Nothing leaves the host.
++# F_LANG=en|ru selects the UI language (default: the manager's, Russian).
++# Release-signing keys are ephemeral Ed25519 keys generated per run in
++# $F_ROOT/keys; they are test fixtures, never shipped or pinned in the manager.
++#
++# Remote layout (under $F_CASE/remote):
++#   www/<host>/<path>        response body (missing file: HTTP 404)
++#   redirect/<host>/<path>   holds the Location URL of a 302
++#   fault/<host>/<path>      partial (exit 18 after half the body),
++#                            truncate (half the body, exit 0), hang
++#   offline                  every request fails (exit 6)
++#   requests                 log of every requested and redirected URL
++# Faults and barriers on the host side (files in $F_CASE):
++#   fail-mv-to               mv onto the named path fails once
++#   park-install-dir         the first install into a .twebproxy-stage4 temp file in
++#                            that directory parks until $F_CASE/release exists
++#                            ($F_CASE/parked marks arrival)
++#   fail-install-backup      install into a backup being created fails (disk error)
++
++F_HARNESS="${BASH_SOURCE[0]}"
++F_SLUG="Lazarev33/twebproxy-manager"
++
++f_init() { # $1=manager under test
++  F_MGR="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
++  F_ROOT="$(mktemp -d /tmp/twebproxy-stagef.XXXXXX)"
++  F_LOCAL_VERSION="$(sed -nE 's/^MANAGER_VERSION="([^"]*)"$/\1/p' "$F_MGR" | head -n1)"
++  export F_MGR F_ROOT F_LOCAL_VERSION F_HARNESS
++  install -d -m 0700 "$F_ROOT/keys"
++  local k
++  for k in A B; do
++    openssl genpkey -algorithm ed25519 -out "$F_ROOT/keys/$k.pem" 2>/dev/null || return 1
++    openssl pkey -in "$F_ROOT/keys/$k.pem" -pubout -outform DER 2>/dev/null | base64 -w0 > "$F_ROOT/keys/$k.pub" || return 1
++  done
++}
++
++f_fini() { [[ -z "${F_ROOT:-}" || "${KEEP_STAGEF_TMP:-0}" == 1 ]] || rm -rf -- "$F_ROOT"; }
++
++# ---- sandbox ---------------------------------------------------------------
++
++f_case() { # $1=name: fresh sandbox with two identical installed copies and the helper
++  F_CASE="$F_ROOT/$1"
++  export F_CASE F_REMOTE="$F_ROOT/$1/remote"
++  install -d -o root -g root -m 0700 "$F_CASE" "$F_CASE/usr" "$F_CASE/opt" "$F_CASE/libexec" \
++    "$F_CASE/etc" "$F_CASE/var/lib" "$F_CASE/run/lock" "$F_CASE/bin" "$F_REMOTE" "$F_REMOTE/www"
++  : > "$F_REMOTE/requests"
++  f_write_models
++  f_fake_manager "$F_CASE/usr/twebproxy" "$F_LOCAL_VERSION"
++  install -o root -g root -m 0755 "$F_CASE/usr/twebproxy" "$F_CASE/opt/twebproxy-manager.sh"
++  printf 'MANAGER_VERSION=%s\nTPROXY_UPSTREAM_COMMIT=0123abcd\nMTPROXY_COMMIT=4567ef89\n' "$F_LOCAL_VERSION" > "$F_CASE/etc/global.env"
++  chmod 0600 "$F_CASE/etc/global.env"
++  F_OLD_HASH="$(f_sha "$F_CASE/usr/twebproxy")"
++  F_RUN=0
++  f_eval 'stage4_install_restore_helper yes' >/dev/null 2>&1 || { echo "f_case: helper bootstrap failed" >&2; return 1; }
++  find /tmp -maxdepth 1 -name 'twebproxy-manager.*' -printf '%f\n' 2>/dev/null | sort > "$F_CASE/tmp-before"
++}
++
++# Rebinds every updater path into the case directory (called after sourcing).
++f_bind() {
++  BASE_DIR="$F_CASE/etc"; GLOBAL_ENV="$BASE_DIR/global.env"; LANGUAGE_FILE="$BASE_DIR/ui-language"
++  PROJECT_DIR="$F_CASE/opt"; PROJECT_MANAGER_COPY="$PROJECT_DIR/twebproxy-manager.sh"
++  LOG_DIR="$PROJECT_DIR/logs"; LOG_MANAGER_DIR="$LOG_DIR/manager"; LOG_RUNTIME_DIR="$LOG_DIR/runtime"
++  LOG_BUNDLE_DIR="$LOG_DIR/bundles"; LOG_FULL_DIR="$LOG_DIR/full"
++  MANAGER_BIN="$F_CASE/usr/twebproxy"
++  LIBEXEC_DIR="$F_CASE/libexec"; UPDATE_RESTORE_HELPER="$LIBEXEC_DIR/restore-update-backup"
++  UPDATE_BACKUP_PARENT="$F_CASE/var/lib/twebproxy"; UPDATE_BACKUP_ROOT="$UPDATE_BACKUP_PARENT/update-backups"
++  UPDATE_LOCK_FILE="$F_CASE/run/lock/twebproxy-manager-update.lock"
++  UPDATE_CACHE_FILE="$PROJECT_DIR/update-check.env"
++  UPDATE_BACKUP_RETENTION=4
++  STAGE4_UPDATE_LOCK_FD=""
++  # Release-signing trust: key A is pinned unless the case says otherwise.
++  case "${F_PIN_KEY:-A}" in
++    none) MANAGER_UPDATE_TRUSTED_KEYS=();;
++    *) MANAGER_UPDATE_TRUSTED_KEYS=("$(<"$F_ROOT/keys/${F_PIN_KEY:-A}.pub")");;
++  esac
++  PATH="$F_CASE/bin:$PATH"
++  [[ -z "${F_LANG:-}" ]] || UI_LANGUAGE="$F_LANG"
++  disable_colors 2>/dev/null || true
++}
++
++f_run() { bash -c 'source "$1"; shift; source "$F_MGR"; f_bind; set -Eeuo pipefail; echo "$$" > "$F_CASE/pid"; "$@"' f-run "$F_HARNESS" "$@"; }
++f_eval() { bash -c 'source "$1"; source "$F_MGR"; f_bind; set -Eeuo pipefail; echo "$$" > "$F_CASE/pid"; eval "$2"' f-eval "$F_HARNESS" "$1"; }
++
++f_update() { # [args...] -> F_RC, F_OUT (combined output file)
++  F_RUN=$((F_RUN + 1)); F_OUT="$F_CASE/out.$F_RUN"
++  timeout -k 5 "${F_TIMEOUT:-120}" bash -c 'source "$1"; shift; source "$F_MGR"; f_bind; set -Eeuo pipefail; echo "$$" > "$F_CASE/pid"; manager_update_cmd "$@"' \
++    f-update "$F_HARNESS" "$@" > "$F_OUT" 2>&1 < /dev/null
++  F_RC=$?
++}
++
++f_sha() { sha256sum "$1" | awk '{print $1}'; }
++
++f_fake_manager() { # $1=path $2=MANAGER_VERSION [$3=behavior] [$4=release label] [$5=extra line]
++  local path="$1" version="$2" behavior="${3:-good}" label="${4:-$2-beta}" extra="${5:-}"
++  install -d -m 0700 "$(dirname -- "$path")"
++  {
++    printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n'
++    printf 'MANAGER_VERSION="%s"\nMANAGER_RELEASE_VERSION="%s"\n' "$version" "$label"
++    [[ -z "$extra" ]] || printf '%s\n' "$extra"
++    printf 'F_BEHAVIOR=%q\nF_CASE=%q\n' "$behavior" "$F_CASE"
++    cat <<'EOF'
++overview() { printf '{"schema_version":"twebproxy.output.v1","command":"overview","overall":"OK","data":{"manager_version":"%s"}}\n' "$MANAGER_VERSION"; }
++case "${1:-}" in
++  --help)
++    if [[ "$F_BEHAVIOR" == hang-help ]]; then
++      echo "$$" > "$F_CASE/hang.pid"; trap '' TERM INT HUP; exec sleep 300
++    fi
++    printf 'TWebProxy Manager v%s\n' "$MANAGER_RELEASE_VERSION";;
++  --json)
++    case "$F_BEHAVIOR" in
++      bad-overview) printf '{"schema_version":"wrong","command":"overview","data":{}}\n';;
++      linger) sleep 120 < /dev/null > /dev/null 2>&1 & echo "$!" > "$F_CASE/linger.pid"
++              printf '{"schema_version":"wrong"}\n';;
++      corrupt-backup) for f in "$F_CASE"/var/lib/twebproxy/update-backups/update-*/files/twebproxy-manager.sh; do
++                        [[ -f "$f" ]] && printf '\n# corrupted during the update\n' >> "$f"
++                      done
++                      printf '{"schema_version":"wrong"}\n';;
++      *) overview;;
++    esac;;
++  *) exit 2;;
++esac
++EOF
++  } > "$path"
++  chmod 0755 "$path"
++  [[ "$behavior" != bad-syntax ]] || printf 'if then fi\n' >> "$path"
++}
++
++# ---- modeled remote --------------------------------------------------------
++
++f_put() { # $1=URL $2=source file (or - for stdin)
++  local rest="${1#https://}" dest
++  dest="$F_REMOTE/www/$rest"
++  mkdir -p "$(dirname -- "$dest")"
++  if [[ "$2" == - ]]; then cat > "$dest"; else cp -- "$2" "$dest"; fi
++}
++
++f_redirect() { # $1=URL $2=Location
++  local dest="$F_REMOTE/redirect/${1#https://}"
++  mkdir -p "$(dirname -- "$dest")"; printf '%s\n' "$2" > "$dest"
++}
++
++f_fault() { # $1=URL $2=partial|truncate|hang
++  local dest="$F_REMOTE/fault/${1#https://}"
++  mkdir -p "$(dirname -- "$dest")"; printf '%s\n' "$2" > "$dest"
++}
++
++f_requested() { grep -Fq -- "$1" "$F_REMOTE/requests"; }
++
++# f_publish VERSION [key=value...]: one release on the modeled GitHub.
++#   behavior=   candidate behavior (good, bad-overview, hang-help, linger, corrupt-backup, bad-syntax)
++#   embedded=   MANAGER_VERSION inside the candidate (default VERSION)
++#   label=      MANAGER_RELEASE_VERSION inside the candidate (default VERSION-beta)
++#   extra=      one extra line inside the candidate
++#   tag= draft= prerelease= html_repo=   release API fields
++#   sign=A|B|none   manifest signing key (none: no manifest/signature assets)
++#   manifest=   jq filter applied to the manifest before signing
++#   tamper=1    change the manifest bytes after signing
++#   artifact=   file served instead of the signed candidate (with matching SHA256SUMS)
++#   asset_host= host the release-download links redirect to
++#   raw_redirect=URL   the raw artifact and SHA256SUMS paths redirect there
++#   api=        file served as the releases/latest answer instead
++f_publish() {
++  local version="$1"; shift
++  local behavior=good embedded="$version" label="$version-beta" extra="" tag="v$version" draft=false
++  local prerelease=false html_repo="$F_SLUG" sign=A manifest_filter=. tamper=0 artifact="" api=""
++  local asset_host=release-assets.githubusercontent.com raw_redirect="" kv
++  for kv in "$@"; do
++    case "$kv" in
++      behavior=*) behavior="${kv#*=}";; embedded=*) embedded="${kv#*=}";; label=*) label="${kv#*=}";;
++      extra=*) extra="${kv#*=}";; tag=*) tag="${kv#*=}";; draft=*) draft="${kv#*=}";;
++      prerelease=*) prerelease="${kv#*=}";; html_repo=*) html_repo="${kv#*=}";; sign=*) sign="${kv#*=}";;
++      manifest=*) manifest_filter="${kv#*=}";; tamper=*) tamper="${kv#*=}";; artifact=*) artifact="${kv#*=}";;
++      asset_host=*) asset_host="${kv#*=}";; raw_redirect=*) raw_redirect="${kv#*=}";; api=*) api="${kv#*=}";;
++      *) echo "f_publish: unknown option $kv" >&2; return 1;;
++    esac
++  done
++  local pub="$F_CASE/published/$tag" commit sha size served
++  mkdir -p "$pub"
++  f_fake_manager "$pub/twebproxy-manager.sh" "$embedded" "$behavior" "$label" "$extra"
++  F_CANDIDATE="$pub/twebproxy-manager.sh"
++  F_CANDIDATE_HASH="$(f_sha "$F_CANDIDATE")"
++  commit="$(printf '%s' "$F_CANDIDATE_HASH" | sha1sum | awk '{print $1}')"
++  F_COMMIT="$commit"
++  sha="$F_CANDIDATE_HASH"; size="$(stat -c %s "$F_CANDIDATE")"
++  served="${artifact:-$F_CANDIDATE}"
++
++  if [[ -n "$api" ]]; then
++    f_put "https://api.github.com/repos/$F_SLUG/releases/latest" "$api"
++  else
++    jq -n --arg tag "$tag" --arg html "https://github.com/$html_repo/releases/tag/$tag" \
++      --argjson draft "$draft" --argjson prerelease "$prerelease" \
++      '{url:"modeled", html_url:$html, tag_name:$tag, name:$tag, draft:$draft, prerelease:$prerelease,
++        body:"Release notes mention \"tag_name\": \"v9.9.9\" in passing.", assets:[]}' \
++      | f_put "https://api.github.com/repos/$F_SLUG/releases/latest" -
++  fi
++
++  local raw="https://raw.githubusercontent.com/$F_SLUG" ref
++  for ref in "$tag" "$commit"; do
++    if [[ -n "$raw_redirect" ]]; then
++      f_redirect "$raw/$ref/twebproxy-manager.sh" "$raw_redirect/twebproxy-manager.sh"
++      f_redirect "$raw/$ref/SHA256SUMS" "$raw_redirect/SHA256SUMS"
++      f_put "$raw_redirect/twebproxy-manager.sh" "$served"
++      printf '%s  twebproxy-manager.sh\n' "$(f_sha "$served")" | f_put "$raw_redirect/SHA256SUMS" -
++    else
++      f_put "$raw/$ref/twebproxy-manager.sh" "$served"
++      printf '%s  twebproxy-manager.sh\n' "$(f_sha "$served")" | f_put "$raw/$ref/SHA256SUMS" -
++    fi
++  done
++
++  [[ "$sign" != none ]] || return 0
++  jq -cn --arg slug "$F_SLUG" --arg version "$version" --arg label "$label" --arg tag "$tag" \
++    --arg commit "$commit" --arg sha "$sha" --argjson size "$size" \
++    '{format:"twebproxy.manager-release.v1", repository:$slug, channel:"stable", version:$version,
++      release_version:$label, tag:$tag, commit:$commit,
++      artifact:{name:"twebproxy-manager.sh", size:$size, sha256:$sha}}' \
++    | jq -c "$manifest_filter" > "$pub/manifest.json"
++  openssl pkeyutl -sign -inkey "$F_ROOT/keys/$sign.pem" -rawin -in "$pub/manifest.json" -out "$pub/manifest.sig.bin" 2>/dev/null || return 1
++  base64 -w0 < "$pub/manifest.sig.bin" > "$pub/manifest.sig"
++  printf '\n' >> "$pub/manifest.sig"
++  [[ "$tamper" != 1 ]] || sed -i 's/"channel":"stable"/"channel":"stable" /' "$pub/manifest.json"
++  local name dl
++  for name in twebproxy-manager-release.json twebproxy-manager-release.json.sig; do
++    dl="https://github.com/$F_SLUG/releases/download/$tag/$name"
++    f_redirect "$dl" "https://$asset_host/github-production-release-asset/1/$tag/$name"
++  done
++  f_put "https://$asset_host/github-production-release-asset/1/$tag/twebproxy-manager-release.json" "$pub/manifest.json"
++  f_put "https://$asset_host/github-production-release-asset/1/$tag/twebproxy-manager-release.json.sig" "$pub/manifest.sig"
++}
++
++f_publish_branch() { # $1=branch $2=VERSION [$3=behavior]: a development branch (never a release)
++  local raw="https://raw.githubusercontent.com/$F_SLUG/$1" file="$F_CASE/published/branch-$1.sh"
++  mkdir -p "$F_CASE/published"
++  f_fake_manager "$file" "$2" "${3:-good}"
++  F_CANDIDATE="$file"; F_CANDIDATE_HASH="$(f_sha "$file")"
++  printf '%s\n' "$2" | f_put "$raw/VERSION" -
++  f_put "$raw/twebproxy-manager.sh" "$file"
++  printf '%s  twebproxy-manager.sh\n%s  VERSION\n' "$F_CANDIDATE_HASH" "$(printf '%s\n' "$2" | sha256sum | awk '{print $1}')" \
++    | f_put "$raw/SHA256SUMS" -
++}
++
++# ---- observations ----------------------------------------------------------
++
++f_copies_are() { # $1=hash: both installed copies are root 0755 regular files with this content
++  local t
++  for t in "$F_CASE/usr/twebproxy" "$F_CASE/opt/twebproxy-manager.sh"; do
++    [[ -f "$t" && ! -L "$t" && "$(stat -c '%u:%g:%a' "$t")" == 0:0:755 && "$(f_sha "$t")" == "$1" ]] || return 1
++  done
++}
++
++f_backup_count() { find "$F_CASE/var/lib/twebproxy/update-backups" -mindepth 1 -maxdepth 1 -name 'update-*' 2>/dev/null | wc -l; }
++
++f_lock_free() { flock -n "$F_CASE/run/lock/twebproxy-manager-update.lock" true; }
++
++f_release_holder() { # stops the f_hold_lock holder and waits until the lock is free
++  local i
++  kill -KILL "$(<"$F_CASE/holder.pid")" 2>/dev/null
++  for ((i = 0; i < 50; i++)); do f_lock_free && return 0; sleep 0.1; done
++  return 1
++}
++
++# Leftovers of an update: candidate temp files in /tmp (pre-Stage F location),
++# the staging directory, and install temp files next to the installed copies.
++f_leftovers() {
++  local now
++  now="$(find /tmp -maxdepth 1 -name 'twebproxy-manager.*' -printf '%f\n' 2>/dev/null | sort)"
++  comm -13 "$F_CASE/tmp-before" <(printf '%s\n' "$now" | sed '/^$/d') | sed 's#^#/tmp/#'
++  [[ ! -e "$F_CASE/var/lib/twebproxy/update-staging" ]] || echo "$F_CASE/var/lib/twebproxy/update-staging"
++  find "$F_CASE/usr" "$F_CASE/opt" -maxdepth 1 -name '.twebproxy-*' 2>/dev/null
++}
++
++# Removes what a case left behind outside its own directory (pre-Stage F code
++# leaks candidates into /tmp) and stops processes a case started.
++f_case_cleanup() {
++  local f p
++  while IFS= read -r f; do
++    [[ "$f" == /tmp/twebproxy-manager.* && -f "$f" ]] && rm -f -- "$f"
++  done < <(f_leftovers 2>/dev/null)
++  for p in "$F_CASE"/hang.pid "$F_CASE"/linger.pid "$F_CASE"/holder.pid; do
++    [[ -f "$p" ]] && kill -KILL "$(<"$p")" 2>/dev/null
++  done
++  return 0
++}
++
++f_hold_lock() { # $1=seconds: another process holds the update lock (pid in holder.pid)
++  : > "$F_CASE/run/lock/twebproxy-manager-update.lock"; chmod 0600 "$F_CASE/run/lock/twebproxy-manager-update.lock"
++  # The holder process itself becomes the sleep, so killing it releases the lock.
++  bash -c 'exec 9>"$1"; flock -x 9; exec sleep "$2"' f-holder "$F_CASE/run/lock/twebproxy-manager-update.lock" "$1" &
++  echo "$!" > "$F_CASE/holder.pid"
++  disown "$!" 2>/dev/null
++  local i
++  for ((i = 0; i < 50; i++)); do f_lock_free || return 0; sleep 0.1; done
++  return 1
++}
++
++f_write_models() {
++  cat > "$F_CASE/bin/curl" <<'SH'
++#!/bin/bash
++# curl model: answers only from $F_REMOTE (see updater-harness.sh).
++set -u
++out="" fmt="" maxredirs=50 maxsize="" follow=0 fail=0 url=""
++while (( $# )); do
++  case "$1" in
++    -o|--output) out="$2"; shift;;
++    -w|--write-out) fmt="$2"; shift;;
++    --max-redirs) maxredirs="$2"; shift;;
++    --max-filesize) maxsize="$2"; shift;;
++    --connect-timeout|--max-time|--retry|-H|--header|--proto|--proto-redir|-A|--user-agent) shift;;
++    --fail) fail=1;;
++    --location) follow=1;;
++    --*) ;;
++    -*) [[ "$1" == *f* ]] && fail=1; [[ "$1" == *L* ]] && follow=1;;
++    *) url="$1";;
++  esac
++  shift
++done
++printf '%s\n' "$url" >> "$F_REMOTE/requests"
++[[ ! -e "$F_REMOTE/offline" ]] || { echo 'curl: (6) Could not resolve host (model offline)' >&2; exit 6; }
++redirects=0 code=200 file=""
++while :; do
++  [[ "$url" =~ ^https://[^/]+/ ]] || { echo "curl: (1) Protocol not supported (model): $url" >&2; exit 1; }
++  rest="${url#https://}"
++  if [[ -f "$F_REMOTE/redirect/$rest" ]]; then
++    if (( ! follow )); then code=302; file=""; break; fi
++    redirects=$((redirects + 1))
++    (( redirects <= maxredirs )) || { echo "curl: (47) Maximum ($maxredirs) redirects followed" >&2; exit 47; }
++    url="$(<"$F_REMOTE/redirect/$rest")"
++    printf 'redirect-> %s\n' "$url" >> "$F_REMOTE/requests"
++    continue
++  fi
++  file="$F_REMOTE/www/$rest"
++  [[ -f "$file" ]] || { code=404; file=""; }
++  break
++done
++if [[ "$code" == 404 ]] && (( fail )); then echo 'curl: (22) The requested URL returned error: 404' >&2; exit 22; fi
++fault=""
++[[ -z "$file" || ! -f "$F_REMOTE/fault/$rest" ]] || fault="$(<"$F_REMOTE/fault/$rest")"
++[[ "$fault" != hang ]] || exec sleep 3600
++size=0; [[ -z "$file" ]] || size="$(stat -c %s "$file")"
++if [[ -n "$maxsize" ]] && (( size > maxsize )); then echo 'curl: (63) Maximum file size exceeded' >&2; exit 63; fi
++emit() {
++  if [[ -z "$file" ]]; then [[ "$code" == 404 ]] && printf '404: Not Found'; return 0; fi
++  case "$fault" in
++    partial|truncate) head -c "$((size / 2))" "$file";;
++    *) cat "$file";;
++  esac
++}
++if [[ -n "$out" ]]; then emit > "$out"; else emit; fi
++[[ "$fault" != partial ]] || { echo 'curl: (18) transfer closed with outstanding read data remaining' >&2; exit 18; }
++if [[ -n "$fmt" ]]; then
++  fmt="${fmt//'%{url_effective}'/$url}"; fmt="${fmt//'%{num_redirects}'/$redirects}"; fmt="${fmt//'%{http_code}'/$code}"
++  printf "$fmt"
++fi
++exit 0
++SH
++  cat > "$F_CASE/bin/mv" <<'SH'
++#!/bin/bash
++# fault layer: mv onto the path named in $F_CASE/fail-mv-to fails once.
++dest="${*: -1}"
++if [[ -f "$F_CASE/fail-mv-to" && "$dest" == "$(<"$F_CASE/fail-mv-to")" ]]; then
++  rm -f "$F_CASE/fail-mv-to"; echo "mv: cannot move to '$dest': model failure" >&2; exit 1
++fi
++exec /usr/bin/mv "$@"
++SH
++  cat > "$F_CASE/bin/install" <<'SH'
++#!/bin/bash
++# fault: fail-install-backup makes every install into a backup being created fail.
++# barrier: the first install into a .twebproxy-stage4 temp file in the directory
++# named by $F_CASE/park-install-dir parks until $F_CASE/release exists.
++dest="${*: -1}"
++if [[ -f "$F_CASE/fail-install-backup" && "$dest" == */update-backups/.incomplete.* ]]; then
++  echo "install: cannot create '$dest': model disk failure" >&2; exit 1
++fi
++if [[ -f "$F_CASE/park-install-dir" && "$(basename -- "$dest")" == .twebproxy-stage4.* \
++      && "$(dirname -- "$dest")" == "$(<"$F_CASE/park-install-dir")" ]]; then
++  rm -f "$F_CASE/park-install-dir"; : > "$F_CASE/parked"
++  while [[ ! -e "$F_CASE/release" ]]; do sleep 0.05; done
++fi
++exec /usr/bin/install "$@"
++SH
++  chmod 0755 "$F_CASE"/bin/*
++}
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index bd65f93..b38bcec 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.19-beta
++# TWebProxy Manager v0.2.20-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.19"
+-MANAGER_RELEASE_VERSION="0.2.19-beta"
++MANAGER_VERSION="0.2.20"
++MANAGER_RELEASE_VERSION="0.2.20-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -18,14 +18,25 @@ MTPROXY_REPO="https://github.com/TelegramMessenger/MTProxy.git"
+ # Pinned by the upstream tproxy-server deployment docs at the time v0.2.0 was built.
+ MTPROXY_COMMIT="f36d8af769ffaeac36978d38c2c0f6d1104c2137"
+ 
+-# Manager release/update source. `check-update` prefers the latest stable GitHub
+-# release and falls back to the repository VERSION file on the default branch.
++# Manager release/update source (docs/UPDATES.md). Only the latest published,
++# non-draft, non-prerelease GitHub Release is an update candidate; development
++# branches and their VERSION files never are.
+ MANAGER_REPO_SLUG="Lazarev33/twebproxy-manager"
+ MANAGER_REPO_URL="https://github.com/$MANAGER_REPO_SLUG"
+ MANAGER_API_URL="https://api.github.com/repos/$MANAGER_REPO_SLUG"
+ MANAGER_RAW_URL="https://raw.githubusercontent.com/$MANAGER_REPO_SLUG"
+-MANAGER_DEFAULT_BRANCH="main"
+ MANAGER_UPDATE_CACHE_TTL=21600
++# manager-update installs a release only when its signed release manifest
++# verifies against one of these pinned Ed25519 public keys (base64 DER
++# SubjectPublicKeyInfo, one per entry) or, while no key is pinned, when the
++# operator passes the expected SHA-256 obtained from an independent channel
++# (--sha256). A SHA256SUMS file from the same source is never authentication.
++# The project has no release-signing key yet, so none is pinned and automatic
++# updates fail closed.
++MANAGER_UPDATE_TRUSTED_KEYS=()
++MANAGER_RELEASE_MANIFEST="twebproxy-manager-release.json"
++MANAGER_RELEASE_FORMAT="twebproxy.manager-release.v1"
++MANAGER_ARTIFACT_MAX_BYTES=8388608
+ 
+ BASE_DIR="/etc/twebproxy"
+ INSTANCES_DIR="$BASE_DIR/instances"
+@@ -91,6 +102,8 @@ UPDATE_BACKUP_PARENT="/var/lib/twebproxy"
+ UPDATE_BACKUP_ROOT="$UPDATE_BACKUP_PARENT/update-backups"
+ UPDATE_RESTORE_HELPER="$LIBEXEC_DIR/restore-update-backup"
+ UPDATE_LOCK_FILE="/run/lock/twebproxy-manager-update.lock"
++# Bounded wait (seconds) for an update lock held by another update or rollback.
++UPDATE_LOCK_WAIT_SECONDS="${TWEBPROXY_UPDATE_LOCK_WAIT:-30}"
+ UPDATE_BACKUP_RETENTION=4
+ CURRENT_LOG=""
+ MANAGER_UPDATE_HINT_ATTEMPTED=0
+@@ -689,22 +702,31 @@ ui_localize_legacy() {
+     'Offline rollback helper отсутствует или небезопасен:'*) printf 'The offline rollback helper is missing or unsafe:%s' "${text#*:}"; return;;
+     'Offline rollback helper отсутствует или небезопасен; обновление остановлено до создания backup.') printf 'The offline rollback helper is missing or unsafe; the update stopped before backup creation.'; return;;
+     'Manager update уже выполняется или lock небезопасен:'*) printf 'A Manager update is already running or the lock is unsafe:%s' "${text#*:}"; return;;
+-    'Текущие manager-копии не образуют точное безопасное состояние; обновление остановлено до создания backup.') printf 'The current Manager copies do not form an exact safe state; the update stopped before backup creation.'; return;;
+-    'Не удалось проверить обновление manager на '*) printf 'Failed to check for a Manager update at %s' "${text#Не удалось проверить обновление manager на }"; return;;
+-    'Не удалось получить информацию об обновлении с '*) printf 'Failed to obtain update information from %s' "${text#Не удалось получить информацию об обновлении с }"; return;;
++    'Текущие manager-копии не образуют точное безопасное состояние; обновление остановлено до создания backup. Если прошлое обновление было прервано, восстанови проверенную копию без сети: '*) printf 'The current Manager copies do not form an exact safe state; the update stopped before backup creation. If an earlier update was interrupted, restore the verified copy offline: %s' "${text##*без сети: }"; return;;
++    'Закрытый каталог обновления в '*) value="${text#Закрытый каталог обновления в }"; printf 'The private update directory in %s could not be prepared; the Manager was not changed.' "${value%% не подготовлен;*}"; return;;
++    'Значение --sha256 должно состоять из 64 шестнадцатеричных символов.') printf 'The --sha256 value must be 64 hexadecimal characters.'; return;;
++    'Неизвестный параметр manager-update: '*) value="${text#Неизвестный параметр manager-update: }"; printf 'Unknown manager-update option: %s. Allowed: --force, --sha256 <SHA-256>.' "${value%. Допустимо:*}"; return;;
++    'Не удалось получить последний стабильный релиз TWebProxy Manager с '*) value="${text#Не удалось получить последний стабильный релиз TWebProxy Manager с }"; printf 'Could not obtain the latest stable TWebProxy Manager release from %s: no release is published, the answer is invalid, or the network is unavailable.' "${value%%: релиз не опубликован*}"; return;;
++    'В этой сборке не закреплён ключ подписи релизов: manager-update установит релиз только с --sha256, полученным из независимого источника (docs/UPDATES.md).') printf 'This build pins no release-signing key: manager-update installs a release only with --sha256 obtained from an independent source (docs/UPDATES.md).'; return;;
++    'Доступна версия '*', но в этой сборке не закреплён ключ подписи релизов'*) value="${text#Доступна версия }"; printf 'Version %s is available, but this build pins no release-signing key, and a SHA256SUMS file from the same source does not prove authenticity. Automatic update is disabled: pass --sha256 <SHA-256 from an independent source> or update manually (docs/UPDATES.md).' "${value%%, но в этой сборке*}"; return;;
++    'Релиз '*' не публикует подписанный манифест ('*) value="${text#Релиз }"; value2="${text#*манифест (}"; printf 'Release %s does not publish the signed manifest (%s and .sig) at the expected GitHub address; the Manager was not changed.' "${value%% не публикует*}" "${value2%% и .sig)*}"; return;;
++    'Подпись манифеста релиза '*) value="${text#Подпись манифеста релиза }"; printf 'The release manifest signature of %s is not confirmed by a pinned key; the Manager was not changed.' "${value%% не подтверждена*}"; return;;
++    'Манифест релиза '*) value="${text#Манифест релиза }"; printf 'The release manifest of %s is invalid or does not match the release; the Manager was not changed.' "${value%% некорректен*}"; return;;
++    'SHA-256 из --sha256 не совпадает с подписанным манифестом релиза '*) value="${text#SHA-256 из --sha256 не совпадает с подписанным манифестом релиза }"; printf 'The --sha256 value does not match the signed release manifest of %s; the Manager was not changed.' "${value%%; manager не изменён.}"; return;;
++    'Не удалось скачать manager '*) value="${text#Не удалось скачать manager }"; value2="${value#* с }"; printf 'Could not download Manager %s from %s without a redirect; the Manager was not changed.' "${value%% с *}" "${value2%% без переадресации*}"; return;;
++    'SHA-256 скачанного manager не совпадает с доверенным значением ('*) value="${text#*значением (}"; printf 'The SHA-256 of the downloaded Manager does not match the trusted value (%s); the Manager was not changed.' "${value%%)*}"; return;;
++    'Скачанный manager не проходит bash -n или '*) value="${text#*соответствуют релизу }"; printf 'The downloaded Manager fails bash -n, or its MANAGER_VERSION / MANAGER_RELEASE_VERSION do not match release %s; the Manager was not changed.' "${value%%; manager не изменён.}"; return;;
++    'Новая версия не установлена; '*) printf 'The new version was not installed; neither Manager copy changed (verified by SHA-256). The verified backup was retained: %s' "${text##*сохранена: }"; return;;
++    'Откат не подтверждён. Восстанови TWebProxy Manager без сети: '*) value="${text#*без сети: }"; value2="${value#* restore }"; printf 'Rollback was not confirmed. Restore TWebProxy Manager offline: %s restore %s (or restore-latest; list: %s list).' "${value%% restore *}" "${value2%% (или*}" "${value%% restore *}"; return;;
++    'Копии TWebProxy Manager не синхронизированы: '*) value="${text#*TWebProxy Manager (}"; printf 'TWebProxy Manager copies were not synchronised: a TWebProxy Manager update or rollback is running (%s).' "${value%)*}"; return;;
+     'Доступна новая версия TWebProxy Manager:'*) printf 'A new TWebProxy Manager version is available:%s' "${text#*:}"; return;;
+     Локальная\ версия\ *\ новее\ опубликованной\ *) value="${text#Локальная версия }"; printf 'Local version %s is newer than published version %s' "${value%% новее опубликованной *}" "${value#* новее опубликованной }"; return;;
+     TWebProxy\ Manager\ *\ —\ актуальная\ версия.) value="${text#TWebProxy Manager }"; printf 'TWebProxy Manager %s is up to date.' "${value% — актуальная версия.}"; return;;
+     TWebProxy\ Manager\ *\ уже\ актуален.) value="${text#TWebProxy Manager }"; printf 'TWebProxy Manager %s is already up to date.' "${value% уже актуален.}"; return;;
+     Опубликованная\ версия\ *) value="${text#Опубликованная версия }"; value2="${value#* не новее локальной }"; printf 'Published version %s is not newer than local version %s. To force installation, run: manager-update --force' "${value%% не новее локальной *}" "${value2%%. Для принудительной*}"; return;;
+     'Скачиваю TWebProxy Manager '*) printf 'Downloading %s' "${text#Скачиваю }"; return;;
+-    В\ *\ нет\ SHA256SUMS.*) value="${text#В }"; printf '%s does not contain SHA256SUMS. Automatic Manager update stopped because the release must publish a checksum.' "${value%% нет SHA256SUMS.*}"; return;;
+-    'SHA256SUMS не содержит корректный hash для twebproxy-manager.sh') printf 'SHA256SUMS does not contain a valid hash for twebproxy-manager.sh.'; return;;
+-    'SHA-256 manager candidate не совпал с SHA256SUMS') printf 'The Manager candidate SHA-256 does not match SHA256SUMS.'; return;;
+-    'Скачанный manager не проходит bash -n') printf 'The downloaded Manager fails bash -n.'; return;;
+     'Не удалось создать и проверить локальный pre-update backup; manager не изменён.') printf 'Failed to create and verify the local pre-update backup; the Manager was not changed.'; return;;
+     'Проверенный pre-update backup:'*) printf 'Verified pre-update backup:%s' "${text#*:}"; return;;
+-    'Не удалось подготовить/установить первую manager-копию; проверенный backup сохранён:'*) printf 'Failed to prepare or install the first Manager copy; the verified backup was retained:%s' "${text#*:}"; return;;
+     'Установка или bounded health-check не завершились. Выполняю один exact rollback:'*) printf 'Installation or the bounded health check did not complete. Performing one exact rollback:%s' "${text#*:}"; return;;
+     'Не удалось выполнить retention проверенных backup; содержимое оставлено без изменений.') printf 'Failed to prune verified backups; their contents were left unchanged.'; return;;
+     'Manager обновлён, но не удалось обновить metadata в global.env; следующий repair исправит metadata.') printf 'The Manager was updated, but global.env metadata could not be updated; the next repair will correct it.'; return;;
+@@ -3551,21 +3573,43 @@ same_underlying_file() {
+ }
+ 
+ install_manager_copy() {
+-  local self="${BASH_SOURCE[0]}" target
++  local self="${BASH_SOURCE[0]}" target tmp held=0 rc=0
+   [[ -f "$self" ]] || return 0
+   install -d -o root -g root -m 0700 "$PROJECT_DIR" "$LOG_DIR" "$LOG_MANAGER_DIR" "$LOG_RUNTIME_DIR" "$LOG_BUNDLE_DIR" "$LOG_FULL_DIR" || return 1
++  # While manager-update or its offline rollback runs, the installed copies are
++  # theirs: take the update lock for the copy. A lock that cannot be used at all
++  # also stops manager-update, so then nothing can overlap.
++  if [[ "$STAGE4_UPDATE_LOCK_FD" != 9 ]]; then
++    if stage4_acquire_update_lock; then
++      held=1
++    else
++      rc=$?
++      if (( rc == 75 )); then
++        warn "Копии TWebProxy Manager не синхронизированы: сейчас выполняется обновление или откат TWebProxy Manager ($UPDATE_LOCK_FILE)."
++        return 0
++      fi
++      rc=0
++    fi
++  fi
+   # Each destination is handled independently: when the manager runs from one of
+   # its own installed paths that destination is already the running file (GNU
+   # install refuses an identical source and destination), but the other copy
+-  # must still be synchronised.
++  # must still be synchronised. Copies are replaced atomically.
+   for target in "$MANAGER_BIN" "$PROJECT_MANAGER_COPY"; do
+     if same_underlying_file "$self" "$target"; then
+-      chown root:root -- "$target" || return 1
+-      chmod 0755 -- "$target" || return 1
++      chown root:root -- "$target" && chmod 0755 -- "$target" || rc=1
++    elif tmp="$(mktemp "$(dirname -- "$target")/.twebproxy-copy.XXXXXX")"; then
++      if ! { install -o root -g root -m 0755 "$self" "$tmp" && mv -fT -- "$tmp" "$target"; }; then
++        rm -f -- "$tmp"
++        rc=1
++      fi
+     else
+-      install -o root -g root -m 0755 "$self" "$target" || return 1
++      rc=1
+     fi
++    (( rc == 0 )) || break
+   done
++  (( ! held )) || stage4_release_update_lock
++  return "$rc"
+ }
+ 
+ # Stage 4 local update backups deliberately cover only the two manager
+@@ -3626,8 +3670,18 @@ s4_embedded_version() {
+   printf '%s' "$values"
+ }
+ 
++# The parent is shared (the ACME webroot lives there and needs traversal): it
++# must be root-owned and not group/other-writable. The backup root itself is 0700.
++s4_safe_parent_dir() {
++  local path="$1" st
++  s4_no_symlink_components "$path" || return 1
++  [[ -d "$path" && ! -L "$path" ]] || return 1
++  st="$(stat -c '%u:%g:%a' -- "$path" 2>/dev/null)" || return 1
++  [[ "$st" =~ ^0:0:([0-7]+)$ ]] && (( (8#${BASH_REMATCH[1]} & 8#022) == 0 ))
++}
++
+ s4_backup_root_safe() {
+-  s4_safe_dir "$UPDATE_BACKUP_PARENT" 700 && s4_safe_dir "$UPDATE_BACKUP_ROOT" 700
++  s4_safe_parent_dir "$UPDATE_BACKUP_PARENT" && s4_safe_dir "$UPDATE_BACKUP_ROOT" 700
+ }
+ 
+ s4_verify_backup_dir() {
+@@ -3693,6 +3747,9 @@ s4_manager_file_safe() {
+   s4_safe_file "$1" 755
+ }
+ 
++# Probes are bounded (SIGKILL 5 s after the timeout, for a probe that ignores
++# SIGTERM), get no stdin and run without descriptor 9, so no process they leave
++# behind can keep the update lock.
+ s4_manager_health() {
+   local expected_hash="$1" expected_version="$2" target hash output
+   [[ "$expected_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+@@ -3703,9 +3760,9 @@ s4_manager_health() {
+     hash="$(sha256sum "$target" | awk '{print $1}')"
+     [[ "$hash" == "$expected_hash" ]] || return 1
+     bash -n "$target" || return 1
+-    output="$(TWEBPROXY_NO_LOG=1 timeout 15 "$target" --help 2>/dev/null)" || return 1
++    output="$(TWEBPROXY_NO_LOG=1 timeout -k 5 15 "$target" --help 2>/dev/null < /dev/null 9>&-)" || return 1
+     grep -Fq "TWebProxy Manager v$expected_version" <<< "$output" || return 1
+-    output="$(TWEBPROXY_NO_LOG=1 timeout 20 "$target" --json overview 2>/dev/null)" || return 1
++    output="$(TWEBPROXY_NO_LOG=1 timeout -k 5 20 "$target" --json overview 2>/dev/null < /dev/null 9>&-)" || return 1
+     jq -e --arg version "$expected_version" '
+       type == "object" and .schema_version == "twebproxy.output.v1" and
+       .command == "overview" and .data.manager_version == $version
+@@ -3748,9 +3805,11 @@ s4_acquire_lock() {
+     S4_LOCK_FD="externally-held"
+     return 0
+   fi
+-  exec {S4_LOCK_FD}>"$UPDATE_LOCK_FILE" || return 1
++  # Fixed descriptor 9, as in the manager: the health probes close it.
++  exec 9>"$UPDATE_LOCK_FILE" || return 1
++  S4_LOCK_FD=9
+   s4_safe_file "$UPDATE_LOCK_FILE" 600 || return 1
+-  flock -n "$S4_LOCK_FD"
++  flock -n 9
+ }
+ 
+ s4_restore_id() {
+@@ -3882,12 +3941,33 @@ stage4_safe_root_file() {
+   [[ "$(stat -c '%u:%g:%a' -- "$path" 2>/dev/null)" == "0:0:$mode" ]]
+ }
+ 
++stage4_restore_helper_valid() { # $1=helper file: safe, parseable, bound to these paths, answers list
++  local helper="$1" output first
++  stage4_safe_root_file "$helper" 755 || return 1
++  bash -n "$helper" || return 1
++  bash -c '
++    source "$1"
++    [[ "$UPDATE_BACKUP_FORMAT" == "$2" && "$UPDATE_BACKUP_PARENT" == "$3" &&
++       "$UPDATE_BACKUP_ROOT" == "$4" && "$UPDATE_LOCK_FILE" == "$5" &&
++       "$MANAGER_BIN" == "$6" && "$PROJECT_MANAGER_COPY" == "$7" ]]
++    declare -F s4_verify_backup_dir s4_manager_health s4_restore_id s4_prune_verified >/dev/null
++  ' _ "$helper" "$UPDATE_BACKUP_FORMAT" "$UPDATE_BACKUP_PARENT" \
++    "$UPDATE_BACKUP_ROOT" "$UPDATE_LOCK_FILE" "$MANAGER_BIN" "$PROJECT_MANAGER_COPY" || return 1
++  output="$(TWEBPROXY_NO_LOG=1 timeout 10 "$helper" list 2>/dev/null)" || return 1
++  first="${output%%$'\n'*}"
++  [[ "$first" == "format=$UPDATE_BACKUP_FORMAT" ]]
++}
++
+ stage4_install_restore_helper() {
+-  local allow_bootstrap="${1:-no}" dir dir_parent tmp output first
++  # no: verify the installed helper; yes: also bootstrap a missing one;
++  # refresh (manager-update, under the update lock): also replace a valid helper
++  # rendered by another manager version, so helper fixes reach existing hosts.
++  # An unsafe or invalid helper is never replaced.
++  local mode="${1:-no}" dir dir_parent tmp
+   dir="$(dirname -- "$UPDATE_RESTORE_HELPER")"
+   stage4_no_symlink_components "$dir" || return 1
+   if [[ ! -e "$dir" ]]; then
+-    [[ "$allow_bootstrap" == yes ]] || return 1
++    [[ "$mode" != no ]] || return 1
+     dir_parent="$(dirname -- "$dir")"
+     stage4_no_symlink_components "$dir_parent" || return 1
+     [[ -d "$dir_parent" && ! -L "$dir_parent" && "$(stat -c '%u:%g' -- "$dir_parent" 2>/dev/null)" == 0:0 ]] || return 1
+@@ -3895,33 +3975,24 @@ stage4_install_restore_helper() {
+   fi
+   [[ -d "$dir" && ! -L "$dir" && "$(stat -c '%u:%g' -- "$dir" 2>/dev/null)" == 0:0 ]] || return 1
+   if [[ -e "$UPDATE_RESTORE_HELPER" || -L "$UPDATE_RESTORE_HELPER" ]]; then
+-    stage4_safe_root_file "$UPDATE_RESTORE_HELPER" 755 || return 1
+-    bash -n "$UPDATE_RESTORE_HELPER" || return 1
+-    bash -c '
+-      source "$1"
+-      [[ "$UPDATE_BACKUP_FORMAT" == "$2" && "$UPDATE_BACKUP_PARENT" == "$3" &&
+-         "$UPDATE_BACKUP_ROOT" == "$4" && "$UPDATE_LOCK_FILE" == "$5" &&
+-         "$MANAGER_BIN" == "$6" && "$PROJECT_MANAGER_COPY" == "$7" ]]
+-      declare -F s4_verify_backup_dir s4_manager_health s4_restore_id s4_prune_verified >/dev/null
+-    ' _ "$UPDATE_RESTORE_HELPER" "$UPDATE_BACKUP_FORMAT" "$UPDATE_BACKUP_PARENT" \
+-      "$UPDATE_BACKUP_ROOT" "$UPDATE_LOCK_FILE" "$MANAGER_BIN" "$PROJECT_MANAGER_COPY" || return 1
+-    output="$(TWEBPROXY_NO_LOG=1 timeout 10 "$UPDATE_RESTORE_HELPER" list 2>/dev/null)" || return 1
+-    first="${output%%$'\n'*}"
+-    [[ "$first" == "format=$UPDATE_BACKUP_FORMAT" ]]
+-    return
++    stage4_restore_helper_valid "$UPDATE_RESTORE_HELPER" || return 1
++    [[ "$mode" == refresh ]] || return 0
++  else
++    [[ "$mode" != no ]] || return 1
+   fi
+-  [[ "$allow_bootstrap" == yes ]] || return 1
+   tmp="$(mktemp "$dir/.restore-update-backup.XXXXXX")" || return 1
+-  trap 'rm -f -- "$tmp"' RETURN
+-  stage4_render_restore_helper > "$tmp"
+-  chmod 0755 "$tmp"
+-  chown root:root "$tmp"
+-  bash -n "$tmp" || return 1
+-  mv -fT -- "$tmp" "$UPDATE_RESTORE_HELPER" || return 1
+-  tmp=""
+-  stage4_safe_root_file "$UPDATE_RESTORE_HELPER" 755 || return 1
+-  trap - RETURN
+-  stage4_install_restore_helper no
++  if stage4_render_restore_helper > "$tmp" && chmod 0755 "$tmp" && chown root:root "$tmp"; then
++    if [[ -f "$UPDATE_RESTORE_HELPER" ]] && cmp -s -- "$tmp" "$UPDATE_RESTORE_HELPER"; then
++      rm -f -- "$tmp"
++      return 0
++    fi
++    if stage4_restore_helper_valid "$tmp" && mv -fT -- "$tmp" "$UPDATE_RESTORE_HELPER"; then
++      stage4_restore_helper_valid "$UPDATE_RESTORE_HELPER"
++      return
++    fi
++  fi
++  rm -f -- "$tmp"
++  return 1
+ }
+ 
+ stage4_verify_backup() {
+@@ -3935,17 +4006,26 @@ stage4_prune_backups() {
+   bash -c 'source "$1"; s4_prune_verified "$2"' _ "$UPDATE_RESTORE_HELPER" "$protect"
+ }
+ 
+-stage4_prepare_backup_root() {
+-  local parent_parent
++# UPDATE_BACKUP_PARENT is shared with the ACME webroot, which the web server must
++# traverse: a missing parent is created 0755, an existing one must be root-owned
++# and not group/other-writable (its mode is left as it is). Backups and staging
++# below it are 0700.
++stage4_backup_parent_ready() {
++  local parent_parent st
+   parent_parent="$(dirname -- "$UPDATE_BACKUP_PARENT")"
+   stage4_no_symlink_components "$parent_parent" || return 1
+   [[ -d "$parent_parent" && ! -L "$parent_parent" ]] || return 1
+   if [[ ! -e "$UPDATE_BACKUP_PARENT" ]]; then
+-    install -d -o root -g root -m 0700 "$UPDATE_BACKUP_PARENT" || return 1
++    install -d -o root -g root -m 0755 "$UPDATE_BACKUP_PARENT" || return 1
+   fi
+   stage4_no_symlink_components "$UPDATE_BACKUP_PARENT" || return 1
+   [[ -d "$UPDATE_BACKUP_PARENT" && ! -L "$UPDATE_BACKUP_PARENT" ]] || return 1
+-  [[ "$(stat -c '%u:%g:%a' -- "$UPDATE_BACKUP_PARENT" 2>/dev/null)" == 0:0:700 ]] || return 1
++  st="$(stat -c '%u:%g:%a' -- "$UPDATE_BACKUP_PARENT" 2>/dev/null)" || return 1
++  [[ "$st" =~ ^0:0:([0-7]+)$ ]] && (( (8#${BASH_REMATCH[1]} & 8#022) == 0 ))
++}
++
++stage4_prepare_backup_root() {
++  stage4_backup_parent_ready || return 1
+   if [[ ! -e "$UPDATE_BACKUP_ROOT" ]]; then
+     install -d -o root -g root -m 0700 "$UPDATE_BACKUP_ROOT" || return 1
+   fi
+@@ -3955,8 +4035,9 @@ stage4_prepare_backup_root() {
+ }
+ 
+ STAGE4_UPDATE_LOCK_FD=""
+-stage4_acquire_update_lock() {
+-  local parent
++stage4_acquire_update_lock() { # 0 held, 75 busy after the bounded wait, 1 unsafe or unavailable
++  local parent wait="$UPDATE_LOCK_WAIT_SECONDS"
++  [[ "$wait" =~ ^[0-9]{1,3}$ ]] || wait=30
+   parent="$(dirname -- "$UPDATE_LOCK_FILE")"
+   stage4_no_symlink_components "$parent" || return 1
+   [[ -d "$parent" && ! -L "$parent" ]] || return 1
+@@ -3964,13 +4045,21 @@ stage4_acquire_update_lock() {
+     ( set -o noclobber; : > "$UPDATE_LOCK_FILE" ) 2>/dev/null || true
+   fi
+   stage4_safe_root_file "$UPDATE_LOCK_FILE" 600 || return 1
+-  # Use a fixed non-logging descriptor: Bash dynamic descriptors may be marked
+-  # close-on-exec, while the offline helper must inherit this exact locked open
+-  # file description for rollback without dropping the lock.
++  # Fixed descriptor 9: the offline helper inherits this exact locked open file
++  # description for rollback, and every health probe runs with it closed.
+   STAGE4_UPDATE_LOCK_FD=9
+-  exec 9>"$UPDATE_LOCK_FILE" || return 1
+-  stage4_safe_root_file "$UPDATE_LOCK_FILE" 600 || return 1
+-  flock -n "$STAGE4_UPDATE_LOCK_FD"
++  exec 9>"$UPDATE_LOCK_FILE" || { STAGE4_UPDATE_LOCK_FD=""; return 1; }
++  stage4_safe_root_file "$UPDATE_LOCK_FILE" 600 || { stage4_release_update_lock; return 1; }
++  # Bounded wait for a finishing update or rollback. The kernel drops the lock
++  # with its holder, so an interrupted update never leaves it behind; the lock
++  # file itself is never deleted.
++  flock -w "$wait" 9 || { stage4_release_update_lock; return 75; }
++}
++
++stage4_release_update_lock() {
++  [[ "$STAGE4_UPDATE_LOCK_FD" == 9 ]] || return 0
++  exec 9>&-
++  STAGE4_UPDATE_LOCK_FD=""
+ }
+ 
+ stage4_current_manager_preflight() {
+@@ -4027,15 +4116,25 @@ stage4_install_candidate_target() {
+   stage4_no_symlink_components "$dir" || return 1
+   [[ -d "$dir" && ! -L "$dir" && "$(stat -c '%u:%g' -- "$dir" 2>/dev/null)" == 0:0 ]] || return 1
+   tmp="$(mktemp "$dir/.twebproxy-stage4.XXXXXX")" || return 1
+-  trap 'rm -f -- "$tmp"' RETURN
+-  install -o root -g root -m 0755 "$candidate" "$tmp" || return 1
+-  stage4_safe_root_file "$tmp" 755 || return 1
+-  hash="$(sha256sum "$tmp" | awk '{print $1}')"
+-  [[ "$hash" == "$expected_hash" ]] || return 1
+-  bash -n "$tmp" || return 1
+-  mv -fT -- "$tmp" "$target" || return 1
+-  tmp=""
+-  trap - RETURN
++  # Explicit cleanup, no RETURN trap: one set here replaced the caller's trap
++  # and outlived this function after a failure.
++  if install -o root -g root -m 0755 "$candidate" "$tmp" \
++     && stage4_safe_root_file "$tmp" 755 \
++     && hash="$(sha256sum "$tmp" | awk '{print $1}')" && [[ "$hash" == "$expected_hash" ]] \
++     && bash -n "$tmp" \
++     && mv -fT -- "$tmp" "$target"; then
++    return 0
++  fi
++  rm -f -- "$tmp"
++  return 1
++}
++
++stage4_manager_copies_match() { # $1=SHA-256: both installed copies are exactly this root 0755 file
++  local target
++  for target in "$MANAGER_BIN" "$PROJECT_MANAGER_COPY"; do
++    stage4_safe_root_file "$target" 755 || return 1
++    [[ "$(sha256sum "$target" | awk '{print $1}')" == "$1" ]] || return 1
++  done
+ }
+ 
+ stage4_manager_health() {
+@@ -4116,75 +4215,150 @@ write_manager_update_cache() {
+ }
+ 
+ load_manager_update_cache() {
++  local line version="" ref="" source=""
+   manager_update_cache_fresh || return 1
+   unset REMOTE_MANAGER_VERSION REMOTE_MANAGER_REF REMOTE_MANAGER_SOURCE CHECKED_AT
+-  # shellcheck disable=SC1090
+-  source "$UPDATE_CACHE_FILE"
+-  valid_manager_version "${REMOTE_MANAGER_VERSION:-}" || return 1
+-  [[ -n "${REMOTE_MANAGER_REF:-}" && -n "${REMOTE_MANAGER_SOURCE:-}" ]] || return 1
++  # Parsed, never sourced. Only a stable-release entry is accepted: a cache
++  # written before Stage F may name a development branch.
++  while IFS= read -r line; do
++    case "$line" in
++      REMOTE_MANAGER_VERSION=*) version="${line#*=}";;
++      REMOTE_MANAGER_REF=*) ref="${line#*=}";;
++      REMOTE_MANAGER_SOURCE=*) source="${line#*=}";;
++    esac
++  done < "$UPDATE_CACHE_FILE"
++  valid_manager_version "$version" && [[ "$source" == release && "$ref" == "v$version" ]] || return 1
++  REMOTE_MANAGER_VERSION="$version"
++  REMOTE_MANAGER_REF="$ref"
++  REMOTE_MANAGER_SOURCE="$source"
++}
++
++manager_release_tag_from_json() { # $1=GitHub releases/latest answer -> the validated stable tag
++  jq -er --arg slug "$MANAGER_REPO_SLUG" '
++    if type == "object" and (.tag_name | type) == "string"
++       and (.tag_name | test("^v[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$"))
++       and .draft == false and .prerelease == false
++       and .html_url == ("https://github.com/" + $slug + "/releases/tag/" + .tag_name)
++    then .tag_name else empty end' <<< "$1" 2>/dev/null
++}
++
++manager_latest_release_tag() { # $1=connect timeout $2=max time $3=user agent -> stable tag
++  local json
++  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
++  # The API answers with the newest published release that is neither a draft
++  # nor a prerelease; the answer is validated anyway. Redirects are not
++  # followed: a moved repository is not silently trusted.
++  json="$(curl -fsS --connect-timeout "$1" --max-time "$2" --max-filesize 1048576 \
++    --proto '=https' --tlsv1.2 \
++    -H 'Accept: application/vnd.github+json' \
++    -H "User-Agent: $3" \
++    "$MANAGER_API_URL/releases/latest" 2>/dev/null)" || return 1
++  manager_release_tag_from_json "$json"
+ }
+ 
+ fetch_manager_update_info() {
+-  local allow_cache="${1:-yes}" json tag version branch
+-  local best_version="" best_ref="" best_source=""
++  local allow_cache="${1:-yes}" tag
+   unset REMOTE_MANAGER_VERSION REMOTE_MANAGER_REF REMOTE_MANAGER_SOURCE
+ 
+   if [[ "$allow_cache" == "yes" ]] && load_manager_update_cache; then
+     return 0
+   fi
+-  command -v curl >/dev/null 2>&1 || return 1
++  # Only the latest stable GitHub Release is a candidate: a VERSION file on a
++  # development branch is never an update source.
++  tag="$(manager_latest_release_tag 3 8 twebproxy-manager-update-check)" || return 1
++  REMOTE_MANAGER_VERSION="${tag#v}"
++  REMOTE_MANAGER_REF="$tag"
++  REMOTE_MANAGER_SOURCE="release"
++  write_manager_update_cache "$REMOTE_MANAGER_VERSION" "$tag" release
++  return 0
++}
+ 
+-  # Evaluate both the latest stable Release and VERSION on the repository branch.
+-  # If main is ahead of the latest GitHub Release, the newer repository version
+-  # is still visible; when versions are equal, the immutable release tag wins.
+-  json="$(curl -fsSL --connect-timeout 3 --max-time 8 --retry 1 \
+-    --proto '=https' --tlsv1.2 \
+-    -H 'Accept: application/vnd.github+json' \
+-    -H 'User-Agent: twebproxy-manager-update-check' \
+-    "$MANAGER_API_URL/releases/latest" 2>/dev/null || true)"
+-  if [[ -n "$json" ]]; then
+-    tag="$(grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' <<<"$json" | head -n1 | sed -E 's/.*:[[:space:]]*"([^"]+)"/\1/')"
+-    version="${tag#v}"
+-    if valid_manager_version "$version"; then
+-      best_version="$version"
+-      best_ref="$tag"
+-      best_source="release"
+-    fi
++manager_release_download() { # $1=URL $2=output $3=max bytes $4=direct|assets
++  local url="$1" out="$2" max="$3" policy="$4" meta code redirects effective redirs=0
++  [[ "$policy" == direct ]] || redirs=3
++  # Checked after the transfer: HTTP 200 only, no redirect for a direct URL, and
++  # for release downloads only a redirect to a GitHub release-asset host. A body
++  # from anywhere else is discarded before anything reads it.
++  meta="$(curl -fsSL --connect-timeout 5 --max-time 60 --retry 2 --max-redirs "$redirs" \
++    --max-filesize "$max" --proto '=https' --proto-redir '=https' --tlsv1.2 \
++    -H 'User-Agent: twebproxy-manager-updater' \
++    -w '%{http_code} %{num_redirects} %{url_effective}' -o "$out" "$url" 2>/dev/null)" || return 1
++  read -r code redirects effective <<< "$meta"
++  [[ "$code" == 200 && "$redirects" =~ ^[0-9]+$ ]] || return 1
++  if (( redirects == 0 )); then
++    [[ "$effective" == "$url" ]] || return 1
++  else
++    [[ "$policy" == assets && "$effective" =~ ^https://([^/@:]+)/ ]] || return 1
++    case "${BASH_REMATCH[1]}" in
++      objects.githubusercontent.com|release-assets.githubusercontent.com) ;;
++      *) return 1;;
++    esac
+   fi
+-
+-  for branch in "$MANAGER_DEFAULT_BRANCH" master; do
+-    version="$(curl -fsSL --connect-timeout 3 --max-time 8 --retry 1 \
+-      --proto '=https' --tlsv1.2 \
+-      -H 'User-Agent: twebproxy-manager-update-check' \
+-      "$MANAGER_RAW_URL/$branch/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+-    if valid_manager_version "$version"; then
+-      if [[ -z "$best_version" ]] || version_is_newer "$version" "$best_version"; then
+-        best_version="$version"
+-        best_ref="$branch"
+-        best_source="branch"
+-      fi
+-      break
++  [[ -f "$out" && ! -L "$out" ]] || return 1
++  (( $(stat -c %s -- "$out") <= max ))
++}
++
++manager_release_signature_ok() { # $1=manifest $2=base64 signature $3=work dir: a pinned key verifies it
++  local manifest="$1" signature="$2" dir="$3" key n=0
++  tr -d '\n' < "$signature" | base64 -d > "$dir/manifest.sig.bin" 2>/dev/null || return 1
++  [[ "$(stat -c %s -- "$dir/manifest.sig.bin")" == 64 ]] || return 1
++  for key in "${MANAGER_UPDATE_TRUSTED_KEYS[@]}"; do
++    n=$((n + 1))
++    printf '%s' "$key" | base64 -d > "$dir/trusted-key-$n.der" 2>/dev/null || continue
++    openssl pkey -pubin -inform DER -in "$dir/trusted-key-$n.der" -out "$dir/trusted-key-$n.pem" 2>/dev/null || continue
++    # -rawin accepts only EdDSA keys; with a 64-byte signature that is Ed25519.
++    if openssl pkeyutl -verify -pubin -inkey "$dir/trusted-key-$n.pem" -rawin \
++         -in "$manifest" -sigfile "$dir/manifest.sig.bin" >/dev/null 2>&1; then
++      return 0
+     fi
+   done
++  return 1
++}
+ 
+-  [[ -n "$best_version" ]] || return 1
+-  REMOTE_MANAGER_VERSION="$best_version"
+-  REMOTE_MANAGER_REF="$best_ref"
+-  REMOTE_MANAGER_SOURCE="$best_source"
+-  write_manager_update_cache "$best_version" "$best_ref" "$best_source"
+-  return 0
++manager_release_manifest_fields() { # $1=verified manifest $2=release tag -> "commit sha256 size release_version"
++  jq -er --arg format "$MANAGER_RELEASE_FORMAT" --arg slug "$MANAGER_REPO_SLUG" --arg tag "$2" \
++    --argjson max "$MANAGER_ARTIFACT_MAX_BYTES" '
++    def ok:
++      type == "object"
++      and (keys == ["artifact","channel","commit","format","release_version","repository","tag","version"])
++      and .format == $format and .repository == $slug and .channel == "stable"
++      and (.version | type) == "string" and (.version | test("^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,6}$"))
++      and .tag == $tag and .tag == ("v" + .version)
++      and (.release_version | type) == "string" and (.release_version | test("^[0-9A-Za-z.+-]{1,64}$"))
++      and (.version as $v | .release_version == $v or (.release_version | startswith($v + "-")))
++      and (.commit | type) == "string" and (.commit | test("^[0-9a-f]{40}$"))
++      and (.artifact | type) == "object" and ((.artifact | keys) == ["name","sha256","size"])
++      and .artifact.name == "twebproxy-manager.sh"
++      and (.artifact.sha256 | type) == "string" and (.artifact.sha256 | test("^[0-9a-f]{64}$"))
++      and (.artifact.size | type) == "number" and .artifact.size == (.artifact.size | floor)
++      and .artifact.size > 0 and .artifact.size <= $max;
++    if ok then [.commit, .artifact.sha256, (.artifact.size | tostring), .release_version] | join(" ")
++    else empty end' "$1" 2>/dev/null
++}
++
++manager_candidate_identity_ok() { # $1=file $2=version [$3=exact release label]: syntax and embedded identity
++  local file="$1" version="$2" label="${3:-}" versions labels
++  bash -n "$file" 2>/dev/null || return 1
++  versions="$(sed -nE 's/^MANAGER_VERSION="([^"]*)"$/\1/p' "$file")"
++  labels="$(sed -nE 's/^MANAGER_RELEASE_VERSION="([^"]*)"$/\1/p' "$file")"
++  [[ "$versions" == "$version" ]] || return 1
++  [[ "$labels" != *$'\n'* && ( "$labels" == "$version" || "$labels" == "$version"-* ) ]] || return 1
++  [[ -z "$label" || "$labels" == "$label" ]]
+ }
+ 
+ manager_check_update_impl() {
+   local allow_cache="${1:-yes}"
+   if ! fetch_manager_update_info "$allow_cache"; then
+-    warn "Не удалось проверить обновление manager на $MANAGER_REPO_URL"
++    warn "Не удалось получить последний стабильный релиз TWebProxy Manager с $MANAGER_REPO_URL: релиз не опубликован, ответ некорректен или сеть недоступна."
+     return 2
+   fi
+ 
+   echo "Manager:  local=$MANAGER_VERSION remote=$REMOTE_MANAGER_VERSION source=$REMOTE_MANAGER_SOURCE ref=$REMOTE_MANAGER_REF"
+   if version_is_newer "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"; then
+     warn "Доступна новая версия TWebProxy Manager: $REMOTE_MANAGER_VERSION"
++    if (( ${#MANAGER_UPDATE_TRUSTED_KEYS[@]} == 0 )); then
++      warn "В этой сборке не закреплён ключ подписи релизов: manager-update установит релиз только с --sha256, полученным из независимого источника (docs/UPDATES.md)."
++    fi
+     [[ "$UI_LANGUAGE" == en ]] && echo "Update: sudo twebproxy manager-update" || echo "Обновить: sudo twebproxy manager-update"
+     return 10
+   fi
+@@ -4211,117 +4385,199 @@ manager_check_update_cmd() {
+ }
+ 
+ set_global_manager_version() {
+-  local new_version="$1" upstream=unknown mtcommit="$MTPROXY_COMMIT"
++  local new_version="$1" upstream=unknown mtcommit="$MTPROXY_COMMIT" content tmp
+   [[ -f "$GLOBAL_ENV" ]] || return 0
+   upstream="$( (unset TPROXY_UPSTREAM_COMMIT; source "$GLOBAL_ENV"; printf '%s' "${TPROXY_UPSTREAM_COMMIT:-unknown}") )"
+   mtcommit="$( (unset MTPROXY_COMMIT; source "$GLOBAL_ENV"; printf '%s' "${MTPROXY_COMMIT:-$mtcommit}") )"
+-  {
+-    printf 'MANAGER_VERSION=%q\n' "$new_version"
+-    printf 'TPROXY_UPSTREAM_COMMIT=%q\n' "$upstream"
+-    printf 'MTPROXY_COMMIT=%q\n' "$mtcommit"
+-  } > "$GLOBAL_ENV"
+-  chmod 0600 "$GLOBAL_ENV"
++  content="$(printf 'MANAGER_VERSION=%q\nTPROXY_UPSTREAM_COMMIT=%q\nMTPROXY_COMMIT=%q' "$new_version" "$upstream" "$mtcommit")" || return 1
++  # Written beside the file, verified, then renamed: a failed write (disk full)
++  # leaves the previous global.env intact.
++  tmp="$(mktemp "$(dirname -- "$GLOBAL_ENV")/.global.env.XXXXXX")" || return 1
++  if printf '%s\n' "$content" > "$tmp" && chmod 0600 "$tmp" \
++     && [[ "$(cat -- "$tmp")" == "$content" ]] && mv -fT -- "$tmp" "$GLOBAL_ENV"; then
++    return 0
++  fi
++  rm -f -- "$tmp"
++  return 1
++}
++
++# Private root-only staging for one manager-update, beside the backup root. A
++# staging directory or install temp file left by an update that was killed is
++# removed here, under the update lock (no other update can own it).
++stage4_update_prepare() {
++  local staging="$UPDATE_BACKUP_PARENT/update-staging" dir stale
++  stage4_backup_parent_ready || return 1
++  if [[ -e "$staging" || -L "$staging" ]]; then
++    [[ -d "$staging" && ! -L "$staging" ]] || return 1
++    rm -rf --one-file-system -- "$staging" || return 1
++  fi
++  for dir in "$(dirname -- "$MANAGER_BIN")" "$(dirname -- "$PROJECT_MANAGER_COPY")"; do
++    for stale in "$dir"/.twebproxy-stage4.?????? "$dir"/.twebproxy-copy.??????; do
++      if [[ -f "$stale" && ! -L "$stale" ]]; then rm -f -- "$stale"; fi
++    done
++  done
++  install -d -o root -g root -m 0700 "$staging" || return 1
++  printf '%s' "$staging"
++}
++
++stage4_update_end() { # removes the staging directory, restores the signals, releases the lock
++  rm -rf --one-file-system -- "$UPDATE_BACKUP_PARENT/update-staging" 2>/dev/null || true
++  trap - EXIT INT TERM HUP
++  stage4_release_update_lock
++}
++
++stage4_update_abort() { # $1=exit status: interrupted before any manager copy was touched
++  stage4_update_end
++  exit "$1"
++}
++
++stage4_update_refuse() { # $1=reason $2=message: the update is refused, no manager copy touched
++  printf 'UPDATE_REFUSED reason=%s\n' "$1" >&2
++  die "$2"
+ }
+ 
+ manager_update_cmd() {
+   need_root; banner
+-  local force=0 candidate="" checksums="" expected actual embedded ref script_url checksum_url
+-  local backup_id="" rollback_rc=0
+-  [[ "${1:-}" == "--force" ]] && force=1
++  local force=0 pinned="" pinned_given=0 work version tag trust url expected size="" label="" fields commit actual
++  local backup_id="" old_hash="" outcome
++  while (( $# )); do
++    case "$1" in
++      --force) force=1;;
++      --sha256)
++        [[ $# -ge 2 ]] || stage4_update_refuse usage "Значение --sha256 должно состоять из 64 шестнадцатеричных символов."
++        pinned="$2"; pinned_given=1; shift;;
++      --sha256=*) pinned="${1#--sha256=}"; pinned_given=1;;
++      '') ;;
++      *) stage4_update_refuse usage "Неизвестный параметр manager-update: $1. Допустимо: --force, --sha256 <SHA-256>.";;
++    esac
++    shift
++  done
++  pinned="${pinned,,}"
++  (( ! pinned_given )) || [[ "$pinned" =~ ^[0-9a-f]{64}$ ]] \
++    || stage4_update_refuse usage "Значение --sha256 должно состоять из 64 шестнадцатеричных символов."
+ 
+   stage4_acquire_update_lock || die "Manager update уже выполняется или lock небезопасен: $UPDATE_LOCK_FILE"
+-  stage4_install_restore_helper yes || die "Offline rollback helper отсутствует или небезопасен; обновление остановлено до создания backup."
+-  stage4_current_manager_preflight || die "Текущие manager-копии не образуют точное безопасное состояние; обновление остановлено до создания backup."
+-
+-  fetch_manager_update_info no || die "Не удалось получить информацию об обновлении с $MANAGER_REPO_URL"
+-  if (( ! force )) && ! version_is_newer "$REMOTE_MANAGER_VERSION" "$MANAGER_VERSION"; then
+-    if [[ "$REMOTE_MANAGER_VERSION" == "$MANAGER_VERSION" ]]; then
++  trap 'stage4_update_end' EXIT
++  trap 'stage4_update_abort 130' INT; trap 'stage4_update_abort 143' TERM; trap 'stage4_update_abort 129' HUP
++  work="$(stage4_update_prepare)" \
++    || die "Закрытый каталог обновления в $UPDATE_BACKUP_PARENT не подготовлен; manager не изменён."
++  stage4_install_restore_helper refresh || die "Offline rollback helper отсутствует или небезопасен; обновление остановлено до создания backup."
++  stage4_current_manager_preflight \
++    || die "Текущие manager-копии не образуют точное безопасное состояние; обновление остановлено до создания backup. Если прошлое обновление было прервано, восстанови проверенную копию без сети: $UPDATE_RESTORE_HELPER restore-latest"
++
++  fetch_manager_update_info no \
++    || stage4_update_refuse release "Не удалось получить последний стабильный релиз TWebProxy Manager с $MANAGER_REPO_URL: релиз не опубликован, ответ некорректен или сеть недоступна."
++  version="$REMOTE_MANAGER_VERSION"; tag="$REMOTE_MANAGER_REF"
++  if (( ! force )) && ! version_is_newer "$version" "$MANAGER_VERSION"; then
++    if [[ "$version" == "$MANAGER_VERSION" ]]; then
+       ok "TWebProxy Manager $MANAGER_VERSION уже актуален."
++      stage4_update_end
+       return 0
+     fi
+-    die "Опубликованная версия $REMOTE_MANAGER_VERSION не новее локальной $MANAGER_VERSION. Для принудительной установки: manager-update --force"
++    die "Опубликованная версия $version не новее локальной $MANAGER_VERSION. Для принудительной установки: manager-update --force"
++  fi
++
++  # Trust: a manifest signed by a pinned key (required whenever a key is
++  # pinned), else an operator-pinned SHA-256; nothing else is authentication.
++  if (( ${#MANAGER_UPDATE_TRUSTED_KEYS[@]} )); then
++    trust="signed-release"
++    manager_release_download "$MANAGER_REPO_URL/releases/download/$tag/$MANAGER_RELEASE_MANIFEST" "$work/manifest.json" 65536 assets \
++      && manager_release_download "$MANAGER_REPO_URL/releases/download/$tag/$MANAGER_RELEASE_MANIFEST.sig" "$work/manifest.json.sig" 4096 assets \
++      || stage4_update_refuse download "Релиз $tag не публикует подписанный манифест ($MANAGER_RELEASE_MANIFEST и .sig) по ожидаемому адресу GitHub; manager не изменён."
++    manager_release_signature_ok "$work/manifest.json" "$work/manifest.json.sig" "$work" \
++      || stage4_update_refuse signature "Подпись манифеста релиза $tag не подтверждена закреплённым ключом; manager не изменён."
++    fields="$(manager_release_manifest_fields "$work/manifest.json" "$tag")" \
++      || stage4_update_refuse manifest "Манифест релиза $tag некорректен или не соответствует релизу; manager не изменён."
++    read -r commit expected size label <<< "$fields"
++    [[ -z "$pinned" || "$pinned" == "$expected" ]] \
++      || stage4_update_refuse digest "SHA-256 из --sha256 не совпадает с подписанным манифестом релиза $tag; manager не изменён."
++    url="$MANAGER_RAW_URL/$commit/twebproxy-manager.sh"
++  elif [[ -n "$pinned" ]]; then
++    trust="operator-sha256"
++    expected="$pinned"
++    url="$MANAGER_RAW_URL/$tag/twebproxy-manager.sh"
++  else
++    stage4_update_refuse no-trust-anchor "Доступна версия $version, но в этой сборке не закреплён ключ подписи релизов, а SHA256SUMS из того же источника не подтверждает подлинность. Автоматическое обновление отключено: укажи --sha256 <SHA-256 из независимого источника> или обнови вручную (docs/UPDATES.md)."
+   fi
+ 
+-  ref="$REMOTE_MANAGER_REF"
+-  script_url="$MANAGER_RAW_URL/$ref/twebproxy-manager.sh"
+-  checksum_url="$MANAGER_RAW_URL/$ref/SHA256SUMS"
+-  candidate="$(mktemp /tmp/twebproxy-manager.XXXXXX.sh)"
+-  checksums="$(mktemp /tmp/twebproxy-manager.XXXXXX.sha256)"
+-  trap 'rm -f "$candidate" "$checksums"' RETURN
+-
+-  log "Скачиваю TWebProxy Manager $REMOTE_MANAGER_VERSION ($REMOTE_MANAGER_SOURCE/$ref)..."
+-  curl -fL --connect-timeout 5 --max-time 30 --retry 2 \
+-    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+-    -H 'User-Agent: twebproxy-manager-updater' \
+-    -o "$candidate" "$script_url"
+-  curl -fL --connect-timeout 5 --max-time 20 --retry 2 \
+-    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+-    -H 'User-Agent: twebproxy-manager-updater' \
+-    -o "$checksums" "$checksum_url" \
+-    || die "В $ref нет SHA256SUMS. Автообновление manager остановлено: release должен публиковать checksum."
+-
+-  expected="$(awk '$2 == "twebproxy-manager.sh" {print $1; exit}' "$checksums")"
+-  [[ "$expected" =~ ^[0-9a-fA-F]{64}$ ]] || die "SHA256SUMS не содержит корректный hash для twebproxy-manager.sh"
+-  actual="$(sha256sum "$candidate" | awk '{print $1}')"
+-  [[ "${actual,,}" == "${expected,,}" ]] || die "SHA-256 manager candidate не совпал с SHA256SUMS"
+-
+-  bash -n "$candidate" || die "Скачанный manager не проходит bash -n"
+-  embedded="$(sed -nE 's/^MANAGER_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$candidate" | head -n1)"
+-  [[ "$embedded" == "$REMOTE_MANAGER_VERSION" ]] || die "VERSION mismatch: metadata=$REMOTE_MANAGER_VERSION script=${embedded:-unknown}"
+-  chmod 0600 "$candidate"
++  log "Скачиваю TWebProxy Manager $version ($tag, trust=$trust)..."
++  manager_release_download "$url" "$work/twebproxy-manager.sh" "$MANAGER_ARTIFACT_MAX_BYTES" direct \
++    || stage4_update_refuse download "Не удалось скачать manager $version с $url без переадресации; manager не изменён."
++  actual="$(sha256sum "$work/twebproxy-manager.sh" | awk '{print $1}')"
++  [[ "$actual" == "$expected" && ( -z "$size" || "$(stat -c %s -- "$work/twebproxy-manager.sh")" == "$size" ) ]] \
++    || stage4_update_refuse digest "SHA-256 скачанного manager не совпадает с доверенным значением ($trust); manager не изменён."
++  manager_candidate_identity_ok "$work/twebproxy-manager.sh" "$version" "$label" \
++    || stage4_update_refuse identity "Скачанный manager не проходит bash -n или его MANAGER_VERSION / MANAGER_RELEASE_VERSION не соответствуют релизу $tag; manager не изменён."
++  chmod 0600 "$work/twebproxy-manager.sh"
+ 
+-  # The downloaded script has not executed at this point.  Publish and verify
++  # The downloaded script has not executed at this point. Publish and verify
+   # the exact pre-update payload before the first target mutation.
+-  backup_id="$(stage4_create_backup "$REMOTE_MANAGER_VERSION")" \
++  old_hash="$(sha256sum "$MANAGER_BIN" | awk '{print $1}')"
++  backup_id="$(stage4_create_backup "$version")" \
+     || die "Не удалось создать и проверить локальный pre-update backup; manager не изменён."
+   log "Проверенный pre-update backup: $backup_id"
+ 
+-  if ! stage4_install_candidate_target "$candidate" "$MANAGER_BIN" "$actual"; then
+-    die "Не удалось подготовить/установить первую manager-копию; проверенный backup сохранён: $backup_id"
+-  fi
+-  if ! stage4_install_candidate_target "$candidate" "$PROJECT_MANAGER_COPY" "$actual" \
+-     || ! stage4_manager_health "$actual" "$REMOTE_MANAGER_VERSION"; then
+-    warn "Установка или bounded health-check не завершились. Выполняю один exact rollback: $backup_id"
+-    if stage4_rollback_exact "$backup_id"; then rollback_rc=0; else rollback_rc=$?; fi
+-    stage4_prune_backups "$backup_id" || warn "Не удалось выполнить retention проверенных backup; содержимое оставлено без изменений."
+-    trap - RETURN
+-    rm -f -- "$candidate" "$checksums"
+-    if (( rollback_rc == 0 )); then
++  # From the first copy to a verified outcome an interruption must not leave the
++  # copies mixed: INT, TERM, HUP and PIPE (a vanished terminal) are ignored by
++  # this process and by every step it runs, the rollback helper included.
++  trap '' INT TERM HUP PIPE
++  if stage4_install_candidate_target "$work/twebproxy-manager.sh" "$MANAGER_BIN" "$actual" \
++     && stage4_install_candidate_target "$work/twebproxy-manager.sh" "$PROJECT_MANAGER_COPY" "$actual" \
++     && stage4_manager_health "$actual" "$version"; then
++    outcome=success
++  elif stage4_manager_copies_match "$old_hash"; then
++    outcome=unchanged
++  else
++    warn "Установка или bounded health-check не завершились. Выполняю один exact rollback: $backup_id" || true
++    stage4_rollback_exact "$backup_id" > "$work/rollback.log" 2>&1 || true
++    # The outcome is what the installed copies prove, not the helper's status.
++    if stage4_manager_health "$old_hash" "$MANAGER_VERSION"; then outcome=rolled-back; else outcome=rollback-failed; fi
++  fi
++  trap 'stage4_update_abort 130' INT; trap 'stage4_update_abort 143' TERM; trap 'stage4_update_abort 129' HUP; trap - PIPE
++
++  case "$outcome" in
++    unchanged)
++      warn "Новая версия не установлена; обе копии TWebProxy Manager не изменялись (проверено по SHA-256). Проверенная резервная копия сохранена: $backup_id"
++      printf 'UPDATE_FAILED_UNCHANGED backup_id=%s\n' "$backup_id"
++      stage4_update_end
++      return 1;;
++    rolled-back)
++      [[ ! -s "$work/rollback.log" ]] || cat -- "$work/rollback.log"
++      stage4_prune_backups "$backup_id" || warn "Не удалось выполнить retention проверенных backup; содержимое оставлено без изменений."
+       printf 'UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=%s\n' "$backup_id"
+-      return 1
+-    fi
+-    printf 'UPDATE_FAILED_ROLLBACK_FAILED backup_id=%s\n' "$backup_id" >&2
+-    return 1
+-  fi
++      stage4_update_end
++      return 1;;
++    rollback-failed)
++      # No retention here: older verified backups may be the way back.
++      [[ ! -s "$work/rollback.log" ]] || cat -- "$work/rollback.log" >&2
++      printf 'UPDATE_FAILED_ROLLBACK_FAILED backup_id=%s\n' "$backup_id" >&2
++      warn "Откат не подтверждён. Восстанови TWebProxy Manager без сети: $UPDATE_RESTORE_HELPER restore $backup_id (или restore-latest; список: $UPDATE_RESTORE_HELPER list)."
++      stage4_update_end
++      return 1;;
++  esac
+ 
+-  if ! set_global_manager_version "$REMOTE_MANAGER_VERSION"; then
++  if ! set_global_manager_version "$version"; then
+     warn "Manager обновлён, но не удалось обновить metadata в global.env; следующий repair исправит metadata."
+   fi
+   rm -f "$UPDATE_CACHE_FILE" || warn "Manager обновлён, но update cache не удалён."
+   stage4_prune_backups "$backup_id" || warn "Manager обновлён, но retention проверенных backup не выполнен."
+-  trap - RETURN
+-  rm -f -- "$candidate" "$checksums"
+-  ok "TWebProxy Manager обновлён: $MANAGER_VERSION -> $REMOTE_MANAGER_VERSION"
++  stage4_update_end
++  ok "TWebProxy Manager обновлён: $MANAGER_VERSION -> $version"
+   printf 'UPDATE_SUCCESS backup_id=%s\n' "$backup_id"
+ }
+ 
+ fetch_manager_update_hint_info() {
+-  local version
++  local tag
+   if load_manager_update_cache; then
+     return 0
+   fi
+-  command -v curl >/dev/null 2>&1 || return 1
+-  # The automatic hint is deliberately cheap: one short request to VERSION.
+-  # Full release/main evaluation is reserved for explicit check-update.
+-  version="$(curl -fsSL --connect-timeout 2 --max-time 3 \
+-    --proto '=https' --tlsv1.2 \
+-    -H 'User-Agent: twebproxy-manager-update-hint' \
+-    "$MANAGER_RAW_URL/$MANAGER_DEFAULT_BRANCH/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+-  valid_manager_version "$version" || return 1
+-  REMOTE_MANAGER_VERSION="$version"
+-  REMOTE_MANAGER_REF="$MANAGER_DEFAULT_BRANCH"
+-  REMOTE_MANAGER_SOURCE="branch"
+-  write_manager_update_cache "$version" "$MANAGER_DEFAULT_BRANCH" branch
++  # The automatic hint is deliberately cheap: one short request for the latest
++  # stable release (never a development branch).
++  tag="$(manager_latest_release_tag 2 3 twebproxy-manager-update-hint)" || return 1
++  REMOTE_MANAGER_VERSION="${tag#v}"
++  REMOTE_MANAGER_REF="$tag"
++  REMOTE_MANAGER_SOURCE="release"
++  write_manager_update_cache "$REMOTE_MANAGER_VERSION" "$tag" release
+ }
+ 
+ manager_update_hint() {
+@@ -8491,7 +8747,8 @@ Usage: twebproxy [--json|--raw] [--no-color] [command] [args]
+ 
+ Manager / Core:
+   check-update                 check for a new Manager version
+-  manager-update [--force]     verified backup, update, health gate and exact rollback
++  manager-update [--force] [--sha256 HEX]
++                               verified release, backup, health gate and exact rollback
+   manager-backup-list          list verified local update backups
+   manager-rollback [latest|id] restore both Manager copies from a local backup
+   core-install                 install dependencies, relay and MTProxy
+@@ -8537,7 +8794,8 @@ TWebProxy Manager v$MANAGER_RELEASE_VERSION
+ 
+ TWebProxy Manager / основа:
+   check-update                 проверить новую версию TWebProxy Manager
+-  manager-update [--force]     резервная копия, обновление, проверка и точный откат
++  manager-update [--force] [--sha256 HEX]
++                               проверенный релиз, резервная копия, проверка и точный откат
+   manager-backup-list          показать проверенные локальные резервные копии обновлений
+   manager-rollback [latest|id] восстановить обе копии TWebProxy Manager из резервной копии
+   core-install                 установить зависимости, relay и MTProxy
+@@ -8614,7 +8872,7 @@ main() {
+   setup_logging "$cmd"
+   case "$cmd" in
+     check-update) manager_check_update_cmd ;;
+-    manager-update) manager_update_cmd "${1:-}" ;;
++    manager-update) manager_update_cmd "$@" ;;
+     manager-backup-list) manager_backup_list_cmd ;;
+     manager-rollback) manager_restore_backup_cmd "${1:-latest}" ;;
+     core-install) core_install_cmd ;;

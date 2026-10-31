@@ -1,0 +1,8 @@
+name	rc	last_line
+audit-reproduce-cross-instance-orphan-on-v0.2.15	1	FAIL: cross-instance mutation confirmed
+audit-reproduce-backend-id-collision-on-v0.2.15	1	FAIL: add(A,b--x) overwrote the live B/x backend env
+backend-identity-on-v0.2.15	1	c12-backend-identity: pass=35 fail=53
+backend-identity-on-mutant-prefix-only-overlap	1	c12-backend-identity: pass=87 fail=1
+backend-identity-on-mutant-check-before-lock	1	c12-backend-identity: pass=84 fail=4
+audit-reproduce-cross-instance-orphan-on-v0.2.14-mgr	0	PASS
+audit-reproduce-backend-id-collision-on-v0.2.14-mgr	1	FAIL: add(A,b--x) overwrote the live B/x backend env

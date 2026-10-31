@@ -44,6 +44,12 @@ c1_harness() {
   case ":$PATH:" in *":$TMP/bin:"*) ;; *) export PATH="$TMP/bin:$PATH";; esac
   # Host-only preconditions and the Stage B firewall (covered by its own suite).
   need_root() { :; }; need_systemd() { :; }; check_platform() { :; }; banner() { :; }
+  # v0.2.23 host-only steps: the procfs policy and the owned guard session are
+  # real-host behaviour (tests/prerc). The model guard mirrors backend state.
+  proc_hardening_ensure() { :; }; proc_hardening_state() { builtin printf hidden; }
+  proc_hidepid_value() { builtin printf invisible; }
+  fw_guard_live() { BF_BACKENDS="$BACKENDS_DIR" backend_fw_collect; }
+  export TWEBPROXY_CADDY_CERT_WAIT=0
   ensure_core() { :; }
   # Stage B firewall stand-in: the protected port set is what the real
   # backend_fw_collect derives from backends/*.env at rebuild time.

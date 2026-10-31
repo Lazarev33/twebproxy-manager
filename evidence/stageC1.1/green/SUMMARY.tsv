@@ -1,0 +1,27 @@
+name	rc	seconds	last_line
+bash-n-all	0	1	bash -n OK
+c11-backend-stop	0	7	c11-backend-stop: pass=67 fail=0
+c1-identity	0	1	c1-profile-identity: pass=32 fail=0
+c1-persistence	0	5	c1-state-persistence: pass=54 fail=0
+c1-concurrency	0	6	c1-concurrency: pass=33 fail=0
+c1-ports	0	7	c1-port-allocation: pass=26 fail=0
+suite-stage-c1	0	27	stage-c1-suite: PASS (all mandatory model checks executed)
+c11-scope-vs-v0214	0	4	PASS c11-scope unchanged=346 modified=8 added=3
+c1-scope-vs-v0213	0	5	PASS c1-scope unchanged=310 modified=22 added=25
+suite-stage-b	77	14	stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)
+suite-stage-a	77	69	stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)
+protocol-meta	0	0	PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+sa6-release-metadata	0	0	sa6-release-metadata: 6 pass, 0 fail
+fg-tg5	0	1	tg5: pass=13 fail=0
+fg-tg5b	0	0	tg5b: pass=19 fail=0
+fg-tg7	0	1	tg7: pass=12 fail=0
+fg-df3	0	11	df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail
+fg-df3b	0	2	df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
+read-only-core	0	7	read-only-core-fixture: PASS
+l10n-static-C	0	4	localization-static-audit: PASS (252 bilingual keys; 314 legacy call-sites)
+l10n-static-UTF8	0	5	localization-static-audit: PASS (252 bilingual keys; 314 legacy call-sites)
+l10n-flow-C	0	2	localization-flow-fixture: PASS (locale=C)
+l10n-flow-UTF8	0	3	localization-flow-fixture: PASS (locale=C.UTF-8)
+static-smoke	0	0	static-smoke: PASS
+certificate-smoke	0	1	certificate-smoke: PASS
+stage4-hash	0	0	fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set

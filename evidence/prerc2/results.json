@@ -1,0 +1,397 @@
+{
+ "checkpoint": "v0.2.24-beta focused pre-RC security correction",
+ "baseline": {
+  "commit": "302ae80188de395bea62998e825fdbe37661e950",
+  "manager_sha256": "f804a72897cb44f4476f074b0be1769eeff59d4f79b0f220f49f2f87854e2475"
+ },
+ "inputs": {
+  "v0.2.23_all_in_one_sha256": "b842ea1ab575a95f166d7341682ab824d8601e7080a946708495e82e762a111f",
+  "v0.2.23_final_real_host_acceptance_sha256": "52020645bc874e9171f1a0b63bc172eb53c83bbddd1b46b795dc84b51c0d073b",
+  "acceptance_verdict": "REJECTED"
+ },
+ "candidate": {
+  "branch": "prerc/v0.2.24",
+  "see": "COMMIT-IDENTITY.txt",
+  "manager_sha256": "fd2d153c19451bdc6f22679718bddb400a140cc48b165b716af37669d97370dd"
+ },
+ "verdict": "BOTH_P1_FIXED_ON_TESTED_HOST; awaiting independent acceptance; NOT an RC",
+ "independence": "not independent: implemented and tested by the same Claude session",
+ "environment": "owner-authorized disposable test VPS, Ubuntu 24.04.5, kernel 6.8.0-147, systemd 255, nft 1.0.9; no reboot; production VPS not accessed; no GitHub publication",
+ "p1_a_owner_loss_exposure": {
+  "status": "FIXED_REAL_HOST",
+  "mechanism": "per-backend PID 1 cgroup socket filter (IPAddressDeny=any, IPAddressAllow=localhost + Telegram DC CIDRs, IPAccounting=yes) + ExecStartPre=+backend-start-check; nftables guard kept as second layer",
+  "red_v0.2.23_full": {
+   "backend_open": 2789,
+   "backend_samples": 20861,
+   "control_open": 13072,
+   "open_by_scenario": {
+    "child-kill+nft-restart-1": 9,
+    "child-kill+nft-restart+backend-restarts-1": 26,
+    "child-kill+foreign-flush-1": 64,
+    "frozen-shell+child-kill+flush-hold10s-1": 2690
+   }
+  },
+  "red_v0.2.23_quick_first_run": {
+   "backend_open": 224,
+   "backend_samples": 12941
+  },
+  "green_v0.2.24_development": {
+   "backend_open": 0,
+   "backend_samples": 42161,
+   "control_open": 26124,
+   "scenarios": 31,
+   "all_recovered": true
+  },
+  "green_v0.2.24_committed_candidate": {
+   "backend_open": 0,
+   "backend_samples": 41347,
+   "control_open": 25138,
+   "scenarios": 31,
+   "all_recovered": true
+  },
+  "no_nftables_table_windows": {
+   "red-fw-v0.2.23-full": {
+    "windows_without_any_twebproxy_table_while_backends_alive": 3,
+    "total_window_ms": 10356.8,
+    "backend_samples_inside": 5585,
+    "status_inside": {
+     "OPEN": 2744,
+     "ERR111": 2841
+    },
+    "open_inside": 2744
+   },
+   "green-fw-v0.2.24-final": {
+    "windows_without_any_twebproxy_table_while_backends_alive": 7,
+    "total_window_ms": 31315.2,
+    "backend_samples_inside": 9938,
+    "status_inside": {
+     "ERR111": 8472,
+     "TIMEOUT": 1466
+    },
+    "open_inside": 0
+   },
+   "final": {
+    "windows_without_any_twebproxy_table_while_backends_alive": 9,
+    "total_window_ms": 31538.5,
+    "backend_samples_inside": 10109,
+    "status_inside": {
+     "TIMEOUT": 1461,
+     "ERR111": 8648
+    },
+    "open_inside": 0
+   }
+  }
+ },
+ "p1_b_procfs_failure": {
+  "status": "FIXED_REAL_HOST",
+  "red_v0.2.23": {
+   "S1-repair-mount-fail": {
+    "verdict": "RED",
+    "detail": "rc=1 readable=4"
+   },
+   "S2-restart-mount-fail": {
+    "verdict": "RED",
+    "detail": "rc=0 readable=4"
+   },
+   "S3-repair-stacked": {
+    "verdict": "RED",
+    "detail": "rc=0 readable=4"
+   },
+   "S4-systemd-start-unprotected": {
+    "verdict": "RED",
+    "detail": "unit_restart_rc=0 b1=active/pid1437223 fw_restart_rc=0 readers_after_fw=12/12 active_after_fw=2 audit_procfs_error=1 untouched_backend_readers_before=12/12"
+   },
+   "S5-explicit-opt-out": {
+    "verdict": "GREEN",
+    "detail": "disable_rc=0 start=active journal_warning=0 audit_warning=1 policy=off enable_rc=0"
+   }
+  },
+  "green_v0.2.24_development": {
+   "S1-repair-mount-fail": {
+    "verdict": "GREEN",
+    "detail": "rc=1 readable=0"
+   },
+   "S2-restart-mount-fail": {
+    "verdict": "GREEN",
+    "detail": "rc=1 readable=0"
+   },
+   "S3-repair-stacked": {
+    "verdict": "GREEN",
+    "detail": "rc=0 readable=0"
+   },
+   "S4-systemd-start-unprotected": {
+    "verdict": "GREEN",
+    "detail": "unit_restart_rc=1 b1=activating/pid0 fw_restart_rc=0 readers_after_fw=0/0 active_after_fw=0 audit_procfs_error=1 untouched_backend_readers_before=12/12"
+   },
+   "S5-explicit-opt-out": {
+    "verdict": "GREEN",
+    "detail": "disable_rc=0 start=active journal_warning=1 audit_warning=1 policy=off enable_rc=0"
+   }
+  },
+  "green_v0.2.24_committed_candidate": {
+   "S1-repair-mount-fail": {
+    "verdict": "GREEN",
+    "detail": "rc=1 readable=0"
+   },
+   "S2-restart-mount-fail": {
+    "verdict": "GREEN",
+    "detail": "rc=1 readable=0"
+   },
+   "S3-repair-stacked": {
+    "verdict": "GREEN",
+    "detail": "rc=0 readable=0"
+   },
+   "S4-systemd-start-unprotected": {
+    "verdict": "GREEN",
+    "detail": "unit_restart_rc=1 b1=activating/pid0 fw_restart_rc=0 readers_after_fw=0/0 active_after_fw=0 audit_procfs_error=1 untouched_backend_readers_before=12/12"
+   },
+   "S5-explicit-opt-out": {
+    "verdict": "GREEN",
+    "detail": "disable_rc=0 start=active journal_warning=1 audit_warning=1 policy=off enable_rc=0"
+   }
+  }
+ },
+ "p2_proc_multimount": {
+  "status": "FIXED_REAL_HOST",
+  "evidence": "S3 stacked proc mounts: v0.2.23 4/4 readable with audit protected; v0.2.24 top mount hardened, 0/4"
+ },
+ "regression": {
+  "real_host_prerc_suite_v0.2.23_harnesses": "PASS (fw transitions, guard continuity, P1-G-01 restore RESTORE_PARTIAL/3, proc readers 0, DPI ENOSPC, rollback EOF/decline)",
+  "real_host_lifecycle": "PASS (delete x2, core-uninstall clean: 0 unit files/links/loaded units/nft tables, core-install, restore + repair x2 rc 0, audits PASS, HTTPS 200 verify 0)",
+  "model_static": {
+   "counts": {
+    "0": 41,
+    "77": 2,
+    "other": 0
+   },
+   "rows": [
+    {
+     "name": "git-diff-check",
+     "rc": "0",
+     "last_line": "git diff --check v0.2.23..candidate: clean"
+    },
+    {
+     "name": "bash-n-all",
+     "rc": "0",
+     "last_line": "bash -n OK (108 scripts)"
+    },
+    {
+     "name": "e-operations",
+     "rc": "0",
+     "last_line": "e-operations: pass=48 fail=0"
+    },
+    {
+     "name": "suite-stage-e",
+     "rc": "0",
+     "last_line": "stage-e-suite: PASS (all mandatory model checks executed)"
+    },
+    {
+     "name": "f-updater",
+     "rc": "0",
+     "last_line": "updater-fixture: 278 pass, 0 fail"
+    },
+    {
+     "name": "suite-stage-f",
+     "rc": "0",
+     "last_line": "stage-f-suite: PASS (all mandatory model checks executed)"
+    },
+    {
+     "name": "suite-stage-g",
+     "rc": "0",
+     "last_line": "stage-g-suite: PASS (all mandatory checks executed)"
+    },
+    {
+     "name": "suite-stage-h",
+     "rc": "0",
+     "last_line": "stage-h-suite: PASS (all mandatory checks executed)"
+    },
+    {
+     "name": "prerc2-scope-vs-v0223",
+     "rc": "0",
+     "last_line": "PASS prerc2-scope unchanged=427 modified=15 added=11"
+    },
+    {
+     "name": "start-gate-fixture",
+     "rc": "0",
+     "last_line": "start-gate-fixture: pass=27 fail=0"
+    },
+    {
+     "name": "heredoc-guard",
+     "rc": "0",
+     "last_line": "heredoc-guard: PASS (no backtick in an unquoted heredoc)"
+    },
+    {
+     "name": "python-compile",
+     "rc": "0",
+     "last_line": "python syntax OK"
+    },
+    {
+     "name": "stage4-mandatory-suite",
+     "rc": "0",
+     "last_line": "stage4-mandatory-suite: PASS (A-V all executed)"
+    },
+    {
+     "name": "stage-x-dpi-suite",
+     "rc": "0",
+     "last_line": "stage-x-dpi-suite: PASS (all mandatory autonomous tests executed; mandatory_skips=0)"
+    },
+    {
+     "name": "stage-x-dpi-installed-asset",
+     "rc": "0",
+     "last_line": "stage-x-dpi-installed-asset-fixture: PASS"
+    },
+    {
+     "name": "updater-function-hashes",
+     "rc": "0",
+     "last_line": "830f6cd889f2c821c2fc69fe6b623c2595be0180517bfb7d2197079687c6b859  stage4-protected-function-set-full"
+    },
+    {
+     "name": "d-frontend-tls",
+     "rc": "0",
+     "last_line": "d-frontend-tls: pass=122 fail=0"
+    },
+    {
+     "name": "suite-stage-d",
+     "rc": "0",
+     "last_line": "stage-d-suite: PASS (all mandatory model checks executed)"
+    },
+    {
+     "name": "suite-stage-c2",
+     "rc": "0",
+     "last_line": "stage-c2-suite: PASS (all mandatory model checks executed)"
+    },
+    {
+     "name": "suite-stage-c1",
+     "rc": "0",
+     "last_line": "stage-c1-suite: PASS (all mandatory model checks executed)"
+    },
+    {
+     "name": "audit-c11-cross-instance-orphan",
+     "rc": "0",
+     "last_line": "PASS"
+    },
+    {
+     "name": "audit-c11-backend-id-collision",
+     "rc": "0",
+     "last_line": "PASS: existing B/x backend env preserved"
+    },
+    {
+     "name": "audit-c1-failed-backend-stop",
+     "rc": "0",
+     "last_line": "FW collection ports=[23980,23981,28980,28981]"
+    },
+    {
+     "name": "audit-c1-orphan-backend",
+     "rc": "0",
+     "last_line": "API profiles=[alpha]"
+    },
+    {
+     "name": "suite-stage-b",
+     "rc": "77",
+     "last_line": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+    },
+    {
+     "name": "suite-stage-a",
+     "rc": "77",
+     "last_line": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+    },
+    {
+     "name": "protocol-meta",
+     "rc": "0",
+     "last_line": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+    },
+    {
+     "name": "sa6-release-metadata",
+     "rc": "0",
+     "last_line": "sa6-release-metadata: 6 pass, 0 fail"
+    },
+    {
+     "name": "fg-tg5",
+     "rc": "0",
+     "last_line": "tg5: pass=13 fail=0"
+    },
+    {
+     "name": "fg-tg5b",
+     "rc": "0",
+     "last_line": "tg5b: pass=19 fail=0"
+    },
+    {
+     "name": "fg-tg7",
+     "rc": "0",
+     "last_line": "tg7: pass=12 fail=0"
+    },
+    {
+     "name": "fg-df3",
+     "rc": "0",
+     "last_line": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+    },
+    {
+     "name": "fg-df3b",
+     "rc": "0",
+     "last_line": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+    },
+    {
+     "name": "read-only-core",
+     "rc": "0",
+     "last_line": "read-only-core-fixture: PASS"
+    },
+    {
+     "name": "l10n-static-C",
+     "rc": "0",
+     "last_line": "localization-static-audit: PASS (332 bilingual keys; 415 legacy call-sites)"
+    },
+    {
+     "name": "l10n-static-UTF8",
+     "rc": "0",
+     "last_line": "localization-static-audit: PASS (332 bilingual keys; 415 legacy call-sites)"
+    },
+    {
+     "name": "l10n-flow-C",
+     "rc": "0",
+     "last_line": "localization-flow-fixture: PASS (locale=C)"
+    },
+    {
+     "name": "l10n-flow-UTF8",
+     "rc": "0",
+     "last_line": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+    },
+    {
+     "name": "static-smoke",
+     "rc": "0",
+     "last_line": "static-smoke: PASS"
+    },
+    {
+     "name": "certificate-smoke",
+     "rc": "0",
+     "last_line": "certificate-smoke: PASS"
+    },
+    {
+     "name": "tui-presentation",
+     "rc": "0",
+     "last_line": "tui-presentation-fixture: PASS"
+    },
+    {
+     "name": "stage-x-fixui",
+     "rc": "0",
+     "last_line": "stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)"
+    },
+    {
+     "name": "stage4-hash",
+     "rc": "0",
+     "last_line": "bf060d063c53bd220210036c227df0cb251d5ba749c860df411b6de5fbb3c223  stage4-protected-function-set"
+    }
+   ],
+   "sentinel_calls": 0
+  }
+ },
+ "not_executed": [
+  "Debian 12",
+  "Ubuntu 22.04",
+  "real cold boot (no reboot authorized)",
+  "genuine Telegram clients",
+  "signed release",
+  "fresh add of a new hostname",
+  "Stage A/B real-lab gates (need a clean lab host)"
+ ],
+ "host_final_state": "two instances active, audits PASS, hidepid=invisible, /etc/fstab unchanged, nftables.service inactive as before"
+}

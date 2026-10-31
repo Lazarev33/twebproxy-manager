@@ -1,0 +1,1793 @@
+[
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "twebproxy_backend": 858
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:01.146360+00:00",
+   "mono_ns": 135430110218143
+  },
+  "label": "normal-nftables-start-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 859,
+   "twebproxy_backend": 863
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:04.424382+00:00",
+   "mono_ns": 135433388241606
+  },
+  "label": "normal-nftables-start-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 859,
+   "twebproxy_backend": 863
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:04.511081+00:00",
+   "mono_ns": 135433474939662
+  },
+  "label": "normal-nftables-reload-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 864,
+   "twebproxy_backend": 868
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:07.707667+00:00",
+   "mono_ns": 135436671532477
+  },
+  "label": "normal-nftables-reload-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 864,
+   "twebproxy_backend": 868
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:07.857939+00:00",
+   "mono_ns": 135436821815256
+  },
+  "label": "normal-nftables-restart-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 873,
+   "twebproxy_backend": 877
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:11.245381+00:00",
+   "mono_ns": 135440209238013
+  },
+  "label": "normal-nftables-restart-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "filter": 873,
+   "twebproxy_backend": 877
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:11.408378+00:00",
+   "mono_ns": 135440372236636
+  },
+  "label": "normal-nftables-stop-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "twebproxy_backend": 881
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:14.704611+00:00",
+   "mono_ns": 135443668470612
+  },
+  "label": "normal-nftables-stop-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1248510",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1253703",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1251488",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 846,
+   "twebproxy_backend": 881
+  },
+  "nft_children": [
+   "1248520"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:14.842480+00:00",
+   "mono_ns": 135443806338766
+  },
+  "label": "normal-firewall-restart-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1256438",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1256541",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1256542",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 882,
+   "twebproxy_backend": 884
+  },
+  "nft_children": [
+   "1256451"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:18.250993+00:00",
+   "mono_ns": 135447214851978
+  },
+  "label": "normal-firewall-restart-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1256438",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1256541",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1256542",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 882,
+   "twebproxy_backend": 884
+  },
+  "nft_children": [
+   "1256451"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:18.365991+00:00",
+   "mono_ns": 135447329848369
+  },
+  "label": "normal-firewall-reload-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1256438",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1256541",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1256542",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 882,
+   "twebproxy_backend": 886
+  },
+  "nft_children": [
+   "1256451"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:21.767272+00:00",
+   "mono_ns": 135450731132002
+  },
+  "label": "normal-firewall-reload-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1256438",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1256541",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1256542",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 882,
+   "twebproxy_backend": 886
+  },
+  "nft_children": [
+   "1256451"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:21.944353+00:00",
+   "mono_ns": 135450908212466
+  },
+  "label": "normal-firewall-stop-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "0",
+   "NRestarts": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "tables": {
+   "twebproxy_backend": 886
+  },
+  "nft_children": [],
+  "mtproxy_pid_count": 0,
+  "time": {
+   "utc": "2026-10-30T23:06:25.090157+00:00",
+   "mono_ns": 135454054017663
+  },
+  "label": "normal-firewall-stop-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "0",
+   "NRestarts": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "0",
+   "ActiveState": "inactive",
+   "SubState": "dead"
+  },
+  "tables": {
+   "twebproxy_backend": 886
+  },
+  "nft_children": [],
+  "mtproxy_pid_count": 0,
+  "time": {
+   "utc": "2026-10-30T23:06:25.150750+00:00",
+   "mono_ns": 135454114609110
+  },
+  "label": "normal-firewall-start-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257324",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257326",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:28.487887+00:00",
+   "mono_ns": 135457451748773
+  },
+  "label": "normal-firewall-start-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257324",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257326",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:28.616869+00:00",
+   "mono_ns": 135457580726812
+  },
+  "label": "normal-daemon-reload-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257324",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257326",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:32.311851+00:00",
+   "mono_ns": 135461275708272
+  },
+  "label": "normal-daemon-reload-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257324",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257326",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:32.520297+00:00",
+   "mono_ns": 135461484158516
+  },
+  "label": "normal-backend-restarts-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257876",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257877",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:35.877358+00:00",
+   "mono_ns": 135464841222336
+  },
+  "label": "normal-backend-restarts-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257876",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257877",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "twebproxy_backend": 889
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:36.024929+00:00",
+   "mono_ns": 135464988787263
+  },
+  "label": "normal-foreign-flush-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257876",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257877",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:39.195661+00:00",
+   "mono_ns": 135468159523020
+  },
+  "label": "normal-foreign-flush-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1257227",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1257876",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1257877",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 887,
+   "filter": 890,
+   "twebproxy_backend": 894
+  },
+  "nft_children": [
+   "1257237"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:39.475453+00:00",
+   "mono_ns": 135468439313060
+  },
+  "label": "child-kill+nft-restart-1-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1258740",
+   "NRestarts": "1",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1258842",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1258843",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 899,
+   "twebproxy_guard": 904,
+   "twebproxy_backend": 906
+  },
+  "nft_children": [
+   "1258754"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:45.953606+00:00",
+   "mono_ns": 135474917463665
+  },
+  "label": "child-kill+nft-restart-1-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1258740",
+   "NRestarts": "1",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1258842",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1258843",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 899,
+   "twebproxy_guard": 904,
+   "twebproxy_backend": 906
+  },
+  "nft_children": [
+   "1258754"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:46.145867+00:00",
+   "mono_ns": 135475109731184
+  },
+  "label": "child-kill+nft-restart-2-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1259333",
+   "NRestarts": "2",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1259433",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1259434",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 911,
+   "twebproxy_guard": 916,
+   "twebproxy_backend": 918
+  },
+  "nft_children": [
+   "1259346"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:51.985963+00:00",
+   "mono_ns": 135480949821847
+  },
+  "label": "child-kill+nft-restart-2-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1259333",
+   "NRestarts": "2",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1259433",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1259434",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 911,
+   "twebproxy_guard": 916,
+   "twebproxy_backend": 918
+  },
+  "nft_children": [
+   "1259346"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:52.172738+00:00",
+   "mono_ns": 135481136598329
+  },
+  "label": "child-kill+nft-restart-3-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1259927",
+   "NRestarts": "3",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1260028",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1260033",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 923,
+   "twebproxy_guard": 928,
+   "twebproxy_backend": 930
+  },
+  "nft_children": [
+   "1259939"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:58.038488+00:00",
+   "mono_ns": 135487002347916
+  },
+  "label": "child-kill+nft-restart-3-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1259927",
+   "NRestarts": "3",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1260028",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1260033",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 923,
+   "twebproxy_guard": 928,
+   "twebproxy_backend": 930
+  },
+  "nft_children": [
+   "1259939"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:06:58.190032+00:00",
+   "mono_ns": 135487153889759
+  },
+  "label": "child-kill+nft-restart+backend-restarts-1-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1260556",
+   "NRestarts": "4",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1260659",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1260658",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 935,
+   "twebproxy_guard": 940,
+   "twebproxy_backend": 942
+  },
+  "nft_children": [
+   "1260570"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:04.296328+00:00",
+   "mono_ns": 135493260186003
+  },
+  "label": "child-kill+nft-restart+backend-restarts-1-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1260556",
+   "NRestarts": "4",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1260659",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1260658",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 935,
+   "twebproxy_guard": 940,
+   "twebproxy_backend": 942
+  },
+  "nft_children": [
+   "1260570"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:04.477142+00:00",
+   "mono_ns": 135493441029348
+  },
+  "label": "child-kill+nft-restart+backend-restarts-2-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1261172",
+   "NRestarts": "5",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1261275",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1261276",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 947,
+   "twebproxy_guard": 952,
+   "twebproxy_backend": 954
+  },
+  "nft_children": [
+   "1261186"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:10.346897+00:00",
+   "mono_ns": 135499310754460
+  },
+  "label": "child-kill+nft-restart+backend-restarts-2-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1261172",
+   "NRestarts": "5",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1261275",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1261276",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 947,
+   "twebproxy_guard": 952,
+   "twebproxy_backend": 954
+  },
+  "nft_children": [
+   "1261186"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:10.486282+00:00",
+   "mono_ns": 135499450144323
+  },
+  "label": "child-kill+nft-restart+backend-restarts-3-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1261903",
+   "NRestarts": "6",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1262006",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1262008",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 959,
+   "twebproxy_guard": 964,
+   "twebproxy_backend": 966
+  },
+  "nft_children": [
+   "1261914"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:16.538874+00:00",
+   "mono_ns": 135505502732304
+  },
+  "label": "child-kill+nft-restart+backend-restarts-3-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1261903",
+   "NRestarts": "6",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1262006",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1262008",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 959,
+   "twebproxy_guard": 964,
+   "twebproxy_backend": 966
+  },
+  "nft_children": [
+   "1261914"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:16.725409+00:00",
+   "mono_ns": 135505689268051
+  },
+  "label": "child-kill+foreign-flush-1-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1262440",
+   "NRestarts": "7",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1262545",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1262546",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 967,
+   "twebproxy_backend": 971
+  },
+  "nft_children": [
+   "1262452"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:22.931842+00:00",
+   "mono_ns": 135511895700481
+  },
+  "label": "child-kill+foreign-flush-1-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1262440",
+   "NRestarts": "7",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1262545",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1262546",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 967,
+   "twebproxy_backend": 971
+  },
+  "nft_children": [
+   "1262452"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:23.158129+00:00",
+   "mono_ns": 135512122004796
+  },
+  "label": "child-kill+foreign-flush-2-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1263047",
+   "NRestarts": "8",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1263146",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1263156",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 972,
+   "twebproxy_backend": 976
+  },
+  "nft_children": [
+   "1263059"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:29.846761+00:00",
+   "mono_ns": 135518810621480
+  },
+  "label": "child-kill+foreign-flush-2-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1263047",
+   "NRestarts": "8",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1263146",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1263156",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 972,
+   "twebproxy_backend": 976
+  },
+  "nft_children": [
+   "1263059"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:29.986959+00:00",
+   "mono_ns": 135518951072867
+  },
+  "label": "child-kill+foreign-flush-3-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1263577",
+   "NRestarts": "9",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1263683",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1263684",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 977,
+   "twebproxy_backend": 981
+  },
+  "nft_children": [
+   "1263590"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:36.234804+00:00",
+   "mono_ns": 135525198661987
+  },
+  "label": "child-kill+foreign-flush-3-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1263577",
+   "NRestarts": "9",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1263683",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1263684",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 977,
+   "twebproxy_backend": 981
+  },
+  "nft_children": [
+   "1263590"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:36.372362+00:00",
+   "mono_ns": 135525336220943
+  },
+  "label": "shell-kill+nft-restart-1-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1264170",
+   "NRestarts": "10",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1264283",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1264286",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 986,
+   "twebproxy_guard": 991,
+   "twebproxy_backend": 993
+  },
+  "nft_children": [
+   "1264184"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:42.347673+00:00",
+   "mono_ns": 135531311534336
+  },
+  "label": "shell-kill+nft-restart-1-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1264170",
+   "NRestarts": "10",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1264283",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1264286",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 986,
+   "twebproxy_guard": 991,
+   "twebproxy_backend": 993
+  },
+  "nft_children": [
+   "1264184"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:42.523015+00:00",
+   "mono_ns": 135531487078133
+  },
+  "label": "shell-kill+nft-restart-2-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1264768",
+   "NRestarts": "11",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1264882",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1264880",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 998,
+   "twebproxy_guard": 1003,
+   "twebproxy_backend": 1005
+  },
+  "nft_children": [
+   "1264785"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:48.548837+00:00",
+   "mono_ns": 135537512696809
+  },
+  "label": "shell-kill+nft-restart-2-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1264768",
+   "NRestarts": "11",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1264882",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1264880",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 998,
+   "twebproxy_guard": 1003,
+   "twebproxy_backend": 1005
+  },
+  "nft_children": [
+   "1264785"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:48.717828+00:00",
+   "mono_ns": 135537681716313
+  },
+  "label": "shell-kill+nft-restart-3-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1265365",
+   "NRestarts": "12",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1265475",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1265476",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1010,
+   "twebproxy_guard": 1015,
+   "twebproxy_backend": 1017
+  },
+  "nft_children": [
+   "1265384"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:54.652485+00:00",
+   "mono_ns": 135543616343864
+  },
+  "label": "shell-kill+nft-restart-3-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1265365",
+   "NRestarts": "12",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1265475",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1265476",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1010,
+   "twebproxy_guard": 1015,
+   "twebproxy_backend": 1017
+  },
+  "nft_children": [
+   "1265384"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:07:54.801282+00:00",
+   "mono_ns": 135543765141569
+  },
+  "label": "shell-kill+foreign-flush+backend-restarts-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1265890",
+   "NRestarts": "13",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1265989",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1265990",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 1018,
+   "twebproxy_backend": 1022
+  },
+  "nft_children": [
+   "1265902"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:03.442677+00:00",
+   "mono_ns": 135552406534604
+  },
+  "label": "shell-kill+foreign-flush+backend-restarts-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1265890",
+   "NRestarts": "13",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1265989",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1265990",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 1018,
+   "twebproxy_backend": 1022
+  },
+  "nft_children": [
+   "1265902"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:03.579164+00:00",
+   "mono_ns": 135552543021958
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-1-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1266431",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1266529",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1266530",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1027,
+   "twebproxy_guard": 1032,
+   "twebproxy_backend": 1034
+  },
+  "nft_children": [
+   "1266441"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:07.780211+00:00",
+   "mono_ns": 135556744068237
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-1-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1266431",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1266529",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1266530",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1027,
+   "twebproxy_guard": 1032,
+   "twebproxy_backend": 1034
+  },
+  "nft_children": [
+   "1266441"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:07.914034+00:00",
+   "mono_ns": 135556877925065
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-2-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1266960",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267058",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267057",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1039,
+   "twebproxy_guard": 1044,
+   "twebproxy_backend": 1046
+  },
+  "nft_children": [
+   "1266970"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:12.060366+00:00",
+   "mono_ns": 135561024228219
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-2-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1266960",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267058",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267057",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1039,
+   "twebproxy_guard": 1044,
+   "twebproxy_backend": 1046
+  },
+  "nft_children": [
+   "1266970"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:12.216688+00:00",
+   "mono_ns": 135561180551814
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-3-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1267489",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267592",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267593",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1051,
+   "twebproxy_guard": 1056,
+   "twebproxy_backend": 1058
+  },
+  "nft_children": [
+   "1267499"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:16.384246+00:00",
+   "mono_ns": 135565348104620
+  },
+  "label": "concurrent-fw+nft+backend+daemon-reload-3-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1267489",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267592",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267593",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "filter": 1051,
+   "twebproxy_guard": 1056,
+   "twebproxy_backend": 1058
+  },
+  "nft_children": [
+   "1267499"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:16.551915+00:00",
+   "mono_ns": 135565515774798
+  },
+  "label": "child-kill+firewall-restart+flush-before"
+ },
+ {
+  "firewall": {
+   "MainPID": "1267890",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267987",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267988",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 1059,
+   "twebproxy_backend": 1063
+  },
+  "nft_children": [
+   "1267903"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:20.087484+00:00",
+   "mono_ns": 135569051358776
+  },
+  "label": "child-kill+firewall-restart+flush-after"
+ },
+ {
+  "firewall": {
+   "MainPID": "1267890",
+   "NRestarts": "0",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-1>--default.service": {
+   "MainPID": "1267987",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "twebproxy-mtproxy@<test-host-2>--default.service": {
+   "MainPID": "1267988",
+   "ActiveState": "active",
+   "SubState": "running"
+  },
+  "tables": {
+   "twebproxy_guard": 1059,
+   "twebproxy_backend": 1067
+  },
+  "nft_children": [
+   "1267903"
+  ],
+  "mtproxy_pid_count": 4,
+  "time": {
+   "utc": "2026-10-30T23:08:21.484511+00:00",
+   "mono_ns": 135570448391736
+  },
+  "label": "final"
+ }
+]

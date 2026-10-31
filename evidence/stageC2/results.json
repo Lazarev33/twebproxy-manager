@@ -1,0 +1,212 @@
+{
+ "stage": "C2",
+ "version": "0.2.17-beta",
+ "verdict": "STAGE C2 DEVELOPMENT_ACCEPTED / NEXT: D (frontend / TLS), pending separate production RC lab gates",
+ "baseline": {
+  "commit": "f06d1fba40365d96a46f80c9e49a37e422fc5c93",
+  "tree": "c5e471709d1c70a3c4e72e68b660fba11b403e07",
+  "manager_sha256": "bc4aff18838314db418f32442c6a996638b3397c5bf06191c6a0d804bb9c6226",
+  "input_zip_sha256": "4cc5e3d5eac5502cdb14b7bc879667607a0465c78cdb78e760dfd4c3b00355b8"
+ },
+ "result_protocol": "0=PASS 1=FAIL 77=NOT_EXECUTED; NOT_EXECUTED is never counted as PASS",
+ "environment": "production host: model/static tests only; sentinel stubs first in PATH (incl. apt-get/apt/dpkg); 0 sentinel calls; host metadata canary (incl. /usr/local/bin/tproxy-server) unchanged",
+ "summary": {
+  "PASS": 25,
+  "FAIL": 0,
+  "NOT_EXECUTED": 2
+ },
+ "red": {
+  "relay-lifecycle-on-v0.2.16": {
+   "exit_status": 1,
+   "last_line": "c2-relay-lifecycle: pass=65 fail=35"
+  },
+  "relay-lifecycle-on-mutant-no-final-verify": {
+   "exit_status": 1,
+   "last_line": "c2-relay-lifecycle: pass=95 fail=5"
+  },
+  "relay-lifecycle-on-mutant-no-interrupt-trap": {
+   "exit_status": 1,
+   "last_line": "c2-relay-lifecycle: pass=97 fail=3"
+  }
+ },
+ "red_notes": [
+  "relay-lifecycle fixture on v0.2.16: 35 of 100 checks FAIL (deterministic): no rollback when a relay restart fails after the swap; partial binary on an interrupted write; crash after first ready reported as success; incomplete rollback reported as 'rolled back'; slow-listening relay causes a false rollback (curl --retry does not retry a refused connection); SIGTERM mid-update leaves a partial upgrade; concurrent updates/restarts not serialized; restart ignores the instance lock; delete reports success while the relay is still running; no durable previous binary.",
+  "Mutants of the fixed manager: final verification removed -> 5 FAIL (crash_after_ready_*); interruption trap removed -> 3 FAIL (interrupted_*)."
+ ],
+ "green": [
+  {
+   "name": "git-diff-check",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "git diff --check f06d1fb (excluding captured evidence): clean"
+  },
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "c2-relay-lifecycle",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c2-relay-lifecycle: pass=100 fail=0"
+  },
+  {
+   "name": "suite-stage-c2",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c2-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "c2-scope-vs-v0216",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS c2-scope unchanged=357 modified=6 added=8"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "audit-c11-cross-instance-orphan",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS"
+  },
+  {
+   "name": "audit-c11-backend-id-collision",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS: existing B/x backend env preserved"
+  },
+  {
+   "name": "audit-c1-failed-backend-stop",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "FW collection ports=[23980,23981,28980,28981]"
+  },
+  {
+   "name": "audit-c1-orphan-backend",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "API profiles=[alpha]"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 332 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 332 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set"
+  }
+ ],
+ "green_stability": "relay-lifecycle fixture repeated 3 times on the fixed manager: 3/3 rc=0",
+ "not_executed_gates": [
+  "Real systemd relay lifecycle: Type=simple restart, Restart=on-failure/StartLimit behaviour, is-active during auto-restart, disable --now of twebproxy@ units.",
+  "Real curl exit codes against the tproxy-server admin /readyz during startup.",
+  "Real Go toolchain test/build of upstream tproxy-server and -check of real instance configs.",
+  "ENOSPC / interrupted write during the atomic binary install in /usr/local/bin and the previous-binary copy in /opt/twebproxy-manager.",
+  "Real terminal Ctrl-C (process-group SIGINT) and SSH hang-up during an update.",
+  "Real flock contention between update, restart, delete and profile mutations under load.",
+  "Stage A/B lab-only cases (exit 77), unchanged."
+ ]
+}

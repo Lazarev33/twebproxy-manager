@@ -1,0 +1,43 @@
+name	rc	seconds	last_line
+git-diff-check	0	0	git diff --check stage-h/v0.2.22: clean
+bash-n-all	0	1	bash -n OK (104 scripts)
+e-operations	0	92	e-operations: pass=48 fail=0
+suite-stage-e	0	98	stage-e-suite: PASS (all mandatory model checks executed)
+f-updater	0	64	updater-fixture: 278 pass, 0 fail
+suite-stage-f	0	84	stage-f-suite: PASS (all mandatory model checks executed)
+suite-stage-g	0	92	stage-g-suite: PASS (all mandatory checks executed)
+suite-stage-h	0	42	stage-h-suite: PASS (all mandatory checks executed)
+prerc-scope-vs-v0222	0	7	PASS prerc-scope unchanged=400 modified=20 added=22  [rerun after golden-fixture update]
+heredoc-guard	0	0	heredoc-guard: PASS (no backtick in an unquoted heredoc)
+python-compile	0	0	python syntax OK
+stage4-mandatory-suite	0	19	stage4-mandatory-suite: PASS (A-V all executed)  [rerun after golden-fixture update]	OK	profile:fixture.example/default
+stage-x-dpi-suite	0	19	stage-x-dpi-suite: PASS (all mandatory autonomous tests executed; mandatory_skips=0)  [rerun after golden-fixture update]	OK	profile:fixture.example/default
+stage-x-dpi-installed-asset	0	3	stage-x-dpi-installed-asset-fixture: PASS
+updater-function-hashes	0	1	830f6cd889f2c821c2fc69fe6b623c2595be0180517bfb7d2197079687c6b859  stage4-protected-function-set-full
+d-frontend-tls	0	38	d-frontend-tls: pass=122 fail=0
+suite-stage-d	0	38	stage-d-suite: PASS (all mandatory model checks executed)
+suite-stage-c2	0	30	stage-c2-suite: PASS (all mandatory model checks executed)
+suite-stage-c1	0	51	stage-c1-suite: PASS (all mandatory model checks executed)
+audit-c11-cross-instance-orphan	0	1	PASS
+audit-c11-backend-id-collision	0	1	PASS: existing B/x backend env preserved
+audit-c1-failed-backend-stop	0	0	FW collection ports=[23980,23981,28980,28981]
+audit-c1-orphan-backend	0	0	API profiles=[alpha]
+suite-stage-b	77	14	stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)
+suite-stage-a	77	71	stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)
+protocol-meta	0	0	PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+sa6-release-metadata	0	0	sa6-release-metadata: 6 pass, 0 fail
+fg-tg5	0	0	tg5: pass=13 fail=0
+fg-tg5b	0	1	tg5b: pass=19 fail=0
+fg-tg7	0	0	tg7: pass=12 fail=0
+fg-df3	0	11	df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail
+fg-df3b	0	2	df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
+read-only-core	0	1	read-only-core-fixture: PASS  [rerun after golden-fixture update]	OK	profile:fixture.example/default
+l10n-static-C	0	6	localization-static-audit: PASS (327 bilingual keys; 407 legacy call-sites)
+l10n-static-UTF8	0	7	localization-static-audit: PASS (327 bilingual keys; 407 legacy call-sites)
+l10n-flow-C	0	4	localization-flow-fixture: PASS (locale=C)
+l10n-flow-UTF8	0	4	localization-flow-fixture: PASS (locale=C.UTF-8)
+static-smoke	0	1	static-smoke: PASS
+certificate-smoke	0	0	certificate-smoke: PASS
+tui-presentation	0	3	tui-presentation-fixture: PASS
+stage-x-fixui	0	18	stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)  [rerun after golden-fixture update]	OK	profile:fixture.example/default
+stage4-hash	0	0	bf060d063c53bd220210036c227df0cb251d5ba749c860df411b6de5fbb3c223  stage4-protected-function-set

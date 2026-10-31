@@ -1,0 +1,946 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ec84241..b457ec1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,34 @@
+ # Changelog
+ 
++## 0.2.17-beta — 2026-10-27 — Stage C2: жизненный цикл relay
++
++- `twebproxy update` (relay):
++  - кандидат проходит upstream-тесты, сборку и `-check` для каждого инстанса
++    до любой замены; текущий binary сначала сохраняется в
++    `/opt/twebproxy-manager/relay/tproxy-server.previous`;
++  - binary заменяется атомарно (полная копия рядом и rename), прерванная
++    запись больше не оставляет обрезанный файл;
++  - relays перезапускаются по одному, готовность `/readyz` ждётся
++    ограниченное время (отказ соединения, пока relay не слушает, —
++    обычный повтор); после всех перезапусков каждый relay проверяется ещё раз;
++  - при сбое перезапуска, готовности, повторной проверки или при
++    прерывании (INT/TERM/HUP) прежний binary возвращается, перезапущенные
++    relays перезапускаются на нём и проверяются; итог сообщается точно:
++    полный откат, неполный откат с перечнем не готовых relays или
++    невосстановленный binary; коммит upstream записывается только при успехе;
++  - обновления relay не выполняются параллельно; замена binary и
++    перезапуски relay сериализованы с `restart`, `delete` и перезапуском
++    relay в операциях с профилями.
++- `twebproxy restart` берёт блокировку инстанса; ошибка systemd при
++  перезапуске relay сообщается с именем unit.
++- `twebproxy delete` удаляет инстанс только после доказанной остановки relay;
++  иначе ничего не удаляется.
++- Первичная установка relay (`build_tproxy_server`) тоже заменяет binary
++  атомарно.
++- Stage A/A.1, B/B.1, C1/C1.1/C1.2, Stage 4, DPI и TLS не изменены. Статус:
++  C2 принят по модельным тестам разработки; следующий этап — D (frontend/TLS).
++  Реальные проверки systemd/curl/Go/ENOSPC остаются обязательными перед RC.
++
+ ## 0.2.16-beta — 2026-10-26 — Stage C1.2: владение именами backend
+ 
+ Имя backend — `<hostname>--<profile>`, а `--` допустим в обеих частях, поэтому
+diff --git a/VERSION b/VERSION
+index 9097948..0fcb3bb 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.16
++0.2.17
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index da24810..79f53d2 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1,6 +1,6 @@
+ # TWebProxy Manager — Development Roadmap
+ 
+-Updated: 2026-10-26. This document tracks **planned work**, not production release status.
++Updated: 2026-10-27. This document tracks **planned work**, not production release status.
+ 
+ ## Product goal
+ 
+@@ -23,9 +23,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.13 Stage B.1 | Development checkpoint | libexec permissions, privileged-test safety gate, R1/R3; real nft/systemd NOT_EXECUTED |
+ | v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | F03/F04/F05/F13 state and profile integrity; independent audit: C1-AUD-01/02 |
+ | v0.2.15 Stage C1.1 | Superseded by C1.2 | C1-AUD-01/02 fixed; independent audit: C11-AUD-03/04 |
+-| v0.2.16 Stage C1.2 | **Development accepted (model gates)** | C11-AUD-03/04 backend-id ownership fixed; real systemd/nft/race/ENOSPC gates remain mandatory before an RC |
++| v0.2.16 Stage C1.2 | Development accepted (model gates) | C11-AUD-03/04 backend-id ownership fixed; real systemd/nft/race/ENOSPC gates remain mandatory before an RC |
++| v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay update with atomic install, bounded readiness, final verification, rollback and interruption handling; relay update/restart serialization; restart/delete failure propagation; real systemd/curl/Go/ENOSPC gates remain mandatory before an RC |
+ 
+-**Next development stage: C2 — relay lifecycle** (see "Core implementation stages").
++**Next development stage: D — frontend / TLS** (see "Core implementation stages").
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+diff --git a/tests/stagec2/README.md b/tests/stagec2/README.md
+new file mode 100644
+index 0000000..7a5bee8
+--- /dev/null
++++ b/tests/stagec2/README.md
+@@ -0,0 +1,25 @@
++# Stage C2 verification
++
++Relay lifecycle: relay binary update (candidate validation, atomic install,
++restart, bounded readiness, final verification, rollback, interruption),
++relay update/restart serialization, instance restart and delete failure
++propagation. Model tests only: safe on any Linux test workstation with Bash,
++jq, coreutils and util-linux; no system state changes.
++
++```sh
++bash tests/stagec2/run-stage-c2-suite.sh            # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stagec2/relay-lifecycle-fixture.sh [<manager>]
++bash tests/stagec2/c2-scope-invariants.sh <v0.2.16 source tree>
++```
++
++`relay-harness.sh` extends `tests/stagec1/state-harness.sh`: the installed
++relay binary is a script with a build marker, `go test`/`go build` are models
++producing a candidate build, systemctl records which build each relay runs,
++and curl answers `/readyz` from that record. Faults (start/restart failure,
++never ready, slow listen, crash after first ready, partial binary write,
++`-check` rejection) are files in the sandbox; see the harness header.
++
++None of this proves real systemd, curl, Go toolchain or filesystem behaviour;
++those remain disposable-VM gates before an RC. The C1 scope tests
++(`tests/stagec1/c1*-scope-invariants.sh`) describe their own stage deltas and
++are run against their stage checkpoints, not against later trees.
+diff --git a/tests/stagec2/c2-scope-invariants.sh b/tests/stagec2/c2-scope-invariants.sh
+new file mode 100644
+index 0000000..9893f29
+--- /dev/null
++++ b/tests/stagec2/c2-scope-invariants.sh
+@@ -0,0 +1,89 @@
++#!/usr/bin/env bash
++# Stage C2 scope against the exact v0.2.16 (Stage C1.2, f06d1fb) tree: only the
++# relay update, relay restart/readiness, relay binary install, instance restart
++# and instance delete (relay stop) paths may change; ui_localize_legacy may only
++# gain lines; new top-level variables are limited to the relay lock/wait state;
++# every other file except release metadata and the ROADMAP status is
++# byte-identical (README, assets, other docs, C1 code and tests included).
++# Usage: c2-scope-invariants.sh <v0.2.16 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.16 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-c2-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(update_cmd restart_relay_wait_ready restart_cmd delete_instance_cmd build_tproxy_server
++  ui_localize_legacy)
++ADDED=(relay_lock_acquire relay_lock_release relay_wait_ready relay_verify stop_relay_unit
++  relay_binary_install relay_previous_save relay_update_apply)
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS docs/ROADMAP.md)
++ADDED_FILES=(tests/stagec2/README.md tests/stagec2/relay-harness.sh tests/stagec2/relay-lifecycle-fixture.sh
++  tests/stagec2/run-stage-c2-suite.sh tests/stagec2/c2-scope-invariants.sh)
++NEW_VARS=(RELAY_LOCK_FD RELAY_LOCK_DEPTH RELAY_READY_WAIT_SECONDS RELAY_UPDATE_INTERRUPTED)
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${NEW_VARS[*]}"))=" "$TMP/candidate.vars" > "$TMP/candidate.vars.old"
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars.old"
++echo "PASS top-level variables unchanged except release identity and ${#NEW_VARS[@]} relay lock/wait variables"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageC2/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (README, assets, docs, other tests and evidence included)"
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS c2-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagec2/relay-harness.sh b/tests/stagec2/relay-harness.sh
+new file mode 100644
+index 0000000..3be3b0e
+--- /dev/null
++++ b/tests/stagec2/relay-harness.sh
+@@ -0,0 +1,184 @@
++#!/usr/bin/env bash
++# Behavioral sandbox for the Stage C2 relay lifecycle regressions.
++#
++# Extends tests/stagec1/state-harness.sh (same rules: the manager code under
++# test is unmodified, commands run through c1_run/c1_eval in a separate bash
++# process with production `set -Eeuo pipefail`, nothing outside $TMP is read or
++# written). Added host-boundary models:
++#   - the installed relay binary ($TPROXY_BIN) is a script carrying a build
++#     marker ("# relay-build: <name>"); `go test`/`go build` produce a candidate
++#     with marker $C2_BUILD (default "candidate");
++#   - systemctl start/restart of twebproxy@HOST records which build the relay
++#     runs and its admin port; curl http://127.0.0.1:<admin>/readyz answers from
++#     that record.
++# This proves control flow, binary/state postconditions and reported results,
++# not real systemd, curl or Go behaviour.
++#
++# Faults (files in $TMP):
++#   fail-go-test, fail-go-build          upstream test / build fails
++#   check-fail-<build>-<host>            `<build> -check` rejects that host's config
++#   fail-restart-<unit>                  systemctl start/restart/enable of <unit> fails
++#   fail-start-<build>-<host>            starting the relay of <host> fails while <build> is installed
++#   fail-stop-<unit>                     (C1 model) stop/disable of <unit> fails
++#   unready-<build>-<host>               relay of <host> running <build> never gets ready
++#   slow-<host>                          the first 2 probes after each start are refused
++#   crash-<build>-<host>                 ready once, then the unit is failed
++#   fail-bin-write                       a write to $TPROXY_BIN* stops half-way (ENOSPC-like)
++# Barrier: C2_AT_PROBE=<name>:<host> parks the first readiness probe of <host>
++# (touch <name>.reached, write the manager pid to <name>.pid, wait for <name>.go).
++
++C2_HARNESS="${BASH_SOURCE[0]}"
++# shellcheck source=/dev/null
++source "$(dirname "$C2_HARNESS")/../stagec1/state-harness.sh"
++
++c2_harness() {
++  export C2_HARNESS
++  if [[ ! -e "$TMP/bin/.c2-models" ]]; then
++    install -d -m 0700 "$TMP/bin" "$TMP/units"
++    ( C1_ROOT="$TMP"; c1_write_models )
++    c2_write_models
++    c2_relay_binary old > "$TMP/bin/tproxy-server"; chmod 0755 "$TMP/bin/tproxy-server"
++    : > "$TMP/bin/.c2-models"
++  fi
++  export C2_TPROXY_BIN="$TMP/bin/tproxy-server" C2_INSTANCES_DIR="$TMP/etc/instances"
++  c1_harness
++  TPROXY_SRC="$TMP/tproxy-src"; GO_BIN="$TMP/bin/go"; install -d -m 0700 "$TPROXY_SRC"
++  # Network, package and host-install steps are never reached from a test.
++  install_base_deps() { :; }
++  ensure_go() { GO_BIN="$TMP/bin/go"; }
++  sync_tproxy_upstream() { UPSTREAM_COMMIT="${C2_UPSTREAM_COMMIT:-1111111111111111111111111111111111111111}"; }
++  install_manager_copy() { :; }
++  c1_instance_stubs
++  c2_faults
++}
++
++c2_run() { bash -c 'source "$C2_HARNESS"; c2_harness; set -Eeuo pipefail; "$@"' c2-run "$@"; }
++c2_eval() { bash -c 'source "$C2_HARNESS"; c2_harness; set -Eeuo pipefail; eval "$1"' c2-eval "$1"; }
++
++# A write to the relay binary path (or a temporary file next to it) that stops
++# half-way: the destination is left truncated and the command fails.
++c2_faults() {
++  c2_bin_write_fault() { # $1=src $2=dest
++    [[ -e "$TMP/fail-bin-write" && "$2" == "$TPROXY_BIN"* ]] || return 1
++    rm -f "$TMP/fail-bin-write"; head -c 64 "$1" > "$2"; echo "model: write to $2 interrupted" >&2
++  }
++  install() {
++    local a=("$@"); local n=${#a[@]}
++    if (( n >= 2 )) && c2_bin_write_fault "${a[n-2]}" "${a[n-1]}"; then return 1; fi
++    command install "$@"
++  }
++  cp() {
++    local a=("$@"); local n=${#a[@]}
++    if (( n >= 2 )) && c2_bin_write_fault "${a[n-2]}" "${a[n-1]}"; then return 1; fi
++    command cp "$@"
++  }
++}
++
++c2_relay_binary() { # $1=build name -> model relay binary on stdout
++  cat <<SH
++#!/bin/bash
++# relay-build: $1
++build=$1
++SH
++  cat <<'SH'
++# -check model: config and profiles must parse, profile names unique,
++# injectable per-build/per-host rejection.
++[[ ! -e "$C1_ROOT/fail-validate" ]] || { echo 'model: injected validation failure' >&2; exit 1; }
++cfg="" prof=""
++while (( $# )); do case "$1" in -config) cfg="$2"; shift;; -profiles-file) prof="$2"; shift;; esac; shift; done
++host="$(basename "$(dirname "$cfg")")"
++[[ ! -e "$C1_ROOT/check-fail-$build-$host" ]] || { echo "model: $build rejects $host" >&2; exit 1; }
++jq -e . "$cfg" >/dev/null && jq -e '(.profiles|length) >= 1 and ((.profiles|map(.name)|unique|length) == (.profiles|length))' "$prof" >/dev/null
++SH
++}
++
++c2_write_models() {
++  cat > "$TMP/bin/go" <<'SH'
++#!/bin/bash
++# Go toolchain model: `go test ./...`, `go build ... -o OUT ./cmd/tproxy-server`.
++printf 'go %s\n' "$*" >> "$C1_ROOT/events"
++case "$1" in
++  test) [[ ! -e "$C1_ROOT/fail-go-test" ]] || { echo 'model: upstream test failed' >&2; exit 1; }; exit 0;;
++  build)
++    [[ ! -e "$C1_ROOT/fail-go-build" ]] || { echo 'model: build failed' >&2; exit 1; }
++    out=""; while (( $# )); do [[ "$1" == -o ]] && { out="$2"; shift; }; shift; done
++    [[ -n "$out" ]] || exit 2
++    source "$C2_HARNESS"; c2_relay_binary "${C2_BUILD:-candidate}" > "$out"; exit 0;;
++  version) echo 'go version model'; exit 0;;
++esac
++exit 0
++SH
++  # systemctl: C1 unit model plus relay units. A started twebproxy@HOST records
++  # the build of the installed binary at start time and the instance admin port.
++  mv "$TMP/bin/systemctl" "$TMP/bin/systemctl-c1"
++  cat > "$TMP/bin/systemctl" <<'SH'
++#!/bin/bash
++args=("$@"); unit="${args[-1]}"
++if [[ "$unit" == twebproxy@*.service ]]; then
++  printf '%s\n' "$*" >> "$C1_ROOT/systemctl.calls"
++  printf 'systemctl %s\n' "$*" >> "$C1_ROOT/events"
++  host="${unit#twebproxy@}"; host="${host%.service}"
++  quiet=0; [[ "${2:-}" == --quiet ]] && quiet=1
++  failed() { rm -f "$C1_ROOT/units/$unit"; echo failed > "$C1_ROOT/state-$unit"; echo "model: $1" >&2; exit 1; }
++  start() {
++    [[ ! -e "$C1_ROOT/fail-restart-$unit" ]] || failed "start of $unit failed"
++    [[ -x "$C2_TPROXY_BIN" ]] && b="$(sed -n 's/^# relay-build: //p' "$C2_TPROXY_BIN")" && [[ -n "$b" ]] ||
++      failed "$unit exec failed"
++    [[ ! -e "$C1_ROOT/fail-start-$b-$host" ]] || failed "$unit with build $b failed to start"
++    admin="$(sed -n 's/^ADMIN_PORT=//p' "$C2_INSTANCES_DIR/$host/instance.env" 2>/dev/null)"
++    rm -f "$C1_ROOT/state-$unit"
++    printf 'BUILD=%s\nADMIN=%s\nPROBES=0\n' "$b" "$admin" > "$C1_ROOT/units/$unit"
++    printf 'relay %s started build=%s\n' "$host" "$b" >> "$C1_ROOT/events"
++  }
++  case "$1" in
++    reset-failed|daemon-reload) exit 0;;
++    enable) [[ "${2:-}" == --now ]] || exit 0; [[ -e "$C1_ROOT/units/$unit" ]] || start; exit 0;;
++    start) [[ -e "$C1_ROOT/units/$unit" ]] || start; exit 0;;
++    restart) start; exit 0;;
++    disable|stop)
++      [[ ! -e "$C1_ROOT/fail-stop-$unit" ]] || { echo "model: stop of $unit failed" >&2; exit 1; }
++      rm -f "$C1_ROOT/units/$unit" "$C1_ROOT/state-$unit"; exit 0;;
++    is-active)
++      if [[ -e "$C1_ROOT/state-$unit" ]]; then (( quiet )) || cat "$C1_ROOT/state-$unit"; exit 3; fi
++      [[ -e "$C1_ROOT/units/$unit" ]] || { (( quiet )) || echo inactive; exit 3; }
++      (( quiet )) || echo active; exit 0;;
++    *) exit 0;;
++  esac
++fi
++exec "$(dirname "$0")/systemctl-c1" "$@"
++SH
++  cat > "$TMP/bin/curl" <<'SH'
++#!/bin/bash
++# Relay admin endpoint model: http://127.0.0.1:<admin>/(readyz|healthz).
++url="${*: -1}"
++[[ "$url" =~ ^http://127\.0\.0\.1:([0-9]+)/(readyz|healthz)$ ]] || exit 0
++port="${BASH_REMATCH[1]}"
++printf 'curl %s\n' "$url" >> "$C1_ROOT/events"
++f=""; for u in "$C1_ROOT"/units/twebproxy@*.service; do
++  [[ -f "$u" ]] && grep -qx "ADMIN=$port" "$u" && { f="$u"; break; }
++done
++if [[ -n "${C2_AT_PROBE:-}" && -n "$f" ]]; then
++  name="${C2_AT_PROBE%%:*}"; h="${C2_AT_PROBE#*:}"; uh="${f##*/twebproxy@}"; uh="${uh%.service}"
++  if [[ "$uh" == "$h" && ! -e "$C1_ROOT/$name.reached" ]]; then
++    echo "$PPID" > "$C1_ROOT/$name.pid"; : > "$C1_ROOT/$name.reached"
++    for ((i = 0; i < 600; i++)); do [[ -e "$C1_ROOT/$name.go" ]] && break; sleep 0.05; done
++  fi
++fi
++[[ -n "$f" && -f "$f" ]] || exit 7                     # nothing listening: connection refused
++host="${f##*/twebproxy@}"; host="${host%.service}"
++build="$(sed -n 's/^BUILD=//p' "$f")"; probes="$(sed -n 's/^PROBES=//p' "$f")"
++sed -i "s/^PROBES=.*/PROBES=$((probes + 1))/" "$f"
++if [[ -e "$C1_ROOT/slow-$host" ]] && (( probes < 2 )); then exit 7; fi
++[[ ! -e "$C1_ROOT/unready-$build-$host" ]] || exit 22
++if [[ -e "$C1_ROOT/crash-$build-$host" ]] && (( probes >= 1 )); then
++  rm -f "$f"; echo failed > "$C1_ROOT/state-twebproxy@$host.service"; exit 7
++fi
++exit 0
++SH
++  chmod 0755 "$TMP/bin/go" "$TMP/bin/systemctl" "$TMP/bin/curl"
++}
++
++# Helpers for assertions.
++c2_build_of() { sed -n 's/^# relay-build: //p' "$1" 2>/dev/null; }          # $1=binary
++c2_relay_build() { sed -n 's/^BUILD=//p' "$TMP/units/twebproxy@$1.service" 2>/dev/null; }   # $1=host
++c2_relay_up() { [[ -f "$TMP/units/twebproxy@$1.service" ]]; }
+diff --git a/tests/stagec2/relay-lifecycle-fixture.sh b/tests/stagec2/relay-lifecycle-fixture.sh
+new file mode 100644
+index 0000000..418ee60
+--- /dev/null
++++ b/tests/stagec2/relay-lifecycle-fixture.sh
+@@ -0,0 +1,183 @@
++#!/usr/bin/env bash
++# C2 regression: relay binary update and relay lifecycle operations are
++# failure-safe. A failed validation, binary write, restart, readiness check or
++# interruption leaves the previous binary installed and every relay running it
++# (or reports precisely which relay is not ready); success is reported only
++# after every relay is verified on the new binary; relay updates and restarts
++# are serialized; instance restart/delete report systemd failures.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c2-relay.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagec2/relay-harness.sh"
++c2_harness
++export TWEBPROXY_RELAY_READY_WAIT=3   # bounded readiness wait, shortened for the model
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++not() { ! "$@"; }
++show() { grep -E '\[(x|!|\+)\]' "${1:-$TMP/out}" | tail -n 4 | sed 's/\x1b\[[0-9;]*m//g; s/^/  | /'; }
++A=alpha.example; B=beta.example
++OLDC=0000000000000000000000000000000000000000 NEWC=1111111111111111111111111111111111111111
++PREV="$TMP/opt/relay/tproxy-server.previous"
++
++seed() { # $@ = hosts (default A B), each with one running profile and a running relay
++  local h n=0 hosts=("$@"); (( $# )) || hosts=("$A" "$B")
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$SITES_DIR" "$BASE_DIR/.locks" "$TMP/opt/relay" "$TMP"/units/* \
++    "$TMP"/fail-* "$TMP"/check-fail-* "$TMP"/unready-* "$TMP"/slow-* "$TMP"/crash-* "$TMP"/state-* \
++    "$TMP"/*.reached "$TMP"/*.go "$TMP"/*.pid "$TMP/firewall.applied"
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"; install -d -m 0755 "$SITES_DIR"
++  c2_relay_binary old > "$TPROXY_BIN"; chmod 0755 "$TPROXY_BIN"
++  for h in "${hosts[@]}"; do
++    c1_seed_instance "$h" $((18080 + 2*n)) $((18081 + 2*n))
++    c1_seed_profile "$h" main "$(printf '%032d' $((n + 1)))" https $((23980 + n)) $((28980 + n))
++    c1_run rebuild_profiles_json "$h" >/dev/null 2>&1
++    "$TMP/bin/systemctl" start "twebproxy-mtproxy@$h--main.service"
++    "$TMP/bin/systemctl" start "twebproxy@$h.service"
++    n=$((n + 1))
++  done
++  printf 'MANAGER_VERSION=0\nTPROXY_UPSTREAM_COMMIT=%s\nMTPROXY_COMMIT=0\n' "$OLDC" > "$GLOBAL_ENV"
++  c1_eval rebuild_firewall >/dev/null 2>&1; : > "$TMP/events"
++}
++bin_build() { c2_build_of "$TPROXY_BIN"; }
++relays_on() { local b="$1" h; shift; for h; do c2_relay_up "$h" && [[ "$(c2_relay_build "$h")" == "$b" ]] || return 1; done; }
++recorded_commit() { sed -n 's/^TPROXY_UPSTREAM_COMMIT=//p' "$GLOBAL_ENV"; }
++no_relay_start() { ! grep -q '^relay .* started' "$TMP/events"; }
++no_backend_action() { ! grep -qE '^systemctl .*twebproxy-mtproxy@' "$TMP/events"; }
++protected() { [[ -f "$TMP/firewall.applied" ]] && tr ',' '\n' < "$TMP/firewall.applied" | grep -qx "$1"; }
++tmp_leftovers() { find /tmp -maxdepth 1 \( -name 'tproxy-candidate.*' -o -name 'tproxy-old.*' -o -name 'twebproxy-relay-update.*' \) -newer "$TMP/mark" 2>/dev/null | wc -l; }
++no_tmp_leftovers() { [[ "$(tmp_leftovers)" == 0 ]]; }
++no_bin_debris() { [[ -z "$(find "$(dirname "$TPROXY_BIN")" -maxdepth 1 -name "$(basename "$TPROXY_BIN")?*" ! -name '*.previous')" ]]; }
++update() { : > "$TMP/mark"; c2_run update_cmd > "$TMP/out" 2>&1; rc=$?; }
++unchanged_after_failed_update() { # $1 = case name
++  check "$1_fails" test "$rc" -ne 0
++  check "$1_binary_old" test "$(bin_build)" = old
++  check "$1_relays_on_old_and_up" relays_on old "$A" "$B"
++  check "$1_commit_not_recorded" test "$(recorded_commit)" = "$OLDC"
++  check "$1_backends_untouched" no_backend_action
++  check "$1_no_temp_or_bin_debris" eval 'no_tmp_leftovers && no_bin_debris'
++}
++
++# ---------- 1-3. candidate rejected before anything is replaced ----------
++seed; : > "$TMP/fail-go-test"; update; show
++unchanged_after_failed_update go_test_failure
++check go_test_failure_no_relay_restart no_relay_start
++seed; : > "$TMP/fail-go-build"; update
++unchanged_after_failed_update go_build_failure
++check go_build_failure_no_relay_restart no_relay_start
++seed; : > "$TMP/check-fail-candidate-$B"; update; show
++unchanged_after_failed_update config_check_failure
++check config_check_failure_no_relay_restart no_relay_start
++check config_check_failure_names_host grep -q "$B" "$TMP/out"
++
++# ---------- 4. binary write interrupted (ENOSPC-like) ----------
++seed; : > "$TMP/fail-bin-write"; update; show
++unchanged_after_failed_update bin_write_failure
++check bin_write_failure_binary_intact test "$(bin_build)" = old -a -x "$TPROXY_BIN"
++
++# ---------- 5. candidate cannot start on the second relay ----------
++seed; : > "$TMP/fail-start-candidate-$B"; update; show
++unchanged_after_failed_update restart_failure
++check restart_failure_names_relay grep -q "twebproxy@$B.service" "$TMP/out"
++
++# ---------- 6. candidate never becomes ready on the second relay ----------
++seed; : > "$TMP/unready-candidate-$B"; update; show
++unchanged_after_failed_update readiness_failure
++check readiness_failure_names_relay grep -q "$B" "$TMP/out"
++
++# ---------- 7. candidate is ready, then the first relay crashes ----------
++seed; : > "$TMP/crash-candidate-$A"; update; show
++unchanged_after_failed_update crash_after_ready
++check crash_after_ready_names_relay grep -q "$A" "$TMP/out"
++
++# ---------- 8. rollback itself incomplete: reported, never "rolled back" ----------
++seed; : > "$TMP/unready-candidate-$B"; : > "$TMP/unready-old-$A"; update; show
++check rollback_incomplete_fails test "$rc" -ne 0
++check rollback_incomplete_binary_old test "$(bin_build)" = old
++check rollback_incomplete_names_unready_relay grep -qE "$A.*(not ready|did not become ready)|(not ready|did not become ready).*$A" "$TMP/out"
++check rollback_incomplete_not_claimed_complete not grep -qx '.*The update was rolled back\.' "$TMP/out"
++
++# ---------- 9. relays that need a few seconds to listen (bounded wait) ----------
++seed; : > "$TMP/slow-$A"; : > "$TMP/slow-$B"; update; show
++check slow_start_succeeds test "$rc" -eq 0
++check slow_start_relays_on_candidate relays_on candidate "$A" "$B"
++check slow_start_binary_candidate test "$(bin_build)" = candidate
++
++# ---------- 10. success ----------
++seed; update; show
++check success_rc test "$rc" -eq 0
++check success_binary_candidate test "$(bin_build)" = candidate
++check success_relays_on_candidate relays_on candidate "$A" "$B"
++check success_commit_recorded test "$(recorded_commit)" = "$NEWC"
++check success_previous_binary_kept test "$(c2_build_of "$PREV")" = old
++check success_backends_untouched no_backend_action
++check success_no_temp_or_bin_debris eval 'no_tmp_leftovers && no_bin_debris'
++check success_reported grep -q "Relay updated to $NEWC" "$TMP/out"
++# 11. no instances: binary replaced, nothing restarted.
++seed "$A"; c1_run delete_instance_cmd "$A" >/dev/null 2>&1; : > "$TMP/events"; update
++check no_instances_succeeds test "$rc" -eq 0 -a "$(bin_build)" = candidate
++check no_instances_no_relay_start no_relay_start
++
++# ---------- 12. interrupted (SIGTERM) while verifying the second relay ----------
++seed; : > "$TMP/mark"
++C2_AT_PROBE="int:$B" c2_run update_cmd > "$TMP/out" 2>&1 & p=$!
++c1_wait_reached int; kill -TERM "$(cat "$TMP/int.pid")" 2>/dev/null; : > "$TMP/int.go"; wait "$p"; rc=$?; show
++unchanged_after_failed_update interrupted
++
++# ---------- 13-14. one relay update / relay restart at a time ----------
++seed; C2_AT_PROBE="cu:$A" c2_run update_cmd > "$TMP/out1" 2>&1 & p=$!
++c1_wait_reached cu; mark="$(wc -l < "$TMP/events")"
++TWEBPROXY_STATE_LOCK_WAIT=1 C2_BUILD=second c2_run update_cmd > "$TMP/out2" 2>&1; rc2=$?
++TWEBPROXY_STATE_LOCK_WAIT=1 c2_run restart_cmd "$B" > "$TMP/out3" 2>&1; rc3=$?
++during="$(tail -n +"$((mark + 1))" "$TMP/events")"
++: > "$TMP/cu.go"; wait "$p"; rc1=$?
++check concurrent_update_refused test "$rc2" -ne 0
++check concurrent_update_no_second_build_installed not grep -q 'build=second' <<<"$during"
++check concurrent_update_reports_busy grep -qiE 'busy|another operation' "$TMP/out2"
++check restart_during_update_refused test "$rc3" -ne 0
++check restart_during_update_touches_nothing not grep -qE "systemctl .*@$B(--main)?\.service" <<<"$during"
++check first_update_completes test "$rc1" -eq 0 -a "$(bin_build)" = candidate
++check first_update_relays_on_candidate relays_on candidate "$A" "$B"
++
++# ---------- 15-17. restart: instance lock, systemd and readiness failures ----------
++seed; install -d -m 0700 "$BASE_DIR/.locks"
++exec {held}>>"$BASE_DIR/.locks/instance-$A.lock"; flock "$held"
++TWEBPROXY_STATE_LOCK_WAIT=1 c2_run restart_cmd "$A" > "$TMP/out" 2>&1 {held}>&-; rc=$?
++exec {held}>&-
++check restart_waits_for_instance_lock test "$rc" -ne 0
++check restart_locked_touches_nothing not grep -q '^systemctl ' "$TMP/events"
++seed; : > "$TMP/fail-restart-twebproxy@$A.service"; c2_run restart_cmd "$A" > "$TMP/out" 2>&1; rc=$?; show
++check restart_systemd_failure_fails test "$rc" -ne 0
++check restart_systemd_failure_names_unit grep -q "twebproxy@$A.service" "$TMP/out"
++check restart_systemd_failure_no_success not grep -q 'was restarted and is ready' "$TMP/out"
++seed; : > "$TMP/unready-old-$A"; c2_run restart_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check restart_unready_fails test "$rc" -ne 0 -a "$(grep -c 'did not become ready' "$TMP/out")" -ge 1
++seed; c2_run restart_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check restart_success test "$rc" -eq 0 -a "$(grep -c 'was restarted and is ready' "$TMP/out")" -eq 1
++
++# ---------- 18-19. delete: the relay must be proven stopped before anything is removed ----------
++seed; : > "$TMP/fail-stop-twebproxy@$A.service"; c2_run delete_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?; show
++check delete_relay_stop_failure_fails test "$rc" -ne 0
++check delete_relay_stop_failure_instance_kept test -f "$INSTANCES_DIR/$A/instance.env" -a -f "$BACKENDS_DIR/$A--main.env"
++check delete_relay_stop_failure_backend_running test -e "$TMP/units/twebproxy-mtproxy@$A--main.service"
++check delete_relay_stop_failure_ports_protected protected 23980
++check delete_relay_stop_failure_names_relay grep -q "twebproxy@$A.service" "$TMP/out"
++check delete_relay_stop_failure_no_success not grep -q "$A was deleted" "$TMP/out"
++seed; c2_run delete_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check delete_success test "$rc" -eq 0 -a ! -e "$INSTANCES_DIR/$A" -a ! -e "$TMP/units/twebproxy@$A.service"
++check delete_success_reported grep -q "$A was deleted" "$TMP/out"
++check delete_success_other_relay_untouched relays_on old "$B"
++
++# ---------- 20. profile add: a relay restart failure is reported ----------
++seed; : > "$TMP/fail-restart-twebproxy@$A.service"
++C1_NAME=extra c2_run profile_add_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check profile_add_relay_failure_fails test "$rc" -ne 0
++check profile_add_relay_failure_no_success not grep -q 'Profile extra was added' "$TMP/out"
++seed; C1_NAME=extra c2_run profile_add_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check profile_add_success_reported test "$rc" -eq 0 -a "$(grep -c 'Profile extra was added' "$TMP/out")" -ge 1
++check profile_add_success_relay_ready relays_on old "$A"
++
++printf 'c2-relay-lifecycle: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec2/run-stage-c2-suite.sh b/tests/stagec2/run-stage-c2-suite.sh
+new file mode 100644
+index 0000000..4051db5
+--- /dev/null
++++ b/tests/stagec2/run-stage-c2-suite.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage C2 cases are model tests (tests/stagec2/relay-harness.sh): they change
++# no system state and need no lab host. Scope: c2-scope-invariants.sh <v0.2.16 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "C2 relay update / restart / delete lifecycle (MODEL)" "$ROOT/tests/stagec2/relay-lifecycle-fixture.sh" 900 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-c2-suite: PASS (all mandatory model checks executed)';;
++  77) echo 'stage-c2-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-c2-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 51abebc..bc06506 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.16-beta
++# TWebProxy Manager v0.2.17-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.16"
+-MANAGER_RELEASE_VERSION="0.2.16-beta"
++MANAGER_VERSION="0.2.17"
++MANAGER_RELEASE_VERSION="0.2.17-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -500,6 +500,19 @@ ui_localize_legacy() {
+     'Hostname '*' пересекается с '*' в именах backend'*) value="${text#Hostname }"; value2="${text#* пересекается с }"; printf 'Hostname %s overlaps with %s in backend names (<hostname>--<profile>); the instance was not created and nothing was changed.' "${value%% пересекается*}" "${value2%% в именах*}"; return;;
+     'Имя backend '*' уже использует профиль другого инстанса; '*) value="${text#Имя backend }"; printf 'Backend name %s is already used by a profile of another instance; the profile was not created and nothing was changed.' "${value%% уже*}"; return;;
+     'Для '*' есть backend env, который нельзя однозначно отнести к этому инстансу; ничего не удалено.') value="${text#Для }"; printf '%s has backend env files that cannot be attributed to this instance unambiguously; nothing was deleted.' "${value%% есть backend*}"; return;;
++    # Stage C2 relay lifecycle messages.
++    'Другая операция обновляет или перезапускает relay; повтори позже.') printf 'Another operation is updating or restarting the relay (relay lock busy); retry later.'; return;;
++    'Не удалось перезапустить relay '*'.') value="${text#Не удалось перезапустить relay }"; printf 'Failed to restart relay %s.' "${value%.}"; return;;
++    'Relay twebproxy@'*' не остановлен или его состояние неизвестно; ничего не удалено. '*) value="${text#Relay }"; value="${value%% не остановлен*}"; printf 'Relay %s is not stopped or its state is unknown; nothing was deleted. Check it (systemctl status %s) and retry.' "$value" "$value"; return;;
++    'Не удалось сохранить текущий relay binary; update отменён до замены binary.') printf 'Could not save the current relay binary; the update was canceled before the binary was replaced.'; return;;
++    'Не удалось записать новый relay binary; прежний binary и relays не изменены.') printf 'Could not write the new relay binary; the previous binary and the relays are unchanged.'; return;;
++    'Не удалось установить tproxy-server; прежний binary не изменён.') printf 'Could not install tproxy-server; the previous binary is unchanged.'; return;;
++    'Relay twebproxy@'*' не перезапустился с новым binary; восстанавливаю прежний relay binary.') value="${text#Relay }"; printf 'Relay %s did not restart with the new binary; restoring the previous relay binary.' "${value%% не перезапустился*}"; return;;
++    'Relay '*' не стал ready с новым binary; восстанавливаю прежний relay binary.') value="${text#Relay }"; printf 'Relay %s did not become ready with the new binary; restoring the previous relay binary.' "${value%% не стал ready*}"; return;;
++    'Relay '*' перестал работать после обновления; восстанавливаю прежний relay binary.') value="${text#Relay }"; printf 'Relay %s stopped working after the update; restoring the previous relay binary.' "${value%% перестал*}"; return;;
++    'Обновление relay прервано; восстанавливаю прежний relay binary.') printf 'The relay update was interrupted; restoring the previous relay binary.'; return;;
++    'Откат relay неполный: прежний binary восстановлен, но не ready: '*) value="${text#*но не ready: }"; printf "Relay rollback incomplete: the previous binary was restored, but these relays are not ready: %s. Check them and run 'twebproxy restart <hostname>'." "${value%%. Проверь*}"; return;;
++    'Откат relay не удался: прежний binary не восстановлен, его копия: '*) value="${text#*его копия: }"; value2="${text#*новым binary: }"; printf 'Relay rollback failed: the previous binary was not restored; its copy: %s. Relays restarted with the new binary: %s.' "${value%%. Relays*}" "${value2%.}"; return;;
+     'Запусти от root:'*) printf 'Run as root:%s' "${text#*:}"; return;;
+     'Нужен systemd.') printf 'systemd is required.'; return;;
+     'jq нужен для --json output.') printf 'jq is required for --json output.'; return;;
+@@ -1325,12 +1338,20 @@ profile_state_restore() { # $1=host $2=profile $3=previous record ("" = remove)
+ }
+ 
+ # Narrow flock locks under $BASE_DIR/.locks: instance-<host> serializes the
+-# mutations of one instance; ports serializes port choice until persistence.
++# mutations of one instance; ports serializes port choice until persistence;
++# relay serializes relay binary replacement with relay restarts/stops;
++# relay-update serializes whole relay updates (upstream checkout and build).
+ # Order: instance -> ports -> (DPI lock, backend firewall helper); the port
+-# lock is a leaf. Closing the descriptor or process exit (die) releases them.
++# lock is a leaf. instance -> relay and relay-update -> relay; ports and relay
++# are never held together. Closing the descriptor or process exit (die)
++# releases them.
+ STATE_LOCK_WAIT_SECONDS="${TWEBPROXY_STATE_LOCK_WAIT:-120}"
+ INSTANCE_LOCK_FD=""; INSTANCE_LOCK_HOST=""; INSTANCE_LOCK_DEPTH=0
+ PORT_LOCK_FD=""; PORT_LOCK_DEPTH=0
++RELAY_LOCK_FD=""; RELAY_LOCK_DEPTH=0
++# Bounded relay readiness wait (seconds, one /readyz probe per second).
++RELAY_READY_WAIT_SECONDS="${TWEBPROXY_RELAY_READY_WAIT:-25}"
++RELAY_UPDATE_INTERRUPTED=0
+ 
+ state_lock_path() { # $1=name -> STATE_LOCK_PATH (re-derived from the current BASE_DIR)
+   local dir="$BASE_DIR/.locks"
+@@ -1377,6 +1398,23 @@ port_lock_release() {
+   (( PORT_LOCK_DEPTH > 0 )) || exec {PORT_LOCK_FD}>&-
+ }
+ 
++relay_lock_acquire() {
++  if (( RELAY_LOCK_DEPTH > 0 )); then RELAY_LOCK_DEPTH=$((RELAY_LOCK_DEPTH + 1)); return 0; fi
++  (( PORT_LOCK_DEPTH == 0 )) || return 1
++  state_lock_path relay || return 1
++  exec {RELAY_LOCK_FD}>>"$STATE_LOCK_PATH" || return 1
++  if ! flock -w "$STATE_LOCK_WAIT_SECONDS" "$RELAY_LOCK_FD"; then
++    exec {RELAY_LOCK_FD}>&-; return 1
++  fi
++  RELAY_LOCK_DEPTH=1
++}
++
++relay_lock_release() {
++  (( RELAY_LOCK_DEPTH > 0 )) || return 0
++  RELAY_LOCK_DEPTH=$((RELAY_LOCK_DEPTH - 1))
++  (( RELAY_LOCK_DEPTH > 0 )) || exec {RELAY_LOCK_FD}>&-
++}
++
+ # ---- Stage X-DPI: optional, IPv4-address-scoped compatibility subsystem ----
+ 
+ dpi_mode_valid() {
+@@ -2890,7 +2928,10 @@ build_tproxy_server() {
+     rm -f "$tmpbin"
+     die "Не удалось собрать tproxy-server."
+   fi
+-  install -o root -g root -m 0755 "$tmpbin" "$TPROXY_BIN"
++  if ! relay_binary_install "$tmpbin"; then
++    rm -f "$tmpbin"
++    die "Не удалось установить tproxy-server; прежний binary не изменён."
++  fi
+   rm -f "$tmpbin"
+   ok "Relay собран."
+ }
+@@ -4604,21 +4645,125 @@ start_all_backends() {
+   while read -r p; do [[ -n "$p" ]] && start_profile_backend "$host" "$p"; done < <(list_profiles_array "$host")
+ }
+ 
+-restart_relay_wait_ready() {
+-  local host="$1" admin="" ready="" i
+-  load_instance "$host"; admin="$ADMIN_PORT"
+-  systemctl reset-failed "twebproxy@$host.service" >/dev/null 2>&1 || true
+-  systemctl enable --now "twebproxy@$host.service" >/dev/null
+-  systemctl restart "twebproxy@$host.service"
+-  for i in {1..25}; do
+-    if curl -fsS --max-time 2 "http://127.0.0.1:$admin/readyz" >/dev/null 2>&1; then ready=1; break; fi
++# Bounded wait until the relay of $1 answers /readyz. A refused connection
++# (relay not listening yet) is retried like any other failure.
++relay_wait_ready() { # $1=host
++  local admin i
++  admin="$(load_instance "$1" >/dev/null 2>&1; printf '%s' "${ADMIN_PORT:-}")"
++  [[ "$admin" =~ ^[0-9]+$ ]] || return 1
++  for ((i = 0; i < RELAY_READY_WAIT_SECONDS; i++)); do
++    if curl -fsS --max-time 2 "http://127.0.0.1:$admin/readyz" >/dev/null 2>&1; then return 0; fi
+     sleep 1
+   done
+-  if [[ -z "$ready" ]]; then
+-    systemctl --no-pager --full status "twebproxy@$host.service" || true
+-    journalctl -u "twebproxy@$host.service" -n 80 --no-pager || true
++  return 1
++}
++
++# One more look after all relays were restarted: still active and ready.
++relay_verify() { # $1=host
++  local admin
++  admin="$(load_instance "$1" >/dev/null 2>&1; printf '%s' "${ADMIN_PORT:-}")"
++  [[ "$admin" =~ ^[0-9]+$ ]] || return 1
++  systemctl is-active --quiet "twebproxy@$1.service" &&
++    curl -fsS --max-time 2 "http://127.0.0.1:$admin/readyz" >/dev/null 2>&1
++}
++
++restart_relay_wait_ready() {
++  local host="$1" unit="twebproxy@$1.service"
++  load_instance "$host"
++  relay_lock_acquire || die "Другая операция обновляет или перезапускает relay; повтори позже."
++  systemctl reset-failed "$unit" >/dev/null 2>&1 || true
++  if ! systemctl enable --now "$unit" >/dev/null || ! systemctl restart "$unit"; then
++    systemctl --no-pager --full status "$unit" || true
++    die "Не удалось перезапустить relay $unit."
++  fi
++  if ! relay_wait_ready "$host"; then
++    systemctl --no-pager --full status "$unit" || true
++    journalctl -u "$unit" -n 80 --no-pager || true
+     die "Relay $host не стал ready."
+   fi
++  relay_lock_release
++}
++
++# Stops and disables the relay of $1 and proves it is not running (inactive or
++# failed afterwards); anything else, including a systemctl error, is "not proven".
++stop_relay_unit() { # $1=host
++  local unit="twebproxy@$1.service" state=""
++  systemctl disable --now "$unit" >/dev/null 2>&1 || true
++  state="$(systemctl is-active "$unit" 2>/dev/null)" || true
++  [[ "$state" == inactive || "$state" == failed ]]
++}
++
++# Replaces $TPROXY_BIN by renaming a complete copy written next to it, so a
++# failed or interrupted write never leaves a partial binary in place.
++relay_binary_install() { # $1=source binary
++  local tmp
++  tmp="$(mktemp "$TPROXY_BIN.new.XXXXXX")" || return 1
++  if install -o root -g root -m 0755 "$1" "$tmp" && mv -f -T "$tmp" "$TPROXY_BIN"; then return 0; fi
++  rm -f -- "$tmp"; return 1
++}
++
++# Durable copy of the installed relay binary (survives /tmp cleanup and an
++# interrupted update); the rollback source of relay_update_apply.
++relay_previous_save() { # -> path on stdout
++  local dir="$PROJECT_DIR/relay" tmp
++  install -d -o root -g root -m 0700 "$dir" || return 1
++  tmp="$(mktemp "$dir/tproxy-server.previous.XXXXXX")" || return 1
++  if install -o root -g root -m 0755 "$TPROXY_BIN" "$tmp" && cmp -s "$TPROXY_BIN" "$tmp" &&
++     mv -f -T "$tmp" "$dir/tproxy-server.previous"; then
++    printf '%s\n' "$dir/tproxy-server.previous"; return 0
++  fi
++  rm -f -- "$tmp"; return 1
++}
++
++# Installs a validated candidate and restarts every relay on it, one at a time;
++# success only when all of them are verified ready on it. On the first failure,
++# or once the caller's trap recorded an interruption, the previous binary is
++# put back and every relay restarted so far is restarted on it and checked.
++# Returns 0 updated; 1 rolled back, all ready; 2 rolled back, RELAY_UPDATE_NOTREADY
++# not ready; 3 previous binary not restored; 4 candidate not written (no change).
++# Every step is checked explicitly: callers run it in an || context.
++relay_update_apply() { # $1=candidate $2=previous copy $3...=hosts
++  local candidate="$1" prev="$2" host failed=0; shift 2
++  local -a restarted=() notready=()
++  RELAY_UPDATE_NOTREADY=""
++  relay_binary_install "$candidate" || return 4
++  for host in "$@"; do
++    if (( RELAY_UPDATE_INTERRUPTED )); then break; fi
++    restarted+=("$host")
++    systemctl reset-failed "twebproxy@$host.service" >/dev/null 2>&1 || true
++    if ! systemctl restart "twebproxy@$host.service" >/dev/null 2>&1; then
++      warn "Relay twebproxy@$host.service не перезапустился с новым binary; восстанавливаю прежний relay binary."
++      failed=1; break
++    fi
++    if ! relay_wait_ready "$host"; then
++      warn "Relay $host не стал ready с новым binary; восстанавливаю прежний relay binary."
++      failed=1; break
++    fi
++  done
++  if (( ! failed && RELAY_UPDATE_INTERRUPTED )); then
++    warn "Обновление relay прервано; восстанавливаю прежний relay binary."
++    failed=1
++  fi
++  if (( ! failed )); then
++    for host in "$@"; do
++      relay_verify "$host" && continue
++      warn "Relay $host перестал работать после обновления; восстанавливаю прежний relay binary."
++      failed=1; break
++    done
++  fi
++  (( failed )) || return 0
++  if ! relay_binary_install "$prev"; then
++    RELAY_UPDATE_NOTREADY="${restarted[*]}"; return 3
++  fi
++  for host in "${restarted[@]}"; do
++    systemctl reset-failed "twebproxy@$host.service" >/dev/null 2>&1 || true
++    if ! systemctl restart "twebproxy@$host.service" >/dev/null 2>&1 || ! relay_wait_ready "$host"; then
++      notready+=("$host")
++    fi
++  done
++  RELAY_UPDATE_NOTREADY="${notready[*]}"
++  (( ${#notready[@]} == 0 )) && return 1
++  return 2
+ }
+ 
+ managed_frontend_family() {
+@@ -5786,10 +5931,14 @@ restart_cmd() {
+   local host="${1:-}" p
+   [[ -n "$host" ]] || host="$(select_instance)"
+   instance_exists "$host" || die "Нет $host"
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  instance_exists "$host" || die "Нет $host"
++  relay_lock_acquire || die "Другая операция обновляет или перезапускает relay; повтори позже."
+   while read -r p; do
+     [[ -n "$p" ]] && start_profile_backend "$host" "$p"
+   done < <(list_profiles_array "$host")
+   restart_relay_wait_ready "$host"
++  relay_lock_release; instance_lock_release
+   ok "$host перезапущен и ready."
+ }
+ 
+@@ -6350,7 +6499,11 @@ delete_instance_cmd() {
+     ambiguous=1
+   done < <(orphan_backend_ids "$host")
+   (( ambiguous == 0 )) || die "Для $host есть backend env, который нельзя однозначно отнести к этому инстансу; ничего не удалено."
+-  systemctl disable --now "twebproxy@$host.service" >/dev/null 2>&1 || true
++  # Held until the instance files are gone: a concurrent relay update must not
++  # restart this relay in between.
++  relay_lock_acquire || die "Другая операция обновляет или перезапускает relay; повтори позже."
++  stop_relay_unit "$host" ||
++    die "Relay twebproxy@$host.service не остановлен или его состояние неизвестно; ничего не удалено. Проверь его (systemctl status twebproxy@$host.service) и повтори."
+   # Every backend of the instance (profiles and orphans) must be proven down
+   # before any record or env file is removed; otherwise nothing is deleted and
+   # the firewall keeps protecting their ports.
+@@ -6362,6 +6515,7 @@ delete_instance_cmd() {
+   for id in "${ids[@]}"; do rm -f -- "$BACKENDS_DIR/$id.env"; done
+   remove_reverse_proxy_for_instance "$host"
+   rm -rf "$(instance_dir "$host")" "$(site_dir "$host")"
++  relay_lock_release
+   rebuild_firewall
+   dpi_with_mutation_lock dpi_remove_host_state_if_orphaned "$old_ip" || warn "$(ui_msg dpi_repair_warning)"
+   instance_lock_release
+@@ -6370,38 +6524,51 @@ delete_instance_cmd() {
+ 
+ update_cmd() {
+   need_root; need_systemd; check_platform; banner; ensure_core
++  local update_fd work candidate prev host rc=0
++  local -a hosts=()
++  # One relay update at a time (it also owns the upstream checkout).
++  state_lock_path relay-update && exec {update_fd}>>"$STATE_LOCK_PATH" &&
++    flock -w "$STATE_LOCK_WAIT_SECONDS" "$update_fd" ||
++    die "Другая операция обновляет или перезапускает relay; повтори позже."
+   install_base_deps; ensure_go; sync_tproxy_upstream latest
+-  local candidate backup host was_ready=0 failed=0
+-  candidate="$(mktemp /tmp/tproxy-candidate.XXXXXX)"; backup="$(mktemp /tmp/tproxy-old.XXXXXX)"
++  work="$(mktemp -d /tmp/twebproxy-relay-update.XXXXXX)" || die "Не удалось собрать candidate tproxy-server; update отменён."
++  candidate="$work/tproxy-server"
+   if ! (umask 022; cd "$TPROXY_SRC" && "$GO_BIN" test ./...); then
+-    rm -f "$candidate" "$backup"
++    rm -rf -- "$work"
+     die "Upstream test suite tproxy-server не прошёл; update отменён до замены binary."
+   fi
+   if ! (umask 022; cd "$TPROXY_SRC" && "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$candidate" ./cmd/tproxy-server); then
+-    rm -f "$candidate" "$backup"
++    rm -rf -- "$work"
+     die "Не удалось собрать candidate tproxy-server; update отменён."
+   fi
+   chmod 0755 "$candidate"
+-  while read -r host; do
+-    [[ -n "$host" ]] || continue
+-    "$candidate" -config "$(instance_dir "$host")/config.json" -profiles-file "$(profiles_json "$host")" -check >/dev/null || die "Новая версия не проходит config check для $host"
+-  done < <(list_hosts_array)
+-  cp -a "$TPROXY_BIN" "$backup"
+-  install -o root -g root -m 0755 "$candidate" "$TPROXY_BIN"
+-  rm -f "$candidate"
+-  while read -r host; do
+-    [[ -n "$host" ]] || continue
+-    systemctl restart "twebproxy@$host.service"
+-    load_instance "$host"
+-    if ! curl -fsS --retry 8 --retry-delay 1 --max-time 3 "http://127.0.0.1:$ADMIN_PORT/healthz" >/dev/null 2>&1; then failed=1; break; fi
+-  done < <(list_hosts_array)
+-  if (( failed )); then
+-    warn "Новый relay не прошёл health-check. Откатываю binary."
+-    install -o root -g root -m 0755 "$backup" "$TPROXY_BIN"
+-    while read -r host; do [[ -n "$host" ]] && systemctl restart "twebproxy@$host.service" || true; done < <(list_hosts_array)
+-    rm -f "$backup"; die "Update откатан."
++  if ! relay_lock_acquire; then
++    rm -rf -- "$work"; die "Другая операция обновляет или перезапускает relay; повтори позже."
+   fi
+-  rm -f "$backup"
++  while read -r host; do [[ -n "$host" ]] && hosts+=("$host"); done < <(list_hosts_array)
++  for host in "${hosts[@]}"; do
++    if ! "$candidate" -config "$(instance_dir "$host")/config.json" -profiles-file "$(profiles_json "$host")" -check >/dev/null; then
++      rm -rf -- "$work"; die "Новая версия не проходит config check для $host"
++    fi
++  done
++  if ! prev="$(relay_previous_save)"; then
++    rm -rf -- "$work"; die "Не удалось сохранить текущий relay binary; update отменён до замены binary."
++  fi
++  # From the binary swap until the outcome is known an interruption only marks
++  # the update as failed; relay_update_apply then rolls back (bounded waits).
++  RELAY_UPDATE_INTERRUPTED=0
++  trap 'RELAY_UPDATE_INTERRUPTED=1' INT TERM HUP
++  relay_update_apply "$candidate" "$prev" "${hosts[@]}" || rc=$?
++  trap - INT TERM HUP
++  rm -rf -- "$work"
++  case "$rc" in
++    0) ;;
++    1) die "Update откатан.";;
++    2) die "Откат relay неполный: прежний binary восстановлен, но не ready: $RELAY_UPDATE_NOTREADY. Проверь их и выполни 'twebproxy restart <hostname>'.";;
++    3) die "Откат relay не удался: прежний binary не восстановлен, его копия: $prev. Relays, перезапущенные с новым binary: ${RELAY_UPDATE_NOTREADY:--}.";;
++    *) die "Не удалось записать новый relay binary; прежний binary и relays не изменены.";;
++  esac
++  relay_lock_release
+   write_global_env; install_manager_copy
+   ok "Relay обновлён до $UPSTREAM_COMMIT."
+ }

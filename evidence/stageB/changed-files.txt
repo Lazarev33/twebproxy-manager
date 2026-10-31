@@ -1,0 +1,16 @@
+ CHANGELOG.md                                   |  20 ++
+ VERSION                                        |   2 +-
+ tests/fieldgate/tg7-backend-state-isolation.sh |  11 +-
+ tests/stageb/README.md                         |  43 ++++
+ tests/stageb/backend-harness.sh                |  35 +++
+ tests/stageb/json-verifier-fixture.sh          |  36 +++
+ tests/stageb/nft-model.sh                      |  50 ++++
+ tests/stageb/real-nft-validation.sh            |  90 +++++++
+ tests/stageb/real-systemd-validation.sh        |  71 ++++++
+ tests/stageb/reproduce-v0211.sh                |  40 ++++
+ tests/stageb/run-stage-b-suite.sh              |  16 ++
+ tests/stageb/scope-invariants.sh               |  64 +++++
+ tests/stageb/systemctl-model.sh                |  23 ++
+ tests/stageb/transaction-fixture.sh            | 100 ++++++++
+ twebproxy-manager.sh                           | 315 +++++++++++++++++++------
+ 15 files changed, 831 insertions(+), 85 deletions(-)

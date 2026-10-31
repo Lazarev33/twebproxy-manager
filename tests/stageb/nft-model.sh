@@ -4,6 +4,9 @@ set -euo pipefail
 root="${BF_TEST_ROOT:?}"
 printf '%s\n' "$*" >> "$root/nft.calls"
 case "$*" in
+  "list table inet twebproxy_guard")
+    [[ -f "$root/guard" ]] || exit 1
+    printf 'table inet twebproxy_guard { # progname nft\n\tflags owner\n}\n'; exit 0;;
   *"list tables inet")
     [[ ! -e "$root/fail-query" ]] || exit 1
     if [[ -f "$root/live" ]]; then

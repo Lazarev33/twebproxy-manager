@@ -1,0 +1,2 @@
+sentinel calls: 0
+host canary: unchanged

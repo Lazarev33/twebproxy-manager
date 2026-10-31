@@ -1,0 +1,1136 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index bb4de10..6451f63 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,29 @@
+ # Changelog
+ 
++## 0.2.13-beta — 2026-10-20 — Stage B.1: исправление прав libexec и безопасность тестов
++
++- Исправлена регрессия 0.2.12 (P0): `rebuild_firewall` переводил существующий
++  `/usr/local/libexec/twebproxy` в 0700, после чего `twebproxy-mtproxy@`
++  (`User=mtproxy`) и nfqws (`User=twebproxy-dpi`) не могли запуститься. Каталог
++  снова поддерживается как `root:root 0755`, как в `prepare_users_and_dirs`;
++  хосты, повреждённые 0.2.12, восстанавливаются первым rebuild. Symlink вместо
++  каталога отвергается до любого chmod.
++- Backend firewall unit получил `ReloadPropagatedFrom=nftables.service`:
++  `systemctl reload nftables` перечитывает `/etc/nftables.conf` (обычно с
++  `flush ruleset`), а `PartOf=` передаёт только stop/restart. Поведение на
++  реальном systemd ещё не проверено (нужна disposable VM).
++- Если `nft -f` вернул ошибку, helper читает live-таблицу и правдиво сообщает,
++  изменилось ли ядро. При commit, за которым последовала ошибка клиента
++  (например, timeout), восстанавливается прежняя проверенная таблица, а при
++  первой установке сохраняется новая изоляция. Успех не заявляется.
++- Реальные nft/systemd/mount/ENOSPC тесты запускаются только на подготовленной
++  disposable VM (`tests/LAB.md`, `tests/lib/lab-gate.sh`); иначе NOT_EXECUTED до
++  любой привилегированной команды. SA3 монтирует tmpfs только в private mount
++  namespace. Fieldgate-раннер и протокол результатов больше не превращают
++  NOT_EXECUTED в PASS.
++- Stage A/A.1, остальная логика Stage B, DPI, relay/профили/frontend и protected
++  Stage 4 function set не изменены.
++
+ ## 0.2.12-beta — 2026-10-20 — Stage B: транзакционный backend firewall
+ 
+ - Backend firewall собирается из проверенного полного набора backend ports
+diff --git a/VERSION b/VERSION
+index f2722b1..2779245 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.12
++0.2.13
+diff --git a/tests/LAB.md b/tests/LAB.md
+new file mode 100644
+index 0000000..109a5ee
+--- /dev/null
++++ b/tests/LAB.md
+@@ -0,0 +1,75 @@
++# Real lab validation (disposable VM only)
++
++Kernel nft, systemd lifecycle, namespace/mount and genuine ENOSPC tests change
++real host state. They run **only** on a disposable Linux VM that was prepared
++for them. Every other host, including a production TWebProxy server where the
++opt-in variable was set by mistake, reports `NOT_EXECUTED` (exit 77) before any
++privileged command. A suite with a `NOT_EXECUTED` case is `INCOMPLETE`, never
++`PASS`.
++
++## Gate (`tests/lib/lab-gate.sh`)
++
++A real test runs only when **all** of these hold:
++
++1. `TWEBPROXY_LAB_MODE=disposable-vm` is exported.
++2. `/etc/twebproxy-disposable-lab` is a regular root-owned file containing this
++   host's `/etc/machine-id`.
++3. No TWebProxy fingerprint exists: `/etc/twebproxy`, `/usr/local/libexec/twebproxy`,
++   `/usr/local/sbin/twebproxy`, `/opt/twebproxy-manager`, `/srv/twebproxy`,
++   `/etc/systemd/system/twebproxy*`. Use a fresh VM snapshot for every run.
++4. The test runs as root.
++
++Gated scripts: `tests/stageb/real-nft-validation.sh`,
++`tests/stageb/real-systemd-validation.sh`, `tests/stagea/sa1-real-nft-validation.sh`,
++the tmpfs section of `tests/stagea/sa3-state-publication.sh`,
++`tests/fieldgate/tg1-real-nft-six-mode-gate.sh`,
++`tests/fieldgate/tg3-installed-manager-lifecycle.sh`.
++`tests/stageb/lab-gate-fixture.sh` fails if a new script uses `unshare`, `mount`,
++`umount`, a real `nft` lookup or `/run/systemd/system` without the gate.
++
++## Preparing the VM
++
++Debian 12 (nft 1.0.6, systemd 252) and Ubuntu 22.04 (1.0.2/249) or 24.04
++(1.0.9/255); optionally Debian 13. Packages: `nftables jq util-linux coreutils`.
++Snapshot the VM first.
++
++```sh
++cat /etc/machine-id > /etc/twebproxy-disposable-lab   # as root, on the VM only
++export TWEBPROXY_LAB_MODE=disposable-vm
++```
++
++## Runs
++
++```sh
++timeout 150 bash tests/stageb/real-nft-validation.sh
++timeout 270 bash tests/stageb/real-systemd-validation.sh
++timeout 150 bash tests/stagea/sa1-real-nft-validation.sh
++timeout 600 bash tests/stagea/sa3-state-publication.sh   # re-execs in a private mount namespace
++timeout 300 bash tests/fieldgate/tg1-real-nft-six-mode-gate.sh
++timeout 600 bash tests/fieldgate/tg3-installed-manager-lifecycle.sh
++bash tests/stageb/run-stage-b-suite.sh; bash tests/stagea/run-stage-a-suite.sh
++```
++
++Record `uname -r`, `nft --version`, `systemctl --version`, each exact command,
++exit status and output. No secrets or real hostnames.
++
++## Additional B.1 checks (manual, on the VM)
++
++- **F1 under real systemd:** a `User=nobody` oneshot unit whose `ExecStart` is a
++  script in a root-owned directory: active with 0755, `203/EXEC` or exit 126 with
++  0700. Then, after a full `core-install` + `add` with v0.2.13:
++  `stat -c %a /usr/local/libexec/twebproxy` is `755` and every
++  `twebproxy-mtproxy@` unit is active; `repair` keeps them active.
++- **R1 reload propagation:** with `nftables.service` enabled and the packaged
++  `/etc/nftables.conf` (starts with `flush ruleset`), start the backend firewall
++  unit, run `systemctl reload nftables`, and confirm `inet twebproxy_backend`
++  is present again afterwards (`journalctl -u twebproxy-firewall` shows the
++  propagated reload). Repeat with the unit started but `nftables.service`
++  inactive (the reload is refused; nothing changes).
++- **R2 dependency propagation:** with relay/backend test units that have
++  `Requires=` + `After=` on the firewall unit, record whether
++  `systemctl restart nftables` and `systemctl stop nftables` restart/stop them
++  (`systemctl show -p ExecMainStartTimestamp`). Expected from systemd source:
++  restart cascades as try-restart; stop stops them (fail-closed).
++- **R3 ambiguous apply:** not reproducible on demand; the model fixture covers
++  the decision logic. Optionally slow the netlink path and use a short timeout.
+diff --git a/tests/fieldgate/run-fieldgate-suite.sh b/tests/fieldgate/run-fieldgate-suite.sh
+index 6283d96..958bc99 100755
+--- a/tests/fieldgate/run-fieldgate-suite.sh
++++ b/tests/fieldgate/run-fieldgate-suite.sh
+@@ -22,18 +22,18 @@ declare -a NAMES=(
+   "DF-3 DPI cleanup + stage diagnostics:df3-dpi-cleanup-stage-diagnostics.sh:600"
+   "DF-3b nfqws cleanup failure propagation:df3b-nfqws-cleanup-propagation.sh:300"
+ )
+-rc=0
++# 0=all executed/PASS; 1=FAIL; 77=INCOMPLETE. TG-1 and TG-3 touch the kernel
++# or real mount points and run only on a disposable lab host (tests/LAB.md).
++source "$ROOT/tests/lib/stage-a-results.sh"
+ for entry in "${NAMES[@]}"; do
+   label="${entry%%:*}"; rest="${entry#*:}"; script="${rest%%:*}"; tmo="${rest##*:}"
+   printf '\n===== %s =====\n' "$label"
+-  if timeout "$tmo" bash "$TESTS/$script" "$MGR"; then
+-    printf '%s: PASS\n' "$label"
+-  else
+-    status=$?
+-    if (( status == 124 )); then printf '%s: FAIL (timed out after %ss)\n' "$label" "$tmo" >&2
+-    else printf '%s: FAIL (exit %s)\n' "$label" "$status" >&2; fi
+-    rc=1
+-  fi
++  stage_a_run_case "$label" "$TESTS/$script" "$tmo" "$MGR"
+ done
+-printf '\nfieldgate-suite: %s\n' "$( ((rc==0)) && echo 'PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1, DF-3, DF-3b)' || echo FAIL )"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) printf '\nfieldgate-suite: PASS (TG-1, TG-3, TG-5, TG-5b, TG-7-backend, FD-1, DF-3, DF-3b)\n';;
++  77) printf '\nfieldgate-suite: INCOMPLETE (lab-only checks NOT_EXECUTED)\n';;
++  *) printf '\nfieldgate-suite: FAIL\n';;
++esac
+ exit "$rc"
+diff --git a/tests/fieldgate/tg1-real-nft-six-mode-gate.sh b/tests/fieldgate/tg1-real-nft-six-mode-gate.sh
+index b0f2185..67988cc 100755
+--- a/tests/fieldgate/tg1-real-nft-six-mode-gate.sh
++++ b/tests/fieldgate/tg1-real-nft-six-mode-gate.sh
+@@ -10,11 +10,16 @@
+ # host's REAL nft, exactly as production line "nft -c -f" does. No mock, no
+ # grep, no regex substitute.
+ #
++# It talks to the running kernel, so it runs only on a disposable lab host
++# (tests/LAB.md); everywhere else it is NOT_EXECUTED, never PASS.
++#
+ # Usage: tg1-real-nft-six-mode-gate.sh [path/to/twebproxy-manager.sh]
+ set -uo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_gate_or_exit tg1-real-nft
+ SCOPE_IP=203.0.113.10
+ MODES=(stock window1152 mss88 nfqws window1152_nfqws mss88_nfqws)
+ 
+diff --git a/tests/fieldgate/tg3-installed-manager-lifecycle.sh b/tests/fieldgate/tg3-installed-manager-lifecycle.sh
+index f093065..419a7b3 100755
+--- a/tests/fieldgate/tg3-installed-manager-lifecycle.sh
++++ b/tests/fieldgate/tg3-installed-manager-lifecycle.sh
+@@ -23,12 +23,18 @@ set -uo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
+ MGR="$(cd "$(dirname "$MGR")" && pwd -P)/$(basename "$MGR")"
++# Mounts over real installed paths: disposable lab host only (tests/LAB.md).
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_gate_or_exit tg3-installed-manager
+ 
+-# Re-exec inside a mount namespace so the real installed paths are writable
+-# tmpfs and nothing escapes to the host.
++# Re-exec inside a private mount namespace so the real installed paths are
++# writable tmpfs and nothing escapes to the host. TG3_INNER alone is no bypass.
+ if [[ "${TG3_INNER:-0}" != 1 ]]; then
+-  exec env TG3_INNER=1 unshare -m bash "$0" "$MGR"
++  export TG3_PARENT_MNT_NS="$(readlink /proc/self/ns/mnt)"
++  exec env TG3_INNER=1 unshare --mount --propagation private bash "$0" "$MGR"
+ fi
++[[ -n "${TG3_PARENT_MNT_NS:-}" && "$(readlink /proc/self/ns/mnt)" != "$TG3_PARENT_MNT_NS" ]] ||
++  { echo 'FAIL tg3: refusing to mount outside a private mount namespace'; exit 1; }
+ mkdir -p /usr/local/sbin /opt/twebproxy-manager
+ mount -t tmpfs none /usr/local/sbin
+ mount -t tmpfs none /opt/twebproxy-manager
+diff --git a/tests/lib/lab-gate.sh b/tests/lib/lab-gate.sh
+new file mode 100644
+index 0000000..dec90d0
+--- /dev/null
++++ b/tests/lib/lab-gate.sh
+@@ -0,0 +1,83 @@
++#!/usr/bin/env bash
++# Gate for REAL privileged tests: kernel nft, systemd units, namespaces, mounts,
++# genuine ENOSPC. Such a test may run only on a disposable lab host that was
++# explicitly prepared for it. Every other host - in particular a production
++# TWebProxy server, even when the opt-in variable is set by mistake - gets
++# NOT_EXECUTED (exit 77) before any privileged command is attempted.
++#
++# Lab preparation (on the disposable VM only, see tests/LAB.md):
++#   cat /etc/machine-id > /etc/twebproxy-disposable-lab   # as root
++#   export TWEBPROXY_LAB_MODE=disposable-vm
++#
++# The decision uses file tests only. The filesystem root is a function argument
++# for the gate's own fixture; scripts always call lab_gate_or_exit, which uses
++# the real root, so no environment variable can redirect the checks.
++
++LAB_GATE_MODE_VALUE=disposable-vm
++LAB_GATE_MARKER=/etc/twebproxy-disposable-lab
++# Present on any host where TWebProxy is (or was) installed.
++LAB_GATE_FINGERPRINTS=(
++  /etc/twebproxy
++  /usr/local/libexec/twebproxy
++  /usr/local/sbin/twebproxy
++  /opt/twebproxy-manager
++  /srv/twebproxy
++)
++
++# Prints the refusal reason and returns 1, or returns 0 when authorized.
++#   $1 = filesystem root ("" for the real host)  $2 = effective uid
++lab_gate_check() {
++  local root="$1" uid="$2" path marker id
++  if [[ "${TWEBPROXY_LAB_MODE:-}" != "$LAB_GATE_MODE_VALUE" ]]; then
++    printf 'TWEBPROXY_LAB_MODE=%s is not set (default runs are model/static only)' "$LAB_GATE_MODE_VALUE"
++    return 1
++  fi
++  for path in "${LAB_GATE_FINGERPRINTS[@]}"; do
++    if [[ -e "$root$path" || -L "$root$path" ]]; then
++      printf 'TWebProxy fingerprint %s exists: refusing on a possibly productive host' "$path"
++      return 1
++    fi
++  done
++  if compgen -G "$root/etc/systemd/system/twebproxy*" >/dev/null; then
++    printf 'TWebProxy systemd units exist under /etc/systemd/system: refusing on a possibly productive host'
++    return 1
++  fi
++  marker="$root$LAB_GATE_MARKER"
++  if [[ -L "$marker" || ! -f "$marker" ]]; then
++    printf 'lab marker %s missing (or not a regular file)' "$LAB_GATE_MARKER"
++    return 1
++  fi
++  if [[ "$(stat -c '%u' -- "$marker" 2>/dev/null)" != 0 ]]; then
++    printf 'lab marker %s is not owned by root' "$LAB_GATE_MARKER"
++    return 1
++  fi
++  id="$(head -n1 -- "$root/etc/machine-id" 2>/dev/null)" || id=""
++  if [[ ! "$id" =~ ^[0-9a-f]{32}$ || "$(head -n1 -- "$marker" 2>/dev/null)" != "$id" ]]; then
++    printf 'lab marker %s does not contain this host machine-id' "$LAB_GATE_MARKER"
++    return 1
++  fi
++  if [[ "$uid" != 0 ]]; then
++    printf 'real lab tests need root'
++    return 1
++  fi
++  return 0
++}
++
++# For scripts whose whole body is a real test.  $1 = test label.
++lab_gate_or_exit() {
++  local reason
++  if reason="$(lab_gate_check "" "$EUID")"; then
++    printf 'LAB_GATE: authorized disposable lab host for %s\n' "$1"
++    return 0
++  fi
++  printf 'NOT_EXECUTED_ENVIRONMENT_LIMITATION %s: %s\n' "$1" "$reason"
++  exit 77
++}
++
++# For mixed scripts: returns 0 when authorized, else prints the reason.
++lab_gate_allows() {
++  local reason
++  reason="$(lab_gate_check "" "$EUID")" && return 0
++  printf '%s' "$reason"
++  return 1
++}
+diff --git a/tests/lib/stage-a-results.sh b/tests/lib/stage-a-results.sh
+index 66070c7..0139286 100644
+--- a/tests/lib/stage-a-results.sh
++++ b/tests/lib/stage-a-results.sh
+@@ -8,7 +8,7 @@ stage_a_run_case() {
+   cat "$out"
+   if (( rc != 0 && rc != 77 )); then
+     STAGE_A_FAIL=$((STAGE_A_FAIL+1)); printf '%s: FAIL (rc=%s)\n' "$label" "$rc"
+-  elif (( rc == 77 )) || grep -Eq '^(SKIP|NOT_EXECUTED|INCOMPLETE)([ :]|$)' "$out"; then
++  elif (( rc == 77 )) || grep -Eq '^(SKIP|NOT_EXECUTED(_ENVIRONMENT_LIMITATION)?|INCOMPLETE)([ :]|$)' "$out"; then
+     STAGE_A_NOT_EXECUTED=$((STAGE_A_NOT_EXECUTED+1)); printf '%s: NOT_EXECUTED\n' "$label"
+   else
+     STAGE_A_PASS=$((STAGE_A_PASS+1)); printf '%s: PASS\n' "$label"
+diff --git a/tests/stagea/sa1-real-nft-validation.sh b/tests/stagea/sa1-real-nft-validation.sh
+index 5ec54f5..d2d299d 100644
+--- a/tests/stagea/sa1-real-nft-validation.sh
++++ b/tests/stagea/sa1-real-nft-validation.sh
+@@ -4,6 +4,9 @@
+ set -Eeuo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++# Disposable lab host only (tests/LAB.md); checked again in the inner phase.
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_gate_or_exit stagea1-real-nft
+ if [[ "${2:-}" != --inside ]]; then
+   NFT="$(command -v nft || true)"
+   if [[ -z "$NFT" ]]; then printf 'NOT_EXECUTED real-nft: nft executable unavailable\n'; exit 77; fi
+diff --git a/tests/stagea/sa1-runner-status-fixture.sh b/tests/stagea/sa1-runner-status-fixture.sh
+index 94035d8..a242765 100755
+--- a/tests/stagea/sa1-runner-status-fixture.sh
++++ b/tests/stagea/sa1-runner-status-fixture.sh
+@@ -17,6 +17,11 @@ rc=0; stage_a_result || rc=$?
+ stage_a_run_case legacy-skipped "$TMP/legacy-skip.sh" 5 > "$TMP/legacy-ne.out"
+ rc=0; stage_a_result || rc=$?
+ [[ "$rc" == 77 && "$STAGE_A_NOT_EXECUTED" == 2 ]]
++# The fieldgate t_skip() spelling with exit 0 is not a PASS either.
++printf 'printf "NOT_EXECUTED_ENVIRONMENT_LIMITATION lab-only-check\\n"\nexit 0\n' > "$TMP/neel-skip.sh"
++stage_a_run_case neel-skipped "$TMP/neel-skip.sh" 5 > "$TMP/neel-ne.out"
++rc=0; stage_a_result || rc=$?
++[[ "$rc" == 77 && "$STAGE_A_NOT_EXECUTED" == 3 && "$STAGE_A_PASS" == 1 ]]
+ stage_a_run_case failed "$TMP/fail.sh" 5 > "$TMP/failed.out"
+ rc=0; stage_a_result || rc=$?
+ [[ "$rc" == 1 && "$STAGE_A_FAIL" == 1 ]]
+diff --git a/tests/stagea/sa3-state-publication.sh b/tests/stagea/sa3-state-publication.sh
+index 535ea67..abbe999 100755
+--- a/tests/stagea/sa3-state-publication.sh
++++ b/tests/stagea/sa3-state-publication.sh
+@@ -17,11 +17,28 @@
+ # genuinely partial copy. The forced-failure seam is used in addition, to reach
+ # the rename boundary deterministically.
+ #
++# The tmpfs section runs only on a disposable lab host (tests/LAB.md) and only
++# inside a private mount namespace; elsewhere it is NOT_EXECUTED (exit 77) and
++# no mount is attempted. All other sections are model tests and always run.
++#
+ # Usage: sa3-state-publication.sh [path/to/twebproxy-manager.sh]
+ set -uo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/lab-gate.sh"
++SA3_LAB_REASON=""
++if SA3_LAB_REASON="$(lab_gate_allows)"; then
++  if [[ "${SA3_IN_PRIVATE_MNT_NS:-}" != 1 ]]; then
++    if timeout 5 unshare --mount --propagation private true; then
++      export SA3_PARENT_MNT_NS="$(readlink /proc/self/ns/mnt)" SA3_IN_PRIVATE_MNT_NS=1
++      exec unshare --mount --propagation private bash "$0" "$MGR"
++    fi
++    SA3_LAB_REASON="private mount namespace unavailable"
++  elif [[ -z "${SA3_PARENT_MNT_NS:-}" || "$(readlink /proc/self/ns/mnt)" == "$SA3_PARENT_MNT_NS" ]]; then
++    SA3_LAB_REASON="not inside a private mount namespace"
++  fi
++fi
+ pass=0; fail=0; not_executed=0
+ t_ok()  { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
+ t_bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
+@@ -68,7 +85,9 @@ live_has  "$A_IP" && t_ok sa3_precondition_rule_live      || t_bad sa3_precondit
+ # 1. GENUINE ENOSPC at the copy boundary (no seam, no stub)
+ # =====================================================================
+ printf '\n--- 1. real ENOSPC during publication ---\n'
+-if mount -t tmpfs -o size=80k tmpfs "$SMALL" 2>/dev/null; then
++if [[ -n "$SA3_LAB_REASON" ]]; then
++  t_skip "sa3_enospc_*: NOT_EXECUTED_ENVIRONMENT_LIMITATION ($SA3_LAB_REASON)"
++elif mount -t tmpfs -o size=80k tmpfs "$SMALL" 2>/dev/null; then
+   SAVED_DPI_DIR="$DPI_DIR"
+   DPI_DIR="$SMALL/dpi"; DPI_STATE_DIR="$DPI_DIR/scopes"; DPI_NFT_FILE="$DPI_DIR/firewall.nft"
+   rm -f "$MOCK_NFT_LIVE"
+@@ -90,6 +109,11 @@ if mount -t tmpfs -o size=80k tmpfs "$SMALL" 2>/dev/null; then
+     state_has "$B_IP" && t_bad sa3_enospc_partial_candidate_not_authoritative \
+                       || t_ok sa3_enospc_partial_candidate_not_authoritative
+     rm -f "$SMALL/ballast"
++    # Control: the same operation on the same filesystem succeeds with space,
++    # so the failure above was caused by ENOSPC and not by anything else.
++    dpi_transaction_set "$B_IP" mss88 beta.example >/dev/null 2>&1; rc=$?
++    if (( rc == 0 )) && state_has "$B_IP"; then t_ok sa3_enospc_control_succeeds_with_space
++    else t_bad "sa3_enospc_control_succeeds_with_space (rc=$rc)"; fi
+   else
+     t_bad sa3_enospc_precondition_state_on_small_fs
+   fi
+diff --git a/tests/stageb/README.md b/tests/stageb/README.md
+index f1dfaf5..f7fe2b9 100644
+--- a/tests/stageb/README.md
++++ b/tests/stageb/README.md
+@@ -1,43 +1,32 @@
+-# Stage B verification
++# Stage B / B.1 verification
+ 
+-Run the behavioral tests on an ordinary Linux test workstation (Bash, jq,
+-coreutils, util-linux). No system nft or systemd state is changed:
++Default runs are model/static only and change no system nft, systemd or mount
++state. They are safe on any Linux test workstation with Bash, jq, coreutils and
++util-linux:
+ 
+ ```sh
+-timeout 90 bash tests/stageb/transaction-fixture.sh
+-timeout 90 bash tests/fieldgate/tg7-backend-state-isolation.sh
++bash tests/stageb/run-stage-b-suite.sh    # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
+ ```
+ 
+-The nft/service model is explicit. Its PASS proves control flow and file
+-postconditions, **not** real kernel atomicity. Partial candidate-write faults
+-are injected command failures, not evidence of real ENOSPC.
+-
+-On a **disposable Debian 12 / Ubuntu 22.04+ VM** with nftables, jq, util-linux
+-and CAP_NET_ADMIN/CAP_SYS_ADMIN:
+-
+-```sh
+-sudo timeout 150 bash tests/stageb/real-nft-validation.sh
+-sudo timeout 150 bash tests/stagea/sa1-real-nft-validation.sh
+-sudo timeout 180 bash tests/stagea/sa3-state-publication.sh
+-sudo timeout 270 bash tests/stageb/real-systemd-validation.sh ./twebproxy-manager.sh --disposable-vm
+-```
+-
+-The Stage B script first creates a separate network namespace. It refuses to
+-run its inner phase in the parent's namespace. No host ruleset is flushed.
+-The namespace vanishes at exit; all filesystem paths are temporary. Do not
+-use a production VPS. The Stage A.1 state-publication test attempts a private
+-tmpfs mount for genuine ENOSPC; no mock may replace its required result.
+-
+-Real nft tests include initial absence, atomic add/delete/recreate, a late
+-batch error after delete, invalid syntax, idempotence, multiple/one/zero
+-backends, real JSON verification, publication-failure rollback and an untouched
+-foreign table. Service action selection and generated ExecStart/ExecReload
+-execution are covered by the behavioral fixture. A real systemd lifecycle
+-check is provided separately and requires the disposable VM; do not call that
+-model a systemd test. The real systemd fixture creates a unique temporary unit
+-in /run/systemd/system and assigns NetworkNamespacePath to its private netns.
+-It checks start/reload, failed reload/restart preservation and non-destructive
+-stop. The production service names and host nft namespace are never modified.
+-
+-Exit 77 / NOT_EXECUTED_ENVIRONMENT_LIMITATION means the required real check
+-did not execute. It must never be counted as PASS.
++Model/static cases:
++
++- `transaction-fixture.sh` — apply/verify/publish/rollback control flow.
++- `libexec-permissions-fixture.sh` — F1: rebuild keeps `LIBEXEC_DIR`
++  root:root 0755 (start and reload path), leaves other entries untouched, lets
++  an unprivileged account run a service entrypoint, keeps `BASE_DIR` private,
++  restores a v0.2.12-damaged 0700 directory, refuses a symlinked directory.
++- `apply-ambiguity-fixture.sh` — R3: `nft -f` failing after the kernel
++  committed; truthful message, previous table restored or new isolation kept.
++- `firewall-unit-fixture.sh` — generated unit contract, including R1
++  `ReloadPropagatedFrom=nftables.service`.
++- `lab-gate-fixture.sh` — R5: real tests refuse to run without a prepared lab
++  host; no privileged command in a default run.
++- `json-verifier-fixture.sh`, `../fieldgate/tg7-backend-state-isolation.sh`.
++
++The nft/service model proves control flow and file postconditions, **not**
++kernel atomicity or real systemd behaviour.
++
++`real-nft-validation.sh` and `real-systemd-validation.sh` are part of the suite
++but run only on a disposable lab host; see `tests/LAB.md`. Elsewhere they
++report `NOT_EXECUTED` and the suite is `INCOMPLETE`. Exit 77 /
++`NOT_EXECUTED_ENVIRONMENT_LIMITATION` must never be counted as PASS.
+diff --git a/tests/stageb/apply-ambiguity-fixture.sh b/tests/stageb/apply-ambiguity-fixture.sh
+new file mode 100644
+index 0000000..f71f08d
+--- /dev/null
++++ b/tests/stageb/apply-ambiguity-fixture.sh
+@@ -0,0 +1,89 @@
++#!/usr/bin/env bash
++# R3 regression: `nft -f` may fail on the client side after the kernel already
++# committed the batch (for example when `timeout` kills nft). The helper must
++# never claim success, must say what the kernel actually holds, and must
++# converge like its other failure paths: previous verified table restored, or -
++# when no table existed - the new isolation retained. Behavioral model only;
++# the real timing window needs a disposable VM.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb-apply.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stageb/backend-harness.sh"
++backend_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++helper() { "$BF_TEST_HELPER" > "$TMP/output" 2>&1; }
++says() { grep -q -- "$1" "$TMP/output"; }
++live_ports() { sed -n 's/.*dport { \([^}]*\) } drop/\1/p' "$TMP/live" | tr -d ' '; }
++failed() {
++  if helper; then bad "$1_reports_failure"; else ok "$1_reports_failure"; fi
++  sed 's/^/  | /' "$TMP/output"
++}
++# Each case starts from the model kernel holding exactly the given canonical file.
++start_from() { rm -f "$TMP"/fail-*; if [[ -n "$1" ]]; then cp "$1" "$TMP/live"; else rm -f "$TMP/live"; fi; }
++
++backend_state a 23980 28980
++rebuild() { (rebuild_firewall) > "$TMP/output" 2>&1; }
++check setup_first_install rebuild
++cp "$FIREWALL_FILE" "$TMP/canonical.a"
++
++# 1. Committed, then reported failure, with a previous table: restore it.
++backend_state b 23981 28981
++touch "$TMP/fail-after-commit"
++failed committed_previous
++check committed_previous_named says 'after the kernel committed the new rules'
++check committed_previous_restored says 'previous live isolation restored'
++check committed_previous_live_is_previous test "$(live_ports)" = 23980,28980
++check committed_previous_canonical_unchanged cmp -s "$TMP/canonical.a" "$FIREWALL_FILE"
++
++# 2. Rejected batch: kernel unchanged, and the message says so.
++start_from "$TMP/canonical.a"
++touch "$TMP/fail-apply"
++failed rejected_previous
++check rejected_previous_named says 'previous live isolation unchanged'
++check rejected_previous_live_unchanged test "$(live_ports)" = 23980,28980
++check rejected_previous_canonical_unchanged cmp -s "$TMP/canonical.a" "$FIREWALL_FILE"
++
++# 3. Committed, then failure, and the restore also fails: explicit RESTORE FAILED.
++start_from "$TMP/canonical.a"
++touch "$TMP/fail-after-commit" "$TMP/fail-rollback"
++failed committed_restore_failed
++check committed_restore_failed_named says 'RESTORE FAILED'
++check committed_restore_failed_canonical_unchanged cmp -s "$TMP/canonical.a" "$FIREWALL_FILE"
++rm -f "$TMP"/fail-*
++check committed_restore_failed_converges_next_run helper
++check committed_restore_failed_full_set test "$(live_ports)" = 23980,23981,28980,28981
++cp "$FIREWALL_FILE" "$TMP/canonical.ab"
++
++# 4. Failure, then the live table cannot be read: unknown, never success.
++rm "$BACKENDS_DIR/b.env"
++start_from "$TMP/canonical.ab"
++touch "$TMP/fail-after-commit" "$TMP/fail-post-verify"
++failed unknown_state
++check unknown_state_named says 'state is unknown'
++check unknown_state_restore_failed says 'RESTORE FAILED'
++check unknown_state_canonical_unchanged cmp -s "$TMP/canonical.ab" "$FIREWALL_FILE"
++
++# 5. First install, committed then failure: retain the new isolation.
++start_from ""; rm -f "$FIREWALL_FILE"
++touch "$TMP/fail-after-commit"
++failed committed_first_install
++check committed_first_install_named says 'after the kernel committed the new rules'
++check committed_first_install_retained says 'retaining applied isolation'
++check committed_first_install_isolation_kept test "$(live_ports)" = 23980,28980
++check committed_first_install_not_published test ! -e "$FIREWALL_FILE"
++
++# 6. First install, rejected batch: nothing installed, and the message says so.
++start_from ""
++touch "$TMP/fail-apply"
++failed rejected_first_install
++check rejected_first_install_named says 'no table was installed'
++check rejected_first_install_no_table test ! -e "$TMP/live"
++check rejected_first_install_not_published test ! -e "$FIREWALL_FILE"
++
++printf 'stageb-apply-ambiguity: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageb/b1-scope-invariants.sh b/tests/stageb/b1-scope-invariants.sh
+new file mode 100644
+index 0000000..69de3fe
+--- /dev/null
++++ b/tests/stageb/b1-scope-invariants.sh
+@@ -0,0 +1,68 @@
++#!/usr/bin/env bash
++# Stage B.1 scope: compared with the exact v0.2.12 tree, only the backend
++# firewall generator/rebuild functions may change, plus one added helper and the
++# release identity. Stage 4, DPI, relay, profile, frontend and UI code, generated
++# non-firewall payloads, README, docs and assets stay byte-identical.
++# Usage: b1-scope-invariants.sh <v0.2.12 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.12 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-b1-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  case "$fn" in rebuild_firewall|write_backend_firewall_helper|write_backend_firewall_unit|backend_fw_transaction) ;;
++    *) echo "FAIL forbidden modification: $fn"; exit 1;; esac
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  if awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline"; then continue; fi
++  case "$fn" in backend_fw_apply_failed) ;; *) echo "FAIL unexpected added function: $fn"; exit 1;; esac
++  echo "allowed added: $fn"; added=$((added+1))
++done < "$TMP/candidate"
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.outside"
++done
++diff -u "$TMP/baseline.outside" "$TMP/candidate.outside"
++echo 'PASS top-level manager variables unchanged (except release identity)'
++for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do
++  cmp "$BASE/$f" "$PROJECT/$f"
++done
++for f in "$BASE"/docs/*.md; do cmp "$f" "$PROJECT/docs/${f##*/}"; done
++echo 'PASS README, docs and pinned nfqws assets unchanged'
++for token in 'cat > "$LIBEXEC_DIR/run-mtproxy"' 'cat > "$LIBEXEC_DIR/refresh-mtproxy-config"' \
++  'cat > "$SYSTEMD_DIR/twebproxy@.service"' 'cat > "$SYSTEMD_DIR/twebproxy-mtproxy@.service"' \
++  'cat > "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.service"' 'cat > "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.timer"'; do
++  for side in baseline candidate; do
++    tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++    awk -v token="$token" 'index($0,token){p=1;next} p && $0=="EOF"{exit} p{print}' "$tree/twebproxy-manager.sh" > "$TMP/$side.payload"
++    [[ -s "$TMP/$side.payload" ]]
++  done
++  cmp "$TMP/baseline.payload" "$TMP/candidate.payload"
++done
++echo 'PASS six non-firewall generated helper/unit payloads unchanged'
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS b1-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stageb/backend-harness.sh b/tests/stageb/backend-harness.sh
+index 6134f24..7cf68ac 100644
+--- a/tests/stageb/backend-harness.sh
++++ b/tests/stageb/backend-harness.sh
+@@ -8,7 +8,9 @@ backend_harness() {
+   BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"
+   FIREWALL_FILE="$BASE_DIR/firewall.nft"
+   LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
+-  install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR" "$TMP/bin"
++  install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$SYSTEMD_DIR" "$TMP/bin"
++  # As prepare_users_and_dirs() leaves it: service accounts execute from here.
++  install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
+   export BF_TEST_ROOT="$TMP" BF_TEST_CANONICAL="$FIREWALL_FILE"
+   export BF_TEST_HELPER="$LIBEXEC_DIR/apply-firewall"
+   export BF_TEST_UNIT="$SYSTEMD_DIR/twebproxy-firewall.service"
+diff --git a/tests/stageb/firewall-unit-fixture.sh b/tests/stageb/firewall-unit-fixture.sh
+new file mode 100644
+index 0000000..da80027
+--- /dev/null
++++ b/tests/stageb/firewall-unit-fixture.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# Generated backend firewall unit contract (Stage B + B.1 R1).
++# R1: nftables.service ExecReload re-reads /etc/nftables.conf, which by default
++# starts with `flush ruleset`; PartOf= propagates only stop/restart, so the
++# backend table vanished on `systemctl reload nftables`. ReloadPropagatedFrom=
++# queues our idempotent ExecReload after it. Static contract only: the real
++# systemd behaviour is a disposable-VM check (tests/LAB.md).
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb-unit.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stageb/backend-harness.sh"
++backend_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++unit="$SYSTEMD_DIR/twebproxy-firewall.service"
++has() { grep -qxF -- "$1" "$unit"; }
++count() { grep -c -- "^$1=" "$unit"; }
++
++check unit_written write_backend_firewall_unit
++check unit_mode_0644 test "$(stat -c '%a' "$unit")" = 644
++check unit_after_nftables has 'After=nftables.service'
++check unit_partof_nftables has 'PartOf=nftables.service'
++check unit_reload_propagated_from_nftables has 'ReloadPropagatedFrom=nftables.service'
++check unit_oneshot has 'Type=oneshot'
++check unit_remain_after_exit has 'RemainAfterExit=yes'
++check unit_execstart_helper has "ExecStart=$LIBEXEC_DIR/apply-firewall"
++check unit_execreload_same_helper has "ExecReload=$LIBEXEC_DIR/apply-firewall"
++check unit_no_destructive_stop test "$(count ExecStop)$(count ExecStopPost)" = 00
++check unit_single_execstart test "$(count ExecStart)" = 1
++# The reload helper fits in the start timeout, which systemd also applies to reload.
++check unit_timeout_present has 'TimeoutStartSec=240'
++# R2 is documented, not changed in B.1: relay/backend units keep Requires=.
++templates() { (write_systemd_templates) > "$TMP/templates.out" 2>&1; }
++check templates_written templates
++check relay_requires_firewall grep -qxF 'Requires=twebproxy-firewall.service' "$SYSTEMD_DIR/twebproxy@.service"
++check backend_requires_firewall grep -qxF 'Requires=twebproxy-firewall.service' "$SYSTEMD_DIR/twebproxy-mtproxy@.service"
++check backend_runs_as_mtproxy grep -qxF 'User=mtproxy' "$SYSTEMD_DIR/twebproxy-mtproxy@.service"
++
++printf 'stageb-firewall-unit: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageb/lab-gate-fixture.sh b/tests/stageb/lab-gate-fixture.sh
+new file mode 100644
+index 0000000..f914d71
+--- /dev/null
++++ b/tests/stageb/lab-gate-fixture.sh
+@@ -0,0 +1,139 @@
++#!/usr/bin/env bash
++# R5 regression: real privileged tests (kernel nft, systemd, namespaces, mounts,
++# genuine ENOSPC) must never run unless a disposable lab host was explicitly
++# prepared. A default run must report NOT_EXECUTED (77), never PASS, and must
++# not invoke a single privileged command - also on a production TWebProxy host.
++#
++# Safe by construction: the gated scripts run with sentinel nft/unshare/mount/
++# systemctl/... first in PATH and TWEBPROXY_LAB_MODE removed; any sentinel call
++# is a failure. Authorized decisions are exercised only on synthetic roots.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-lab-gate.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++
++GATED=(
++  tests/stageb/real-nft-validation.sh
++  tests/stageb/real-systemd-validation.sh
++  tests/stagea/sa1-real-nft-validation.sh
++  tests/stagea/sa3-state-publication.sh
++  tests/fieldgate/tg1-real-nft-six-mode-gate.sh
++  tests/fieldgate/tg3-installed-manager-lifecycle.sh
++)
++PRIVILEGED='\bunshare\b|\bmount\b|\bumount\b|command -v nft|/run/systemd/system'
++
++# ---------- 1. gate decision on synthetic roots ----------
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_root() { # $1=name -> prepared lab root with a valid marker
++  local r="$TMP/root-$1"
++  install -d -m 0755 "$r/etc"
++  printf '0123456789abcdef0123456789abcdef\n' > "$r/etc/machine-id"
++  printf '0123456789abcdef0123456789abcdef\n' > "$r/etc/twebproxy-disposable-lab"
++  printf '%s' "$r"
++}
++allowed() { TWEBPROXY_LAB_MODE="$1" lab_gate_check "$2" "$3" >/dev/null; }
++refused() { ! allowed "$@"; }
++good="$(lab_root good)"
++check gate_allows_prepared_lab allowed disposable-vm "$good" 0
++check gate_refuses_without_opt_in refused "" "$good" 0
++check gate_refuses_wrong_opt_in_value refused 1 "$good" 0
++check gate_refuses_non_root refused disposable-vm "$good" 1000
++r="$(lab_root nomarker)"; rm "$r/etc/twebproxy-disposable-lab"
++check gate_refuses_missing_marker refused disposable-vm "$r" 0
++r="$(lab_root symlink)"; mv "$r/etc/twebproxy-disposable-lab" "$r/etc/real-marker"
++ln -s real-marker "$r/etc/twebproxy-disposable-lab"
++check gate_refuses_symlink_marker refused disposable-vm "$r" 0
++r="$(lab_root foreign)"; printf 'ffffffffffffffffffffffffffffffff\n' > "$r/etc/twebproxy-disposable-lab"
++check gate_refuses_marker_from_other_host refused disposable-vm "$r" 0
++r="$(lab_root noid)"; rm "$r/etc/machine-id"
++check gate_refuses_without_machine_id refused disposable-vm "$r" 0
++if [[ $EUID -eq 0 ]]; then
++  r="$(lab_root owner)"; chown 65534 "$r/etc/twebproxy-disposable-lab"
++  check gate_refuses_non_root_marker refused disposable-vm "$r" 0
++fi
++for fp in "${LAB_GATE_FINGERPRINTS[@]}"; do
++  r="$(lab_root "fp${fp//\//_}")"; install -d "$r${fp%/*}"; : > "$r$fp"
++  check "gate_refuses_installed_fingerprint${fp//\//_}" refused disposable-vm "$r" 0
++done
++r="$(lab_root unit)"; install -d "$r/etc/systemd/system"; : > "$r/etc/systemd/system/twebproxy-firewall.service"
++check gate_refuses_installed_unit refused disposable-vm "$r" 0
++r="$(lab_root dangling)"; install -d "$r/etc"; ln -s /nonexistent "$r/etc/twebproxy"
++check gate_refuses_dangling_fingerprint_symlink refused disposable-vm "$r" 0
++out="$(TWEBPROXY_LAB_MODE= bash -c 'source "$1"; lab_gate_or_exit demo; echo REACHED' _ "$ROOT/tests/lib/lab-gate.sh")"; rc=$?
++check gate_or_exit_returns_77 test "$rc" -eq 77
++check gate_or_exit_reports_not_executed grep -q '^NOT_EXECUTED_ENVIRONMENT_LIMITATION demo:' <<<"$out"
++check gate_or_exit_stops_script bash -c '! grep -q REACHED <<<"$1"' _ "$out"
++
++# ---------- 2. every real-privilege script is gated before its first privileged line ----------
++# grep -c reads all input: `grep -q` would SIGPIPE the producer under pipefail
++# and silently drop large files from the scan.
++uses_privilege() { grep -vE '^[[:space:]]*#' "$ROOT/$1" | grep -cE "$PRIVILEGED" >/dev/null; }
++mapfile -t found < <(cd "$ROOT" && find tests -name '*.sh' | sort | while read -r f; do
++  [[ "$f" == tests/stageb/lab-gate-fixture.sh || "$f" == tests/lib/lab-gate.sh ]] && continue
++  uses_privilege "$f" && printf '%s\n' "$f"; done)
++expected="$(printf '%s\n' "${GATED[@]}" | sort)"
++if [[ "$(printf '%s\n' "${found[@]}")" == "$expected" ]]; then ok no_ungated_privileged_script_in_tree
++else
++  bad no_ungated_privileged_script_in_tree
++  diff <(printf '%s\n' "$expected") <(printf '%s\n' "${found[@]}") | sed 's/^/  expected<>found: /' >&2
++fi
++declare -A STATICALLY_GATED=()
++for f in "${GATED[@]}"; do
++  gate_line="$(grep -nE '^[^#]*lab_gate_(or_exit|allows)\b' "$ROOT/$f" | head -n1 | cut -d: -f1)"
++  priv_line="$(grep -nE "$PRIVILEGED" "$ROOT/$f" | grep -vE '^[0-9]+:\s*#' | head -n1 | cut -d: -f1)"
++  if [[ -n "$gate_line" && -n "$priv_line" && "$gate_line" -lt "$priv_line" ]]; then
++    ok "gate_precedes_privilege:${f##*/}"; STATICALLY_GATED[$f]=1
++  else
++    bad "gate_precedes_privilege:${f##*/} (gate line '${gate_line:-none}', first privileged line '${priv_line:-none}')"
++  fi
++done
++
++# ---------- 3. default execution: NOT_EXECUTED, no privileged command at all ----------
++SENTINEL="$TMP/sentinel"; mkdir -p "$SENTINEL"
++for c in nft unshare nsenter mount umount systemctl systemd-run ip sysctl modprobe iptables; do
++  printf '#!/bin/sh\necho "%s $*" >> "%s/calls"\nexit 97\n' "$c" "$TMP" > "$SENTINEL/$c"
++done
++chmod 0755 "$SENTINEL"/*
++# An ungated script is never executed here: an older tg3 with TG3_INNER=1, for
++# example, would install over the host's real /usr/local/sbin/twebproxy.
++for f in "${GATED[@]}"; do
++  name="${f##*/}"; : > "$TMP/calls"
++  if [[ -z "${STATICALLY_GATED[$f]:-}" ]]; then bad "default_run_skipped_ungated_script:$name"; continue; fi
++  env -u TWEBPROXY_LAB_MODE -u TG3_INNER PATH="$SENTINEL:$PATH" \
++    timeout 600 bash "$ROOT/$f" "$MGR" > "$TMP/$name.out" 2>&1; rc=$?
++  check "default_run_not_executed_rc77:$name" test "$rc" -eq 77
++  check "default_run_reports_not_executed:$name" grep -q '^NOT_EXECUTED' "$TMP/$name.out"
++  check "default_run_no_privileged_command:$name" test ! -s "$TMP/calls"
++  [[ ! -s "$TMP/calls" ]] || sed 's/^/  sentinel: /' "$TMP/calls" >&2
++  if [[ "$rc" -ne 77 || -s "$TMP/calls" ]]; then sed 's/^/  | /' "$TMP/$name.out" | tail -n 15 >&2; fi
++done
++# The legacy inner-phase markers are not a bypass of the gate.
++if [[ -n "${STATICALLY_GATED[tests/fieldgate/tg3-installed-manager-lifecycle.sh]:-}" ]]; then
++  : > "$TMP/calls"
++  env -u TWEBPROXY_LAB_MODE TG3_INNER=1 PATH="$SENTINEL:$PATH" \
++    timeout 120 bash "$ROOT/tests/fieldgate/tg3-installed-manager-lifecycle.sh" "$MGR" > "$TMP/tg3-inner.out" 2>&1; rc=$?
++  check tg3_inner_marker_is_not_a_bypass test "$rc" -eq 77 -a ! -s "$TMP/calls"
++else
++  bad tg3_inner_marker_is_not_a_bypass_not_run_ungated
++fi
++if [[ -n "${STATICALLY_GATED[tests/stageb/real-nft-validation.sh]:-}" ]]; then
++  : > "$TMP/calls"
++  env -u TWEBPROXY_LAB_MODE PATH="$SENTINEL:$PATH" \
++    timeout 120 bash "$ROOT/tests/stageb/real-nft-validation.sh" "$MGR" --inside > "$TMP/inside.out" 2>&1; rc=$?
++  check real_nft_inside_argument_is_not_a_bypass test "$rc" -eq 77 -a ! -s "$TMP/calls"
++else
++  bad real_nft_inside_argument_is_not_a_bypass_not_run_ungated
++fi
++
++# ---------- 4. runners keep the 0/1/77 protocol (77 is never PASS) ----------
++for r in tests/stagea/run-stage-a-suite.sh tests/stageb/run-stage-b-suite.sh tests/fieldgate/run-fieldgate-suite.sh; do
++  check "runner_uses_result_protocol:${r##*/}" grep -q 'stage_a_run_case' "$ROOT/$r"
++done
++
++printf 'lab-gate: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageb/libexec-permissions-fixture.sh b/tests/stageb/libexec-permissions-fixture.sh
+new file mode 100644
+index 0000000..5ba6e6e
+--- /dev/null
++++ b/tests/stageb/libexec-permissions-fixture.sh
+@@ -0,0 +1,97 @@
++#!/usr/bin/env bash
++# F1 regression (v0.2.12): rebuild_firewall ran `install -d -m 0700` on the
++# existing LIBEXEC_DIR. twebproxy-mtproxy@ (User=mtproxy) and the nfqws worker
++# (User=twebproxy-dpi) execute/read from it, so every later backend start failed.
++#
++# Invariants: rebuild (start and reload path) leaves LIBEXEC_DIR root:root 0755
++# and every other entry byte- and mode-identical; an unprivileged account can
++# traverse it and run a service entrypoint; BASE_DIR stays private; a v0.2.12-
++# damaged 0700 directory is restored; a symlinked directory is refused without
++# touching its target; a missing parent is created traversable under umask 077.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb-libexec.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stageb/backend-harness.sh"
++backend_harness
++pass=0; fail=0; not_executed=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++run() { (rebuild_firewall) > "$TMP/output" 2>&1; }
++mode() { stat -c '%a:%u:%g' -- "$1"; }
++# Everything except the helper rebuild_firewall itself owns.
++snapshot() {
++  (cd "$LIBEXEC_DIR" && find . -mindepth 1 ! -name apply-firewall -printf '%p %m %U:%G %s\n' | sort &&
++    find . -mindepth 1 -type f ! -name apply-firewall -exec sha256sum {} + | sort)
++}
++# Production-shaped content: entrypoints and the nfqws checksum file.
++cp /bin/true "$LIBEXEC_DIR/mtproto-proxy"
++printf '#!/bin/sh\nexec ./libexec/mtproto-proxy\n' > "$LIBEXEC_DIR/run-mtproxy"
++printf '#!/bin/sh\nexit 0\n' > "$LIBEXEC_DIR/refresh-mtproxy-config"
++cp /bin/true "$LIBEXEC_DIR/twebproxy-nfqws"
++# Production writes "<sha>  <absolute binary path>"; relative to $TMP here.
++(cd "$TMP" && sha256sum ./libexec/twebproxy-nfqws > ./libexec/twebproxy-nfqws.sha256)
++chmod 0755 "$LIBEXEC_DIR/mtproto-proxy" "$LIBEXEC_DIR/run-mtproxy" "$LIBEXEC_DIR/refresh-mtproxy-config" "$LIBEXEC_DIR/twebproxy-nfqws"
++chmod 0644 "$LIBEXEC_DIR/twebproxy-nfqws.sha256"
++backend_state a 23980 28980
++snapshot > "$TMP/before"
++
++unprivileged() { # run "$@" as uid/gid 65534 with cwd $TMP (only LIBEXEC_DIR is on the path walk)
++  (cd "$TMP" && setpriv --reuid=65534 --regid=65534 --clear-groups "$@") >/dev/null 2>&1
++}
++can_test_unprivileged=0
++if [[ $EUID -eq 0 ]] && command -v setpriv >/dev/null; then can_test_unprivileged=1; chmod 0711 "$TMP"; fi
++service_checks() { # $1 = phase label
++  if (( ! can_test_unprivileged )); then
++    printf 'NOT_EXECUTED %s unprivileged checks: needs root and setpriv\n' "$1"; not_executed=$((not_executed+1)); return
++  fi
++  check "$1_mtproxy_account_runs_entrypoint" unprivileged ./libexec/run-mtproxy
++  check "$1_dpi_account_reads_checksum" unprivileged sha256sum --check --status ./libexec/twebproxy-nfqws.sha256
++  check "$1_backend_state_not_readable" bash -c '! (cd "$1" && setpriv --reuid=65534 --regid=65534 --clear-groups cat ./etc/backends/a.env) >/dev/null 2>&1' _ "$TMP"
++}
++
++service_checks precondition
++check start_rebuild_succeeds run
++check start_libexec_root_0755 test "$(mode "$LIBEXEC_DIR")" = 755:0:0
++snapshot > "$TMP/after-start"
++check start_other_entries_unchanged cmp -s "$TMP/before" "$TMP/after-start"
++check start_helper_root_0755 test "$(mode "$LIBEXEC_DIR/apply-firewall")" = 755:0:0
++check start_base_dir_private test "$(stat -c '%a' "$BASE_DIR")" = 700
++service_checks after_start
++check reload_rebuild_succeeds run
++check reload_used_not_restart grep -q '^reload twebproxy-firewall.service$' "$TMP/systemctl.calls"
++check reload_libexec_root_0755 test "$(mode "$LIBEXEC_DIR")" = 755:0:0
++snapshot > "$TMP/after-reload"
++check reload_other_entries_unchanged cmp -s "$TMP/before" "$TMP/after-reload"
++service_checks after_reload
++
++# A host damaged by v0.2.12 regains the canonical mode on the next rebuild.
++chmod 0700 "$LIBEXEC_DIR"
++check damaged_rebuild_succeeds run
++check damaged_libexec_restored_0755 test "$(mode "$LIBEXEC_DIR")" = 755:0:0
++service_checks after_repair
++
++# A symlinked LIBEXEC_DIR is refused before any chmod reaches its target.
++real_libexec="$LIBEXEC_DIR"
++install -d -m 0751 "$TMP/elsewhere"   # unusual mode: any chmod through the link shows
++mv "$LIBEXEC_DIR" "$TMP/libexec.real"; ln -s elsewhere "$LIBEXEC_DIR"
++cp "$FIREWALL_FILE" "$TMP/canonical.before"
++if run; then bad symlink_libexec_refused; else ok symlink_libexec_refused; fi
++check symlink_target_mode_untouched test "$(stat -c '%a' "$TMP/elsewhere")" = 751
++check symlink_target_not_written test -z "$(ls -A "$TMP/elsewhere")"
++check symlink_canonical_untouched cmp -s "$TMP/canonical.before" "$FIREWALL_FILE"
++rm "$LIBEXEC_DIR"; mv "$TMP/libexec.real" "$real_libexec"
++
++# A missing parent is created traversable even under the manager's umask 077.
++LIBEXEC_DIR="$TMP/fresh/usr/local/libexec/twebproxy"
++install -d -m 0755 "$TMP/fresh/usr/local"
++BF_TEST_HELPER="$LIBEXEC_DIR/apply-firewall"; export BF_TEST_HELPER
++check fresh_rebuild_succeeds run
++check fresh_parent_traversable test "$(stat -c '%a' "$TMP/fresh/usr/local/libexec")" = 755
++check fresh_libexec_root_0755 test "$(mode "$LIBEXEC_DIR")" = 755:0:0
++
++printf 'stageb-libexec-permissions: pass=%s fail=%s not_executed=%s\n' "$pass" "$fail" "$not_executed"
++(( fail == 0 )) || exit 1
++(( not_executed == 0 )) || exit 77
+diff --git a/tests/stageb/nft-model.sh b/tests/stageb/nft-model.sh
+index 7d763c4..abc2f1d 100644
+--- a/tests/stageb/nft-model.sh
++++ b/tests/stageb/nft-model.sh
+@@ -48,3 +48,9 @@ mv "$root/live.new" "$root/live"
+ if [[ -f "$root/fail-post-verify" ]]; then
+   rm "$root/fail-post-verify"; touch "$root/fail-query-once"
+ fi
++if [[ -f "$root/fail-after-commit" ]]; then
++  # The kernel committed, but the client reports failure (e.g. timeout kill).
++  rm "$root/fail-after-commit"
++  [[ ! -f "$root/fail-rollback" ]] || mv "$root/fail-rollback" "$root/fail-apply"
++  exit 124
++fi
+diff --git a/tests/stageb/real-nft-validation.sh b/tests/stageb/real-nft-validation.sh
+index da76210..f51cd01 100644
+--- a/tests/stageb/real-nft-validation.sh
++++ b/tests/stageb/real-nft-validation.sh
+@@ -3,6 +3,9 @@
+ set -Eeuo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++# Disposable lab host only (tests/LAB.md); checked again in the inner phase.
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_gate_or_exit stageb-real-nft
+ if [[ "${2:-}" != --inside ]]; then
+   command -v nft >/dev/null || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: nft unavailable'; exit 77; }
+   timeout 5 unshare --net true || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: network namespace/CAP_NET_ADMIN unavailable'; exit 77; }
+diff --git a/tests/stageb/real-systemd-validation.sh b/tests/stageb/real-systemd-validation.sh
+index 8fc4463..49baa9f 100644
+--- a/tests/stageb/real-systemd-validation.sh
++++ b/tests/stageb/real-systemd-validation.sh
+@@ -1,11 +1,13 @@
+ #!/usr/bin/env bash
+-# Opt-in: disposable VM ONLY. Creates one temporary /run systemd unit; all nft
++# Disposable lab host ONLY (tests/LAB.md); the former --disposable-vm argument
++# alone no longer authorizes it. Creates one temporary /run systemd unit; all nft
+ # activity (including the systemd helper) is inside a separate network namespace.
+ set -Eeuo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/lab-gate.sh"
++lab_gate_or_exit stageb-real-systemd
+ if [[ "${2:-}" != --inside ]]; then
+-  [[ "${2:-}" == --disposable-vm ]] || { echo 'NOT_EXECUTED: requires --disposable-vm'; exit 77; }
+   command -v nft >/dev/null || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: nft unavailable'; exit 77; }
+   timeout 5 systemctl list-units --no-legend >/dev/null ||
+     { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: running systemd unavailable'; exit 77; }
+diff --git a/tests/stageb/run-stage-b-suite.sh b/tests/stageb/run-stage-b-suite.sh
+index 6b1ca49..18b91c0 100644
+--- a/tests/stageb/run-stage-b-suite.sh
++++ b/tests/stageb/run-stage-b-suite.sh
+@@ -1,12 +1,21 @@
+ #!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Model/static cases always run. REAL cases need a disposable lab host
++# (tests/LAB.md); everywhere else they report NOT_EXECUTED and the suite stays
++# INCOMPLETE - it never turns a missing kernel/systemd check into PASS.
+ set -uo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+ MGR="${1:-$ROOT/twebproxy-manager.sh}"
+ source "$ROOT/tests/lib/stage-a-results.sh"
+ stage_a_run_case "B transactional control flow (MODEL)" "$ROOT/tests/stageb/transaction-fixture.sh" 90 "$MGR"
++stage_a_run_case "B.1 LIBEXEC_DIR permissions F1 (MODEL)" "$ROOT/tests/stageb/libexec-permissions-fixture.sh" 90 "$MGR"
++stage_a_run_case "B.1 nft apply ambiguity R3 (MODEL)" "$ROOT/tests/stageb/apply-ambiguity-fixture.sh" 90 "$MGR"
++stage_a_run_case "B.1 firewall unit contract R1 (STATIC)" "$ROOT/tests/stageb/firewall-unit-fixture.sh" 60 "$MGR"
++stage_a_run_case "B.1 privileged test gate R5" "$ROOT/tests/stageb/lab-gate-fixture.sh" 900 "$MGR"
+ stage_a_run_case "B semantic JSON verifier (SCHEMA)" "$ROOT/tests/stageb/json-verifier-fixture.sh" 60 "$MGR"
+ stage_a_run_case "B backend state isolation TG7" "$ROOT/tests/fieldgate/tg7-backend-state-isolation.sh" 90 "$MGR"
+-stage_a_run_case "B actual kernel transactions (REAL)" "$ROOT/tests/stageb/real-nft-validation.sh" 150 "$MGR"
++stage_a_run_case "B actual kernel transactions (REAL, lab only)" "$ROOT/tests/stageb/real-nft-validation.sh" 150 "$MGR"
++stage_a_run_case "B systemd lifecycle (REAL, lab only)" "$ROOT/tests/stageb/real-systemd-validation.sh" 270 "$MGR"
+ rc=0; stage_a_result || rc=$?
+ case "$rc" in
+   0) echo 'stage-b-suite: PASS (all mandatory checks executed)';;
+diff --git a/tests/stageb/scope-invariants.sh b/tests/stageb/scope-invariants.sh
+index dcfb623..14a940f 100644
+--- a/tests/stageb/scope-invariants.sh
++++ b/tests/stageb/scope-invariants.sh
+@@ -24,7 +24,7 @@ while read -r fn old; do
+ done < "$TMP/baseline"
+ while read -r fn hash; do
+   if awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline"; then continue; fi
+-  case "$fn" in backend_fw_error|backend_fw_render|backend_fw_collect|backend_fw_ports_json|backend_fw_live_ports|backend_fw_batch|backend_fw_restore|backend_fw_transaction|backend_fw_main|write_backend_firewall_helper|write_backend_firewall_unit) ;;
++  case "$fn" in backend_fw_error|backend_fw_render|backend_fw_collect|backend_fw_ports_json|backend_fw_live_ports|backend_fw_batch|backend_fw_restore|backend_fw_apply_failed|backend_fw_transaction|backend_fw_main|write_backend_firewall_helper|write_backend_firewall_unit) ;;
+     *) echo "FAIL unexpected added function: $fn"; exit 1;; esac
+   added=$((added+1))
+ done < "$TMP/candidate"
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 623a5ad..3b1ec70 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.12-beta
++# TWebProxy Manager v0.2.13-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.12"
+-MANAGER_RELEASE_VERSION="0.2.12-beta"
++MANAGER_VERSION="0.2.13"
++MANAGER_RELEASE_VERSION="0.2.13-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -2846,6 +2846,32 @@ backend_fw_restore() {
+   return 1
+ }
+ 
++# The kernel applies the batch atomically, but the nft client can still fail
++# after the commit (e.g. killed by timeout). Say what the kernel holds and
++# converge like the other failure paths. The caller always returns failure.
++backend_fw_apply_failed() {
++  local rc="$1" present="$2" work="$3" ports="$4" old_ports="$5" live
++  if live="$(backend_fw_live_ports "$work/failed.json")"; then
++    if [[ "$present" == yes && "$live" == "$old_ports" ]]; then
++      backend_fw_error "nft apply failed (rc=$rc); previous live isolation unchanged"
++      return 1
++    fi
++    if [[ "$live" == "$ports" ]]; then
++      backend_fw_error "nft apply reported failure (rc=$rc) after the kernel committed the new rules"
++      backend_fw_restore "$present" "$work/rollback" "$work/restored.json" "$old_ports"
++      return 1
++    fi
++  elif [[ "$present" == no ]] &&
++      timeout 30 "$BF_NFT" -j list tables inet > "$work/failed-tables.json" &&
++      jq -e '.nftables|type=="array" and all(.[]; (.table.family=="inet" and .table.name=="twebproxy_backend")|not)' \
++        "$work/failed-tables.json" >/dev/null; then
++    backend_fw_error "nft apply failed (rc=$rc); no table was installed"
++    return 1
++  fi
++  backend_fw_error "RESTORE FAILED: nft apply failed (rc=$rc) and the live twebproxy_backend state is unknown; inspect it; canonical file was not published"
++  return 1
++}
++
+ backend_fw_transaction() {
+   local work="$1" ports old_ports='' present=no actual content bytes
+   [[ ! -L "$BF_FILE" && ( ! -e "$BF_FILE" || -f "$BF_FILE" ) ]] ||
+@@ -2871,7 +2897,8 @@ backend_fw_transaction() {
+     backend_fw_batch "$work/previous" "$work/rollback" || return 1
+   fi
+   timeout 30 "$BF_NFT" -c -f "$work/batch" || return 1
+-  timeout 30 "$BF_NFT" -f "$work/batch" || return 1
++  timeout 30 "$BF_NFT" -f "$work/batch" ||
++    { backend_fw_apply_failed "$?" "$present" "$work" "$ports" "$old_ports"; return 1; }
+   if ! actual="$(backend_fw_live_ports "$work/live.json")" || [[ "$actual" != "$ports" ]]; then
+     backend_fw_error 'live verification failed'
+     backend_fw_restore "$present" "$work/rollback" "$work/restored.json" "$old_ports"
+@@ -2920,7 +2947,7 @@ write_backend_firewall_helper() {
+     printf 'BF_BASE=%q\nBF_BACKENDS=%q\nBF_FILE=%q\nBF_NFT=%q\n' "$BASE_DIR" "$BACKENDS_DIR" "$FIREWALL_FILE" "$nft_bin" || exit 1
+     declare -f is_valid_port backend_fw_error backend_fw_render backend_fw_collect \
+       backend_fw_ports_json backend_fw_live_ports backend_fw_batch \
+-      backend_fw_restore backend_fw_transaction backend_fw_main || exit 1
++      backend_fw_restore backend_fw_apply_failed backend_fw_transaction backend_fw_main || exit 1
+     printf 'backend_fw_main "$@"\n' || exit 1
+   ) > "$tmp" || ! chmod 0755 "$tmp" || ! bash -n "$tmp" ||
+       ! mv -fT -- "$tmp" "$LIBEXEC_DIR/apply-firewall"; then
+@@ -2936,9 +2963,11 @@ write_backend_firewall_unit() {
+   if ! cat > "$tmp" <<EOF
+ [Unit]
+ Description=Firewall for TWebProxy backend-only ports
+-# Reapply after nftables restart, including an external ruleset flush.
++# Reapply after nftables restart (PartOf) and reload (ReloadPropagatedFrom):
++# both re-read /etc/nftables.conf, which usually starts with "flush ruleset".
+ After=nftables.service
+ PartOf=nftables.service
++ReloadPropagatedFrom=nftables.service
+ 
+ [Service]
+ Type=oneshot
+@@ -3134,7 +3163,13 @@ EOF
+ 
+ rebuild_firewall() {
+   local active_rc=0
+-  install -d -m 0700 "$BASE_DIR" "$LIBEXEC_DIR" || return 1
++  # install -d would chmod a symlink's target; the helper refuses them anyway.
++  [[ ! -L "$BASE_DIR" && ! -L "$LIBEXEC_DIR" ]] ||
++    { backend_fw_error "unsafe symlinked directory: $BASE_DIR or $LIBEXEC_DIR"; return 1; }
++  install -d -m 0700 "$BASE_DIR" || return 1
++  # twebproxy-mtproxy@ (User=mtproxy) and the nfqws worker (User=twebproxy-dpi)
++  # execute from here: keep the canonical root:root 0755 of prepare_users_and_dirs.
++  install -d -o root -g root -m 0755 "$LIBEXEC_DIR" || return 1
+   # Also upgrade an already installed helper/unit after a script-only update.
+   write_backend_firewall_helper || return 1
+   write_backend_firewall_unit || return 1

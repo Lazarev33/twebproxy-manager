@@ -1,0 +1,245 @@
+{
+ "stage": "D",
+ "version": "0.2.18-beta",
+ "verdict": "STAGE D DEVELOPMENT_COMPLETE / NEXT: E (operations / diagnostics), pending separate production RC lab gates",
+ "baseline": {
+  "commit": "e841c4e21704e2cbbea84ef8b882938d243ceac0",
+  "tree": "c34c91681a9021fa3c228aef72a71dc241e6cfd1",
+  "manager_sha256": "40d12b9080bbdfe678510263c95c9a1427d89961f6f89653851b6994977a2c30",
+  "input_zip_sha256": "6128708969ad8802a26b3d0660fe9f6ae2149b220f7cd7fe8f812a84fb5eaa55"
+ },
+ "result_protocol": "0=PASS 1=FAIL 77=NOT_EXECUTED; NOT_EXECUTED is never counted as PASS",
+ "environment": "production host: model/static tests only; sentinel stubs (incl. nginx/caddy/certbot/ufw/apt-get) first in PATH; 0 sentinel calls; host metadata canary incl. frontend and Let's Encrypt directories unchanged",
+ "summary": {
+  "PASS": 26,
+  "FAIL": 0,
+  "NOT_EXECUTED": 2
+ },
+ "red": {
+  "rebind-baseline-v0.2.17": {
+   "exit_status": 0,
+   "last_line": "rebind-baseline: 33 lines changed, only frontend path literals; written <scratch>/manager-v0.2.17-rebound.sh"
+  },
+  "frontend-tls-on-v0.2.17": {
+   "exit_status": 1,
+   "last_line": "d-frontend-tls: pass=80 fail=42"
+  },
+  "frontend-tls-on-mutant-no-signal-deferral": {
+   "exit_status": 1,
+   "last_line": "d-frontend-tls: pass=119 fail=3"
+  },
+  "frontend-tls-on-mutant-always-bootstrap": {
+   "exit_status": 1,
+   "last_line": "d-frontend-tls: pass=119 fail=3"
+  },
+  "frontend-tls-on-mutant-lenient-markers": {
+   "exit_status": 1,
+   "last_line": "d-frontend-tls: pass=120 fail=2"
+  },
+  "frontend-tls-on-mutant-no-frontend-lock": {
+   "exit_status": 1,
+   "last_line": "d-frontend-tls: pass=120 fail=2"
+  }
+ },
+ "red_notes": [
+  "frontend-tls fixture on v0.2.17 (frontend path literals rebound only): 42 of 122 checks FAIL, deterministic.",
+  "P0 classes reproduced on v0.2.17: altered or missing END marker deletes other instances' Caddy blocks and user sites; non-atomic Caddyfile/vhost/map writes leave truncated live configuration; concurrent publishes of two Caddy instances lose a block; failed Caddy reload falls back to a restart; invalid or mismatched-key Nginx vhost left enabled after nginx -t failure (next restart takes down every vhost); every nginx-le repair replaces the working TLS vhost with the HTTP-only bootstrap (HTTPS interruption) and a certbot failure leaves it so; delete reports success while the frontend still routes the hostname; interruption leaves the rejected candidate in place.",
+  "P1/P2 classes: leftover ACME bootstrap after a failed first issuance; disk/running divergence after a failed Nginx reload; duplicate marker pairs silently merged; certificate paths with configuration characters accepted; generic errexit messages for certbot/nginx failures in cert-renew.",
+  "Mutants of the Stage D manager: no signal deferral -> 3 FAIL (interruption); bootstrap on every run -> 3 FAIL (HTTPS lost); lenient marker parsing -> 2 FAIL (altered marker); no frontend lock -> 2 FAIL (concurrent publish)."
+ ],
+ "green": [
+  {
+   "name": "git-diff-check",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "git diff --check e841c4e (excluding captured evidence): clean"
+  },
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "d-frontend-tls",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "d-frontend-tls: pass=122 fail=0"
+  },
+  {
+   "name": "suite-stage-d",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-d-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "d-scope-vs-v0217",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS d-scope unchanged=359 modified=11 added=22"
+  },
+  {
+   "name": "suite-stage-c2",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c2-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "audit-c11-cross-instance-orphan",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS"
+  },
+  {
+   "name": "audit-c11-backend-id-collision",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS: existing B/x backend env preserved"
+  },
+  {
+   "name": "audit-c1-failed-backend-stop",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "FW collection ports=[23980,23981,28980,28981]"
+  },
+  {
+   "name": "audit-c1-orphan-backend",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "API profiles=[alpha]"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)",
+   "note": "suite executed; its lab-only real nft/systemd/ENOSPC cases are NOT_EXECUTED on this production host; FAIL=0"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 372 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 372 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set"
+  }
+ ],
+ "green_stability": "frontend-tls fixture repeated 3 times on the fixed manager: 3/3 rc=0; no /tmp leftovers",
+ "findings": {
+  "P0": "all reproduced P0 classes fixed (see red_notes); no known unresolved P0",
+  "P1_fixed": [
+   "bootstrap removed after a failed first issuance",
+   "failed Nginx reload restores the previous managed state",
+   "duplicate/altered markers refused with an accurate error",
+   "unsafe custom certificate paths refused; key/certificate match enforced",
+   "explicit certbot/nginx outcomes in cert-renew; renewal under the instance lock",
+   "Nginx/certbot installed only when missing (repair no longer needs apt)",
+   "existing directory modes kept"
+  ],
+  "deferred": "see DEFERRED.md"
+ },
+ "not_executed_gates": [
+  "Real Caddy: caddy validate/reload semantics, relative imports, reload failure keeping the old config, TLS automation after a block change.",
+  "Real Nginx: nginx -t over the full tree, reload keeping the old config on error, start from a stopped service, link handling.",
+  "Real certbot/ACME (staging): first issuance through the bootstrap vhost, renewal through the TLS vhost's port-80 block, deploy hook, failure without losing the lineage.",
+  "ENOSPC / interrupted writes under /etc/caddy, /etc/nginx and /etc/letsencrypt on an isolated filesystem.",
+  "Terminal Ctrl-C and SSH hang-up during a frontend change.",
+  "Concurrent frontend operations under real flock contention.",
+  "Stage A/B lab-only cases (exit 77), unchanged."
+ ]
+}

@@ -1,0 +1,14 @@
+name	rc	seconds	last_line
+ux-fixture-on-v0.2.21	1	27	ux-fixture: pass=46 fail=52
+heredoc-guard-on-v0.2.21	0	0	heredoc-guard: PASS (no backtick in an unquoted heredoc)
+heredoc-guard-on-help-backtick	1	0	unquoted heredoc (line 8971) has a backtick at line 8976: Quick start: run `sudo twebproxy` and choose Quick setup, or "sudo twebproxy add".
+mutant-quick-asks-everything	1	306	ux-fixture: pass=88 fail=10
+mutant-no-setup-type	1	150	ux-fixture: pass=86 fail=12
+mutant-hostname-no-retry	1	162	ux-fixture: pass=96 fail=2
+mutant-menu-old-order	1	155	ux-fixture: pass=91 fail=7
+mutant-dpi-no-explanations	1	167	ux-fixture: pass=95 fail=3
+mutant-consent-bypassed	1	204	ux-fixture: pass=95 fail=3
+mutant-no-client-help	1	201	ux-fixture: pass=93 fail=5
+mutant-no-status-hints	1	202	ux-fixture: pass=96 fail=2
+mutant-help-backtick	1	198	ux-fixture: pass=96 fail=2
+mutant-tls-hint-overclaims	1	83	ux-fixture: pass=96 fail=2

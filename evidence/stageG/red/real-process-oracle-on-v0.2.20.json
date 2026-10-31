@@ -1,0 +1,181 @@
+{
+ "manager": "<v0.2.20 tree>/twebproxy-manager.sh",
+ "scenarios": {
+  "A": {
+   "title": "candidate --help leaves a child holding stdout (real manager candidate)",
+   "command": "twebproxy manager-update --sha256 9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+   "observed_at_25s": {
+    "running": true,
+    "child_alive": true,
+    "lock_free": false,
+    "copies": {
+     "bin": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+     "copy": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4"
+    },
+    "seconds": 25.02
+   },
+   "final": {
+    "exit_code": 0,
+    "seconds": 41.51,
+    "child_alive": false,
+    "lock_free": true,
+    "copies": {
+     "bin": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+     "copy": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4"
+    },
+    "candidate_sha256": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+    "old_sha256": "51d6df37af478558319411c00477d090860d1f14bdd8be9abd7a50e808cc5218",
+    "result_line": "UPDATE_SUCCESS backup_id=update-20261028T133642Z-7c66cf9c56ce"
+   },
+   "checks": [
+    {
+     "check": "child-spawned",
+     "result": "PASS",
+     "detail": "child pid 142388"
+    },
+    {
+     "check": "bounded",
+     "result": "FAIL",
+     "detail": "update still running at 25.02s"
+    },
+    {
+     "check": "success",
+     "result": "PASS",
+     "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T133642Z-7c66cf9c56ce"
+    },
+    {
+     "check": "installed",
+     "result": "PASS",
+     "detail": "both copies == candidate"
+    },
+    {
+     "check": "no-orphan-at-25s",
+     "result": "FAIL",
+     "detail": "stdout-holding child gone by 25s"
+    },
+    {
+     "check": "lock-free-at-25s",
+     "result": "FAIL",
+     "detail": "lock free by 25s"
+    }
+   ]
+  },
+  "B": {
+   "title": "parent-only SIGKILL while real curl waits for the artifact",
+   "command": "twebproxy manager-update --sha256 be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca",
+   "observed": {
+    "artifact_request_arrived": true,
+    "lock_holders_during_download": [
+     "142669:bash",
+     "142906:bash",
+     "142907:curl"
+    ],
+    "second_update_exit_code": 1,
+    "second_update_result": "\u001b[31m[x]\u001b[0m A Manager update is already running or the lock is unsafe: /tmp/twebproxy-g-oracle-B.15xu3cry/root/run/lock/twebproxy-manager-update.lock",
+    "parent_exit_code": -9,
+    "lock_free_0.3s_after_kill": false,
+    "lock_free_2s_after_kill": false,
+    "lock_holders_after_kill": [
+     "142906:bash",
+     "142907:curl"
+    ],
+    "lock_free_after_server_release": true,
+    "stale_staging_before_next_update": true,
+    "copies_after_kill": {
+     "bin": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664",
+     "copy": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664"
+    },
+    "old_sha256": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664",
+    "next_update_exit_code": 0,
+    "next_update_result": "UPDATE_SUCCESS backup_id=update-20261028T133731Z-2f53325538e6",
+    "staging_after_next_update": false,
+    "copies_after_next_update": {
+     "bin": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca",
+     "copy": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca"
+    },
+    "candidate_sha256": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca"
+   },
+   "checks": [
+    {
+     "check": "download-blocked",
+     "result": "PASS",
+     "detail": "real curl request reached the test server"
+    },
+    {
+     "check": "only-owner-holds-lock",
+     "result": "FAIL",
+     "detail": "holders ['142669:bash', '142906:bash', '142907:curl'], updater pid 142669"
+    },
+    {
+     "check": "concurrent-refused",
+     "result": "PASS",
+     "detail": "second update exit 1"
+    },
+    {
+     "check": "lock-free-0.3s-after-parent-kill",
+     "result": "FAIL",
+     "detail": ""
+    },
+    {
+     "check": "lock-free-2s-after-parent-kill",
+     "result": "FAIL",
+     "detail": ""
+    },
+    {
+     "check": "copies-unchanged",
+     "result": "PASS",
+     "detail": ""
+    },
+    {
+     "check": "next-update-recovers",
+     "result": "PASS",
+     "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T133731Z-2f53325538e6"
+    }
+   ]
+  },
+  "C": {
+   "title": "candidate --help hangs ignoring SIGTERM, with a stdout-holding child: failed health -> rollback",
+   "command": "twebproxy manager-update --sha256 c9768236111c9895e6b281aa75a24dbbb11640db3d636e3eebf44aecad88cb40",
+   "observed": {
+    "exit_code": 1,
+    "seconds": 22.03,
+    "child_alive": false,
+    "lock_free": true,
+    "copies": {
+     "bin": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62",
+     "copy": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62"
+    },
+    "old_sha256": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62",
+    "candidate_sha256": "c9768236111c9895e6b281aa75a24dbbb11640db3d636e3eebf44aecad88cb40",
+    "result_line": "UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T133733Z-3967cde89ede"
+   },
+   "checks": [
+    {
+     "check": "bounded",
+     "result": "PASS",
+     "detail": "22.03s (probe 15 s + 5 s kill grace, then rollback)"
+    },
+    {
+     "check": "truthful-failure",
+     "result": "PASS",
+     "detail": "exit 1, UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T133733Z-3967cde89ede"
+    },
+    {
+     "check": "restored",
+     "result": "PASS",
+     "detail": "both copies == previous manager"
+    },
+    {
+     "check": "no-orphan",
+     "result": "PASS",
+     "detail": "child pid 143997"
+    },
+    {
+     "check": "lock-free",
+     "result": "PASS",
+     "detail": ""
+    }
+   ]
+  }
+ }
+}

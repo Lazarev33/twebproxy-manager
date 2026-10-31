@@ -1,0 +1,28 @@
+name	rc	seconds	last_line
+git-diff-check	0	0	git diff --check f06d1fb (excluding captured evidence): clean
+bash-n-all	0	0	bash -n OK
+c2-relay-lifecycle	0	29	c2-relay-lifecycle: pass=100 fail=0
+suite-stage-c2	0	29	stage-c2-suite: PASS (all mandatory model checks executed)
+c2-scope-vs-v0216	0	5	PASS c2-scope unchanged=357 modified=6 added=8
+suite-stage-c1	0	40	stage-c1-suite: PASS (all mandatory model checks executed)
+audit-c11-cross-instance-orphan	0	1	PASS
+audit-c11-backend-id-collision	0	0	PASS: existing B/x backend env preserved
+audit-c1-failed-backend-stop	0	0	FW collection ports=[23980,23981,28980,28981]
+audit-c1-orphan-backend	0	1	API profiles=[alpha]
+suite-stage-b	77	12	stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)
+suite-stage-a	77	67	stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)
+protocol-meta	0	0	PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+sa6-release-metadata	0	0	sa6-release-metadata: 6 pass, 0 fail
+fg-tg5	0	0	tg5: pass=13 fail=0
+fg-tg5b	0	1	tg5b: pass=19 fail=0
+fg-tg7	0	0	tg7: pass=12 fail=0
+fg-df3	0	10	df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail
+fg-df3b	0	2	df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
+read-only-core	0	6	read-only-core-fixture: PASS
+l10n-static-C	0	5	localization-static-audit: PASS (252 bilingual keys; 332 legacy call-sites)
+l10n-static-UTF8	0	5	localization-static-audit: PASS (252 bilingual keys; 332 legacy call-sites)
+l10n-flow-C	0	3	localization-flow-fixture: PASS (locale=C)
+l10n-flow-UTF8	0	3	localization-flow-fixture: PASS (locale=C.UTF-8)
+static-smoke	0	0	static-smoke: PASS
+certificate-smoke	0	0	certificate-smoke: PASS
+stage4-hash	0	1	fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set

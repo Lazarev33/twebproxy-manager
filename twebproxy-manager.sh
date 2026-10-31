@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 umask 077
 
-# TWebProxy Manager v0.2.22-beta
+# TWebProxy Manager v0.2.25-beta (Bridge Gate3 development)
 # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
 # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
 
 APP="twebproxy"
-MANAGER_VERSION="0.2.22"
-MANAGER_RELEASE_VERSION="0.2.22-beta"
+MANAGER_VERSION="0.2.25"
+MANAGER_RELEASE_VERSION="0.2.25-beta"
 TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
 TPROXY_BRANCH="master"
 # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
@@ -52,6 +52,17 @@ MTPROXY_BIN="$LIBEXEC_DIR/mtproto-proxy"
 SYSTEMD_DIR="/etc/systemd/system"
 GLOBAL_ENV="$BASE_DIR/global.env"
 FIREWALL_FILE="$BASE_DIR/firewall.nft"
+FW_GUARD_TABLE="twebproxy_guard"
+# Remote networks an MTProxy backend may exchange packets with (v0.2.24,
+# P1-EXPOSURE-01): loopback (the local relay) and Telegram's published DC
+# ranges (https://core.telegram.org/resources/cidr.txt, 2026-10-31), which
+# contain every proxy_for address of getProxyConfig. PID 1 enforces this per
+# backend cgroup (IPAddressDeny=any + IPAddressAllow=), independent of nftables.
+TELEGRAM_DC_CIDRS="91.108.56.0/22 91.108.4.0/22 91.108.8.0/22 91.108.16.0/22 91.108.12.0/22 149.154.160.0/20 91.105.192.0/23 91.108.20.0/22 185.76.151.0/24 2001:b28:f23d::/48 2001:b28:f23f::/48 2001:67c:4e8::/48 2001:b28:f23c::/48 2a0a:f280::/32"
+PROC_GROUP="twebproxy-procview"
+PROC_POLICY_FILE="$BASE_DIR/proc-policy"
+PROC_FSTAB_MARK="# twebproxy-proc-hardening"
+FW_NFT_DROPIN="twebproxy-reassert.conf"
 LANGUAGE_FILE="${TWEBPROXY_LANGUAGE_FILE:-$BASE_DIR/ui-language}"
 # Frontend / TLS locations: Caddy, Nginx, Let's Encrypt and the ACME HTTP-01 webroot.
 CADDY_DIR="/etc/caddy"
@@ -132,6 +143,9 @@ english	English	English
 russian	Russian	Русский
 select_language	Select language / Выберите язык	Select language / Выберите язык
 choice	Choice	Выбор
+foreign_nodes	Foreign Nodes / Bridge	Зарубежные узлы / Мост
+foreign_add	Add Foreign Node	Добавить зарубежный узел
+foreign_operation_failed	Bridge operation did not complete (code %s). See the details above; inspect node status before retrying.	Операция с мостом не завершена (код %s). Подробности приведены выше; перед повтором проверьте состояние узла.
 main_menu	Main menu	Главное меню
 instances	Proxies / Instances	Прокси / Инстансы
 profiles	Profiles	Профили
@@ -392,8 +406,8 @@ setup_hostname_retry	Attempts left: %s.	Осталось попыток: %s.
 setup_type	Setup type:	Тип настройки:
 setup_quick	Quick (recommended): automatic ports, profile "default", new secret, https carrier	Быстрая (рекомендуется): порты автоматически, профиль «default», новый secret, carrier https
 setup_advanced	Advanced: choose ports, profile, secret, carrier and MTProxy limits yourself	Расширенная: порты, профиль, secret, carrier и лимиты MTProxy вручную
-setup_site_intro	The same hostname also serves an ordinary website. A real site or application is better; the placeholder only shows that HTTPS works.	На том же hostname работает обычный сайт. Лучше указать настоящий сайт или приложение; заглушка лишь показывает, что HTTPS работает.
-site_placeholder	Temporary placeholder page (generated; replace it with a real site later)	Временная страница-заглушка (создаётся автоматически; позже замените настоящим сайтом)
+setup_site_intro	The bundled cultural website is ready to use on your hostname, or choose your own static site/application. Existing website files are preserved.	Встроенный культурный сайт готов к работе на вашем hostname. Можно выбрать свой каталог или приложение; существующие файлы сайта сохраняются.
+site_placeholder	Bundled default: Cultural Routes of Moscow Oblast	Встроенный сайт: «Культурные маршруты Подмосковья»
 site_directory	My static website: copy a directory with index.html	Мой статический сайт: скопировать каталог с index.html
 site_upstream	My web application on this server (loopback URL)	Моё веб-приложение на этом сервере (адрес loopback)
 tls_caddy	Caddy — automatic HTTPS certificate (recommended)	Caddy — автоматический HTTPS-сертификат (рекомендуется)
@@ -435,6 +449,29 @@ hint_profile	A profile backend needs attention: twebproxy repair %s	Требуе
 hint_no_profile	No profile yet: twebproxy profile-add %s	Профилей пока нет: twebproxy profile-add %s
 hint_firewall	Backend isolation is not confirmed: twebproxy repair %s rebuilds the firewall, then twebproxy audit %s	Изоляция backend не подтверждена: twebproxy repair %s пересоздаёт межсетевой экран, затем twebproxy audit %s
 hint_generic	Details: twebproxy status %s --verbose or twebproxy diagnose %s	Подробности: twebproxy status %s --verbose или twebproxy diagnose %s
+dpi_transaction_failed_stage_fallback	Could not apply %s (stage: %s); the previous state could NOT be restored and network compatibility fell back to STOCK. Check "twebproxy dpi status" and run "twebproxy repair HOSTNAME".	Не удалось применить %s (этап: %s); предыдущее состояние восстановить НЕ удалось, режим совместимости сброшен в STOCK. Проверьте «twebproxy dpi status» и выполните «twebproxy repair HOSTNAME».
+dpi_kernel_rules	Kernel rules	Правила ядра
+dpi_kernel_match	match the recorded mode	совпадают с записанным режимом
+dpi_kernel_diverged	DO NOT match the recorded mode; run: twebproxy repair %s	НЕ совпадают с записанным режимом; выполните: twebproxy repair %s
+rollback_not_performed_eof	Input closed (EOF): nothing was restored.	Ввод закрыт (EOF): ничего не восстановлено.
+rollback_not_performed_declined	Cancelled: nothing was restored.	Отменено: ничего не восстановлено.
+restore_partial_hint	The executables were restored, but %s was not updated (read-only, immutable or full?). Make it writable, e.g. "chattr -i %s", then run "twebproxy repair HOSTNAME".	Исполняемые файлы восстановлены, но %s не обновлён (только для чтения, immutable или нет места?). Сделайте файл записываемым, например «chattr -i %s», затем выполните «twebproxy repair HOSTNAME».
+global_env_write_failed	Could not write %s (read-only, immutable or full?); nothing in it was changed. Make it writable, e.g. "chattr -i %s", and repeat.	Не удалось записать %s (только для чтения, immutable или нет места?); файл не изменён. Сделайте его записываемым, например «chattr -i %s», и повторите.
+proc_status_hidden	Process list of other users is hidden (procfs %s): MTProxy client secrets are not readable by unprivileged local accounts.	Процессы других пользователей скрыты (procfs %s): secrets клиентов MTProxy недоступны непривилегированным локальным учётным записям.
+proc_status_exposed	procfs shows every process to every local user: the MTProxy client secret on its command line is readable by unprivileged accounts. Run: twebproxy proc-hardening enable	procfs показывает все процессы всем локальным пользователям: secret клиента MTProxy в командной строке доступен непривилегированным учётным записям. Выполните: twebproxy proc-hardening enable
+proc_status_disabled	procfs hardening was explicitly disabled by the operator: MTProxy client secrets are readable by unprivileged local accounts.	Защита procfs явно отключена оператором: secrets клиентов MTProxy доступны непривилегированным локальным учётным записям.
+proc_enabled	procfs now hides other users' processes (hidepid=invisible, exempt group %s; persistent via /etc/fstab).	procfs теперь скрывает процессы других пользователей (hidepid=invisible, группа-исключение %s; сохранено в /etc/fstab).
+proc_disabled	procfs hardening disabled; processes of all users are visible again. The audit reports this as an accepted risk.	Защита procfs отключена; процессы всех пользователей снова видны. Аудит отметит это как принятый риск.
+proc_failed	Could not apply the procfs policy: %s	Не удалось применить политику procfs: %s
+proc_fail_closed	procfs does not hide other users' processes, so MTProxy client secrets would be readable by unprivileged local accounts. Fail-closed: %s TWebProxy MTProxy backend(s) stopped, none started. Fix procfs (twebproxy proc-hardening enable) or accept the risk explicitly (twebproxy proc-hardening disable), then run: twebproxy repair HOST	procfs не скрывает процессы других пользователей, поэтому secrets клиентов MTProxy были бы доступны непривилегированным локальным учётным записям. Fail-closed: остановлено backend MTProxy TWebProxy: %s, ни один не запущен. Исправьте procfs (twebproxy proc-hardening enable) или явно примите риск (twebproxy proc-hardening disable), затем выполните: twebproxy repair HOST
+proc_fail_closed_stop_failed	procfs exposes MTProxy client secrets and these backends could not be proven stopped:%s. Stop them manually (systemctl stop UNIT).	procfs раскрывает secrets клиентов MTProxy, и эти backends не удалось гарантированно остановить:%s. Остановите их вручную (systemctl stop UNIT).
+proc_disable_confirm	Disable procfs hardening? Every local account will be able to read the MTProxy client secrets.	Отключить защиту procfs? Любая локальная учётная запись сможет прочитать secrets клиентов MTProxy.
+proc_disable_declined	procfs hardening left unchanged.	Защита procfs не изменена.
+proc_disable_recorded	Accepted risk recorded in %s; every backend start logs it and the audit reports a WARNING.	Принятый риск записан в %s; каждый запуск backend отмечает его в журнале, аудит показывает WARNING.
+proc_note_group	Monitoring tools that need to see all processes can be added to group %s.	Инструменты мониторинга, которым нужен полный список процессов, можно добавить в группу %s.
+caddy_wait_cert	Waiting up to %s s for Caddy to obtain the certificate for %s...	Жду до %s с, пока Caddy получит сертификат для %s...
+caddy_wait_cert_ok	Caddy serves a valid certificate for %s.	Caddy отдаёт действительный сертификат для %s.
+caddy_wait_cert_timeout	Caddy has not served a valid certificate for %s within %s s; the audit below reports what it sees. Check DNS and ports 80/443, then run: twebproxy audit %s	Caddy не отдал действительный сертификат для %s за %s с; аудит ниже покажет фактическое состояние. Проверьте DNS и порты 80/443, затем выполните: twebproxy audit %s
 UI_I18N
 }
 
@@ -817,6 +854,10 @@ ui_localize_legacy() {
     AUDIT\ FAIL:\ у\ *\ нет\ profiles/backends) value="${text#AUDIT FAIL: у }"; printf 'AUDIT FAIL: %s has no profiles/backends' "${value% нет profiles/backends}"; return;;
     AUDIT\ FAIL:\ *\ backend\ service\ не\ active) value="${text#AUDIT FAIL: }"; printf 'AUDIT FAIL: %s backend service is not active' "${value% backend service не active}"; return;;
     AUDIT\ WARN:\ *\ unit\ без\ AF_NETLINK*) value="${text#AUDIT WARN: }"; printf 'AUDIT WARN: %s unit does not allow AF_NETLINK; run repair with the current Manager version' "${value%% unit без AF_NETLINK*}"; return;;
+    *': socket filter PID 1 (IPAddressDeny=any) активен независимо от nftables') printf '%s: PID 1 socket filter (IPAddressDeny=any) is active independently of nftables' "${text%%: socket filter PID 1*}"; return;;
+    AUDIT\ WARN:\ состояние\ socket\ filter\ *\ неизвестно*) value="${text#AUDIT WARN: состояние socket filter }"; printf 'AUDIT WARN: the socket filter state of %s is unknown (systemd unavailable or did not answer)' "${value%% неизвестно*}"; return;;
+    AUDIT\ FAIL:\ *\ socket\ filter\ backend\ отсутствует\ или\ обходится*) value="${text#AUDIT FAIL: }"; value2="${value#* обходится }"; printf 'AUDIT FAIL: %s backend socket filter is missing or bypassed %s; run repair with the current Manager version' "${value%% socket filter backend*}" "${value2%%;*}"; return;;
+    'AUDIT WARN: адреса DC вне allowlist backend (недоступны для MTProxy): '*) value="${text#*MTProxy): }"; printf 'AUDIT WARN: DC addresses outside the backend allowlist (unreachable for MTProxy): %s; update the Manager' "${value%%; обновите manager}"; return;;
     AUDIT\ FAIL:\ *\ port\ *\ не\ слушается) value="${text#AUDIT FAIL: }"; value="${value% не слушается}"; printf 'AUDIT FAIL: %s is not listening' "$value"; return;;
     AUDIT\ FAIL:\ *\ имеет\ non-loopback\ listener\(s\):*) value="${text#AUDIT FAIL: }"; printf 'AUDIT FAIL: %s' "${value/ имеет non-loopback listener(s):/ has non-loopback listener(s):}"; return;;
     AUDIT\ FAIL:\ *\ не\ найден\ в\ backend\ firewall\ rule) value="${text#AUDIT FAIL: }"; printf 'AUDIT FAIL: %s is missing from the backend firewall rule' "${value% не найден в backend firewall rule}"; return;;
@@ -1451,6 +1492,7 @@ render_backend_env() ( # $1=host $2=profile
 instance_derive_state() {
   local host="$1" p bfile content
   BACKEND_PORTS_CHANGED=0
+  if bridge_managed "$host"; then rebuild_profiles_json "$host"; return; fi
   while read -r p; do
     [[ -n "$p" ]] || continue
     bfile="$(backend_env "$host" "$p")"
@@ -1926,7 +1968,7 @@ EOF
 [Unit]
 Description=TWebProxy optional network-compatibility nftables rules
 After=nftables.service
-PartOf=nftables.service
+ReloadPropagatedFrom=nftables.service
 Before=$DPI_NFQWS_UNIT
 
 [Service]
@@ -2475,6 +2517,7 @@ dpi_rollback_to_snapshot() {
   local rc="${DPI_LAST_STAGE_RC:-1}" reason="${DPI_LAST_STAGE_REASON:-}"
   local rollback=restored
   dpi_restore_snapshot "$snapshot" || rollback=failed-fell-back-to-STOCK
+  DPI_LAST_ROLLBACK="$rollback"
   DPI_LAST_STAGE="$stage"; DPI_LAST_STAGE_OP="$op"
   DPI_LAST_STAGE_RC="$rc"; DPI_LAST_STAGE_REASON="$reason"
   dpi_diag_log "stage=$stage op=$op status=$rc result=failed reason=$reason rollback=$rollback"
@@ -2485,7 +2528,9 @@ dpi_rollback_to_snapshot() {
 # failed when one was recorded.
 dpi_transaction_failure_message() {
   local mode="${1:-}"
-  if [[ -n "${DPI_LAST_STAGE:-}" && -n "$mode" ]]; then
+  if [[ "${DPI_LAST_ROLLBACK:-restored}" != restored ]]; then
+    ui_msgf dpi_transaction_failed_stage_fallback "${mode:-?}" "${DPI_LAST_STAGE:-unknown}"
+  elif [[ -n "${DPI_LAST_STAGE:-}" && -n "$mode" ]]; then
     ui_msgf dpi_transaction_failed_stage "$mode" "$DPI_LAST_STAGE"
   elif [[ -n "${DPI_LAST_STAGE:-}" ]]; then
     ui_msgf dpi_transaction_failed_at_stage "$DPI_LAST_STAGE"
@@ -2661,6 +2706,18 @@ dpi_list_methods_cmd() {
   printf '\n%s\n%s\n' "$(ui_msg dpi_footer_scope)" "$(ui_msg dpi_footer_guarantee)"
 }
 
+# Read-only: does the live kernel table match the recorded scope state?
+dpi_runtime_consistency() {
+  local files need=0
+  files="$(find "$DPI_STATE_DIR" -mindepth 1 -maxdepth 1 -print 2>/dev/null)" || files=""
+  if [[ -z "$files" ]]; then
+    if "$DPI_NFT_BIN" list table ip "$DPI_NFT_TABLE" >/dev/null 2>&1; then printf 'diverged'; else printf 'ok'; fi
+    return 0
+  fi
+  grep -qsE '^MODE=.*nfqws' "$DPI_STATE_DIR"/* && need=1
+  if dpi_verify_runtime "$need" >/dev/null 2>&1; then printf 'ok'; else printf 'diverged'; fi
+}
+
 dpi_status_cmd() {
   need_root
   local requested="${1:-}" host row ip mode shared ipv6 any=0
@@ -2674,6 +2731,11 @@ dpi_status_cmd() {
     printf '\n%s\n' "$host"
     tui_kv "$(ui_msg dpi_scope)" "$ip"
     tui_kv "$(ui_msg dpi_mode)" "$mode"
+    if [[ "$(dpi_runtime_consistency)" == ok ]]; then
+      tui_kv "$(ui_msg dpi_kernel_rules)" "$(ui_msg dpi_kernel_match)"
+    else
+      tui_kv "$(ui_msg dpi_kernel_rules)" "$(ui_msgf dpi_kernel_diverged "$host")"
+    fi
     tui_kv "$(ui_msg dpi_ipv6)" "$ipv6"
     [[ -n "$shared" ]] && tui_kv "$(ui_msg dpi_shared_hosts)" "$shared"
     [[ "$mode" != STOCK ]] && any=1
@@ -3053,6 +3115,202 @@ ensure_go() {
   ok "Go: $($GO_BIN version)"
 }
 
+# --- procfs policy (v0.2.23, P1-INHERITED-01) --------------------------------
+# Stock MTProxy takes the client secret as "-S <secret>", and /proc/<pid>/cmdline
+# is readable by every local account unless procfs is mounted with hidepid.
+# A service's own ProtectProc= only changes that service's view of /proc, so the
+# supported mitigation is host-wide: hidepid=invisible, with an exempt group for
+# tools that must see all processes, persisted in /etc/fstab (applied to /proc
+# at boot by systemd-remount-fs). The operator may opt out explicitly
+# ("twebproxy proc-hardening disable"); the audit then reports an accepted risk.
+proc_top_mount_options() { # options of the EFFECTIVE (topmost) /proc mount of this mount namespace
+  # Stacked proc mounts list several /proc lines in mountinfo; only the one no
+  # other /proc mount sits on is what path lookups reach (v0.2.24, P2-PROC-MULTIMOUNT).
+  # Prints "<mount options>,<super options>"; nothing if /proc is not mounted.
+  awk '{ sep = 0; for (i = 7; i <= NF; i++) if ($i == "-") { sep = i; break } }
+       sep && $5 == "/proc" && $(sep + 1) == "proc" { id[$1] = 1; par[$1] = $2; opt[$1] = $6 "," $(sep + 3) }
+       END { for (i in id) { top = 1; for (j in id) if (par[j] == i) top = 0; if (top) print opt[i] } }' \
+    /proc/self/mountinfo 2>/dev/null | head -n1
+}
+
+proc_hidepid_value() { # prints the hidepid value of the effective /proc, or nothing; never fails (callers run under errexit/ERR)
+  local opts="" v=""
+  opts="$(proc_top_mount_options)" || opts=""
+  [[ "$opts" =~ (^|,)hidepid=([a-z0-9]+) ]] && v="${BASH_REMATCH[2]}"
+  printf '%s' "$v"
+}
+
+# Ground truth, independent of how options are spelled: can an unprivileged
+# account (nobody, no supplementary groups) read another user's command line
+# through the effective /proc of this mount namespace? PID 1 stands for every
+# process of another user, the MTProxy backends included.
+# Succeeds (= "exposed") also when the probe itself cannot run: its own
+# command line must be readable first, otherwise the answer is unknown.
+proc_unprivileged_can_read() {
+  local rc=0
+  setpriv --reuid=65534 --regid=65534 --clear-groups --inh-caps=-all --bounding-set=-all \
+    bash -c 'IFS= read -r -d "" s < /proc/self/cmdline || exit 3
+             IFS= read -r -d "" a < /proc/1/cmdline && exit 0; exit 1' >/dev/null 2>&1 || rc=$?
+  (( rc != 1 ))
+}
+
+proc_hide_active() { # hidepid on the effective /proc AND an unprivileged reader really sees nothing
+  case "$(proc_hidepid_value)" in 1|2|noaccess|invisible) ;; *) return 1;; esac
+  ! proc_unprivileged_can_read
+}
+
+# --- Backend socket filter checks (v0.2.24, P1-EXPOSURE-01) -------------------
+ip4_to_int() { local IFS=. a b c d; read -r a b c d <<<"$1"; printf '%s' "$(( (a << 24) | (b << 16) | (c << 8) | d ))"; }
+
+ip4_in_dc_cidrs() { # $1=IPv4 -> success if inside one of TELEGRAM_DC_CIDRS
+  local cidr net len mask ip
+  ip="$(ip4_to_int "$1")"
+  for cidr in $TELEGRAM_DC_CIDRS; do
+    [[ "$cidr" == *.* ]] || continue
+    net="${cidr%/*}"; len="${cidr#*/}"
+    mask=$(( len == 0 ? 0 : (0xFFFFFFFF << (32 - len)) & 0xFFFFFFFF ))
+    (( (ip & mask) == ($(ip4_to_int "$net") & mask) )) && return 0
+  done
+  return 1
+}
+
+# Prints proxy_for IPv4 addresses of the MTProxy routing config outside the
+# allowed DC networks (those DCs would be unreachable for the backends).
+dc_addresses_outside_allowlist() {
+  local f="$MTPROXY_DATA_DIR/proxy-multi.conf" a
+  [[ -r "$f" ]] || return 1
+  while read -r a; do
+    ip4_in_dc_cidrs "$a" || printf '%s\n' "$a"
+  done < <(sed -nE 's/^proxy_for[[:space:]]+-?[0-9]+[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):[0-9]+;.*/\1/p' "$f" | sort -u)
+}
+
+# 0 = the backend cgroup filter is in effect for $1 (unit) and a connection to
+# port $2 through this host's own non-loopback IPv4 does not get through
+# (local traffic bypasses the nftables iifname != lo rule, so only the cgroup
+# filter can stop it); 1 = missing or bypassed; 2 = systemd did not answer
+# (bounded like every audit probe). Prints the observed evidence.
+backend_socket_filter_check() {
+  local unit="$1" port="$2" out="" load="" deny="" bytes="" ip
+  out="$(diag_run "$DIAG_TIMEOUT" systemctl show -p LoadState -p IPAddressDeny -p IPIngressBytes -- "$unit" 2>/dev/null)" ||
+    { printf 'unknown'; return 2; }
+  load="$(sed -n 's/^LoadState=//p' <<<"$out")"
+  deny="$(sed -n 's/^IPAddressDeny=//p' <<<"$out")"
+  bytes="$(sed -n 's/^IPIngressBytes=//p' <<<"$out")"
+  [[ "$load" == loaded ]] || { printf 'unknown'; return 2; }
+  if [[ " $deny " != *" 0.0.0.0/0 "* || " $deny " != *" ::/0 "* || ! "$bytes" =~ ^[0-9]+$ ]]; then
+    printf 'filter-missing'; return 1
+  fi
+  ip="$(diag_run "$DIAG_TIMEOUT" ip -4 -o addr show scope global 2>/dev/null | awk '{sub("/.*", "", $4); print $4; exit}')" || ip=""
+  if [[ -n "$ip" ]] && timeout 1 bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$ip" "$port" 2>/dev/null; then
+    printf 'bypassed-via-%s' "$ip"; return 1
+  fi
+  printf 'enforced'
+}
+
+proc_hardening_state() { # hidden | disabled | exposed
+  if proc_hide_active; then printf 'hidden'
+  elif [[ -f "$PROC_POLICY_FILE" && "$(head -n1 "$PROC_POLICY_FILE" 2>/dev/null)" == off ]]; then printf 'disabled'
+  else printf 'exposed'; fi
+}
+
+proc_fstab_line() { printf 'proc /proc proc defaults,nosuid,nodev,noexec,relatime,hidepid=invisible,gid=%s 0 0 %s\n' "$1" "$PROC_FSTAB_MARK"; }
+
+proc_fstab_write() { # $1 = line to install, or empty to remove ours; other proc lines are kept commented
+  local tmp fstab=/etc/fstab
+  [[ -f "$fstab" && ! -L "$fstab" ]] || { printf '%s is not a regular file' "$fstab"; return 1; }
+  [[ -f "$fstab.twebproxy-backup" ]] || cp -p -- "$fstab" "$fstab.twebproxy-backup" || return 1
+  tmp="$(mktemp /etc/.fstab.twebproxy.XXXXXX)" || return 1
+  {
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" == *"$PROC_FSTAB_MARK"* ]]; then continue; fi
+      if [[ -n "$1" && "$line" =~ ^[[:space:]]*[^#[:space:]]+[[:space:]]+/proc[[:space:]] ]]; then
+        printf '# %s (disabled by TWebProxy proc-hardening)\n' "$line"; continue
+      fi
+      printf '%s\n' "$line"
+    done < "$fstab"
+    [[ -z "$1" ]] || printf '%s' "$1"
+  } > "$tmp" && chmod --reference="$fstab" "$tmp" && mv -fT -- "$tmp" "$fstab" || { rm -f -- "$tmp"; return 1; }
+}
+
+proc_hardening_enable() {
+  local gid
+  getent group "$PROC_GROUP" >/dev/null || groupadd --system "$PROC_GROUP" || { printf 'groupadd %s failed' "$PROC_GROUP"; return 1; }
+  gid="$(getent group "$PROC_GROUP" | cut -d: -f3)"
+  [[ "$gid" =~ ^[0-9]+$ ]] || { printf 'no gid for %s' "$PROC_GROUP"; return 1; }
+  proc_fstab_write "$(proc_fstab_line "$gid")" || { printf 'could not update /etc/fstab'; return 1; }
+  mount -o "remount,hidepid=invisible,gid=$gid" /proc || { printf 'remount of /proc failed'; return 1; }
+  proc_hide_active || { printf '/proc still shows every process after remount'; return 1; }
+  install -d -m 0700 "$BASE_DIR" && printf 'hidepid\n' > "$PROC_POLICY_FILE" && chmod 0600 "$PROC_POLICY_FILE"
+}
+
+proc_hardening_disable() {
+  # The decision is recorded first: it is what makes an exposed /proc an
+  # accepted (WARNING) instead of an unintended (fail-closed) state.
+  install -d -m 0700 "$BASE_DIR" &&
+    printf 'off\naccepted_at=%s\naccepted_by=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${SUDO_USER:-$(id -un)}" > "$PROC_POLICY_FILE" &&
+    chmod 0600 "$PROC_POLICY_FILE" || { printf 'could not record the policy in %s' "$PROC_POLICY_FILE"; return 1; }
+  proc_fstab_write "" || { printf 'could not update /etc/fstab'; return 1; }
+  if [[ -f /etc/fstab.twebproxy-backup ]] && grep -qE '^[[:space:]]*#[[:space:]].*[[:space:]]/proc[[:space:]].*\(disabled by TWebProxy' /etc/fstab; then
+    sed -i -E 's/^# (.*) \(disabled by TWebProxy proc-hardening\)$/\1/' /etc/fstab || return 1
+  fi
+  mount -o remount,hidepid=0 /proc 2>/dev/null || mount -o remount,hidepid=default /proc || { printf 'remount of /proc failed'; return 1; }
+}
+
+# MTProxy backends may run only while the effective /proc hides their command
+# lines or the operator explicitly accepted the risk (v0.2.24, P1-INHERITED-01).
+proc_secret_safe() { case "$(proc_hardening_state)" in hidden|disabled) return 0;; *) return 1;; esac; }
+
+# An unintentionally exposed /proc must not coexist with live secret-bearing
+# backends: stop every TWebProxy backend, prove it stopped, and abort.
+proc_fail_closed() {
+  local units=() u failed=""
+  mapfile -t units < <(systemctl list-units --type=service --all --no-legend --plain 'twebproxy-mtproxy@*.service' 2>/dev/null | awk 'NF {print $1}')
+  for u in "${units[@]}"; do
+    systemctl stop "$u" >/dev/null 2>&1 || true
+    case "$(systemctl is-active "$u" 2>/dev/null || true)" in inactive|failed) ;; *) failed+=" $u";; esac
+  done
+  [[ -z "$failed" ]] || die "$(ui_msgf proc_fail_closed_stop_failed "$failed")"
+  die "$(ui_msgf proc_fail_closed "${#units[@]}")"
+}
+
+# Default on: applied by core-install, add and repair (before any backend
+# starts) unless the operator opted out; callers fail closed when it fails.
+proc_hardening_ensure() {
+  local err
+  [[ "$(proc_hardening_state)" == disabled ]] && return 0
+  if proc_hide_active && grep -qF "$PROC_FSTAB_MARK" /etc/fstab 2>/dev/null; then return 0; fi
+  if err="$(proc_hardening_enable 2>&1)"; then
+    ok "$(ui_msgf proc_enabled "$PROC_GROUP")"; log "$(ui_msgf proc_note_group "$PROC_GROUP")"
+  else
+    warn "$(ui_msgf proc_failed "$err")"; return 1
+  fi
+}
+
+proc_hardening_cmd() {
+  need_root
+  local action="${1:-status}" err
+  case "$action" in
+    status)
+      case "$(proc_hardening_state)" in
+        hidden) ok "$(ui_msgf proc_status_hidden "$(proc_hidepid_value)")";;
+        disabled) warn "$(ui_msg proc_status_disabled)";;
+        *) warn "$(ui_msg proc_status_exposed)"; return 1;;
+      esac;;
+    enable)
+      err="$(proc_hardening_enable 2>&1)" || die "$(ui_msgf proc_failed "$err")"
+      ok "$(ui_msgf proc_enabled "$PROC_GROUP")"; log "$(ui_msgf proc_note_group "$PROC_GROUP")";;
+    disable)
+      # Deliberate: an interactive operator confirms; a non-interactive call
+      # of this explicit command is itself the decision. Both are recorded.
+      if [[ -t 0 ]] && ! yesno "$(ui_msg proc_disable_confirm)" n; then
+        log "$(ui_msg proc_disable_declined)"; return 1
+      fi
+      err="$(proc_hardening_disable 2>&1)" || die "$(ui_msgf proc_failed "$err")"
+      warn "$(ui_msg proc_disabled)"; warn "$(ui_msgf proc_disable_recorded "$PROC_POLICY_FILE")";;
+    *) die "Usage: twebproxy proc-hardening [status|enable|disable]";;
+  esac
+}
+
 prepare_users_and_dirs() {
   id tproxy >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin tproxy
   id mtproxy >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin mtproxy
@@ -3150,22 +3408,38 @@ build_mtproxy_pinned() {
   ok "Official MTProxy собран и установлен: $MTPROXY_BIN"
 }
 
-refresh_mtproxy_material() {
-  log "Получаю официальный proxy-secret и proxy-multi.conf..."
-  local sec_tmp cfg_tmp
-  sec_tmp="$(mktemp)"; cfg_tmp="$(mktemp)"
-  trap 'rm -f "$sec_tmp" "$cfg_tmp"' RETURN
-  curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 https://core.telegram.org/getProxySecret -o "$sec_tmp"
-  curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 https://core.telegram.org/getProxyConfig -o "$cfg_tmp"
-  [[ "$(wc -c < "$sec_tmp")" -ge 100 ]] || die "proxy-secret подозрительно короткий."
-  [[ "$(wc -c < "$cfg_tmp")" -ge 100 ]] || die "proxy-multi.conf подозрительно короткий."
-  grep -q '^default ' "$cfg_tmp" || die "proxy-multi.conf не прошёл проверку."
-  grep -q '^proxy_for ' "$cfg_tmp" || die "proxy-multi.conf не прошёл проверку."
-  install -o root -g root -m 0600 "$sec_tmp" "$MTPROXY_DATA_DIR/proxy-secret"
-  install -o root -g root -m 0600 "$cfg_tmp" "$MTPROXY_DATA_DIR/proxy-multi.conf"
-  trap - RETURN
-  rm -f "$sec_tmp" "$cfg_tmp"
+download_telegram_material() { # official HTTPS, bounded IPv4 retries; no insecure fallback
+  local url="$1" output="$2"
+  case "$url" in https://core.telegram.org/getProxySecret|https://core.telegram.org/getProxyConfig) ;; *) return 1;; esac
+  curl -4 --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+    --connect-timeout 8 --max-time 20 --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 75 \
+    --max-filesize 65536 --output "$output" "$url"
 }
+
+refresh_mtproxy_material() (
+  log "Получаю официальный proxy-secret и proxy-multi.conf..."
+  local work name rollback_ok=1
+  work="$(mktemp -d "$MTPROXY_DATA_DIR/.refresh.XXXXXX")" || return 1
+  trap 'rm -rf -- "$work"' EXIT
+  download_telegram_material https://core.telegram.org/getProxySecret "$work/secret" || return 1
+  download_telegram_material https://core.telegram.org/getProxyConfig "$work/config" || return 1
+  [[ "$(wc -c < "$work/secret")" -ge 100 && "$(wc -c < "$work/secret")" -le 4096 ]] || return 1
+  [[ "$(wc -c < "$work/config")" -ge 100 && "$(wc -c < "$work/config")" -le 65536 ]] || return 1
+  grep -q '^default ' "$work/config" && grep -q '^proxy_for ' "$work/config" || return 1
+  chmod 0600 "$work/secret" "$work/config"
+  for name in proxy-secret proxy-multi.conf; do
+    [[ ! -L "$MTPROXY_DATA_DIR/$name" ]] || return 1
+    if [[ -e "$MTPROXY_DATA_DIR/$name" ]]; then cp -p -- "$MTPROXY_DATA_DIR/$name" "$work/old-$name" || return 1; fi
+  done
+  if ! mv -fT -- "$work/secret" "$MTPROXY_DATA_DIR/proxy-secret"; then return 1; fi
+  if ! mv -fT -- "$work/config" "$MTPROXY_DATA_DIR/proxy-multi.conf"; then
+    if [[ -e "$work/old-proxy-secret" ]]; then
+      mv -fT -- "$work/old-proxy-secret" "$MTPROXY_DATA_DIR/proxy-secret" || rollback_ok=0
+    else rm -f -- "$MTPROXY_DATA_DIR/proxy-secret" || rollback_ok=0; fi
+    (( rollback_ok )) || warn "Telegram material rollback incomplete; inspect $MTPROXY_DATA_DIR before restarting backends."
+    return 1
+  fi
+)
 
 write_global_env() {
   local upstream="${UPSTREAM_COMMIT:-}"
@@ -3173,12 +3447,19 @@ write_global_env() {
     upstream="$( (unset TPROXY_UPSTREAM_COMMIT; source "$GLOBAL_ENV"; printf '%s' "${TPROXY_UPSTREAM_COMMIT:-}") )"
   fi
   [[ -n "$upstream" ]] || upstream=unknown
-  {
-    printf 'MANAGER_VERSION=%q\n' "$MANAGER_VERSION"
-    printf 'TPROXY_UPSTREAM_COMMIT=%q\n' "$upstream"
-    printf 'MTPROXY_COMMIT=%q\n' "$MTPROXY_COMMIT"
-  } > "$GLOBAL_ENV"
-  chmod 0600 "$GLOBAL_ENV"
+  # Written beside itself and renamed: never truncated in place, and a write
+  # obstruction (immutable, read-only, full) is reported as such.
+  local tmp
+  if tmp="$(mktemp "$(dirname -- "$GLOBAL_ENV")/.global.env.XXXXXX" 2>/dev/null)" &&
+     {
+       printf 'MANAGER_VERSION=%q\n' "$MANAGER_VERSION"
+       printf 'TPROXY_UPSTREAM_COMMIT=%q\n' "$upstream"
+       printf 'MTPROXY_COMMIT=%q\n' "$MTPROXY_COMMIT"
+     } > "$tmp" && chmod 0600 "$tmp" && mv -fT -- "$tmp" "$GLOBAL_ENV" 2>/dev/null; then
+    return 0
+  fi
+  [[ -z "${tmp:-}" ]] || rm -f -- "$tmp"
+  die "$(ui_msgf global_env_write_failed "$GLOBAL_ENV" "$GLOBAL_ENV")"
 }
 
 backend_fw_error() { printf 'backend firewall: %s\n' "$*" >&2; }
@@ -3379,6 +3660,192 @@ backend_fw_main() (
   backend_fw_transaction "$work"
 )
 
+# --- Owned guard table (v0.2.23, P1-EXPOSURE-01 / P1-STOP-01) -------------
+# The backend table above is an ordinary table: any "flush ruleset" - which is
+# what nftables.service runs on start, reload, restart and stop with the stock
+# /etc/nftables.conf - deletes it, and the backends were reachable until it was
+# re-applied. inet twebproxy_guard carries the same drop rule but is created
+# with "flags owner" by a long-running nft session of twebproxy-firewall.service.
+# The kernel skips owned tables in a foreign flush and refuses foreign
+# delete/modify (EPERM); the table disappears only when the owning session ends,
+# i.e. when the firewall service stops - and the backends are BindsTo= it, so
+# they stop first. All guard changes go through that session as one-line nft
+# batches, which the kernel applies as one transaction.
+fw_guard_ports_elements() { # $1=comma port list -> " { a, b }" or empty
+  [[ -n "$1" ]] || return 0
+  printf ' { %s }' "${1//,/, }"
+}
+
+fw_guard_batch_create() { # $1=comma port list -> one-line batch
+  printf 'add table inet %s { flags owner; } ; add set inet %s ports { type inet_service; } ; ' "$BF_GUARD" "$BF_GUARD"
+  printf 'add chain inet %s input { type filter hook input priority -6; policy accept; } ; ' "$BF_GUARD"
+  printf 'add rule inet %s input iifname != "lo" tcp dport @ports drop' "$BF_GUARD"
+  [[ -z "$1" ]] || printf ' ; add element inet %s ports%s' "$BF_GUARD" "$(fw_guard_ports_elements "$1")"
+  printf '\n'
+}
+
+fw_guard_batch_update() { # $1=comma port list -> one-line batch (atomic swap of the set)
+  printf 'flush set inet %s ports' "$BF_GUARD"
+  [[ -z "$1" ]] || printf ' ; add element inet %s ports%s' "$BF_GUARD" "$(fw_guard_ports_elements "$1")"
+  printf '\n'
+}
+
+fw_guard_live() { # prints the live guard port list; fails unless the owned table and its drop rule exist
+  local text json
+  text="$(timeout 10 "$BF_NFT" list table inet "$BF_GUARD" 2>/dev/null)" || return 1
+  grep -qE '^[[:space:]]*flags owner' <<<"$text" || return 1
+  grep -qE 'hook input priority' <<<"$text" || return 1
+  grep -qF 'iifname != "lo" tcp dport @ports drop' <<<"$text" || return 1
+  json="$(timeout 10 "$BF_NFT" -j list set inet "$BF_GUARD" ports 2>/dev/null)" || return 1
+  jq -er '[.nftables[] | select(.set) | (.set.elem // [])[] | numbers] | sort | map(tostring) | join(",")' <<<"$json"
+}
+
+fw_guard_wait() { # bounded wait until the kernel guard equals the backend state
+  local expected live="" i
+  expected="$(backend_fw_collect)" || return 1
+  for ((i = 0; i < 100; i++)); do
+    if live="$(fw_guard_live)" && [[ "$live" == "$expected" ]]; then return 0; fi
+    sleep 0.2
+  done
+  backend_fw_error "guard: kernel guard does not match backend state (expected '${expected:-none}', live '${live:-absent}')"
+  return 1
+}
+
+fw_guard_hold() { # runs as the service main process: HUP must reach this shell
+  set -Eeuo pipefail
+  export LC_ALL=C
+  umask 077
+  local ports nftpid guard_fd
+  FW_GUARD_RELOAD=0
+  [[ -d "$BF_BASE" && ! -L "$BF_BASE" && "$(stat -c '%u:%g:%a' "$BF_BASE")" == 0:0:700 ]] ||
+    { backend_fw_error 'unsafe backend state directory'; exit 1; }
+  exec 8>"$BF_BASE/.firewall-guard.lock"
+  flock -n 8 || { backend_fw_error 'guard: another guard session is running'; exit 1; }
+  ports="$(backend_fw_collect)" || exit 1
+  # nft reads its commands from this pipe; its own output goes to the journal.
+  exec {guard_fd}> >(exec "$BF_NFT" -i 8>&-)
+  nftpid=$!
+  fw_guard_batch_create "$ports" >&"$guard_fd"
+  trap 'FW_GUARD_RELOAD=1' HUP
+  trap 'exit 0' TERM INT
+  while kill -0 "$nftpid" 2>/dev/null; do
+    if (( FW_GUARD_RELOAD )); then
+      FW_GUARD_RELOAD=0
+      if ports="$(backend_fw_collect)"; then
+        fw_guard_batch_update "$ports" >&"$guard_fd"
+      else
+        backend_fw_error 'guard: backend state invalid; the previous guard set is kept'
+      fi
+    fi
+    sleep 1 & wait $! || true
+  done
+  backend_fw_error 'guard: the owning nft session ended; the guard table is gone'
+  exit 1
+}
+
+fw_guard_main() {
+  case "${1:-}" in
+    hold) fw_guard_hold;;
+    wait) fw_guard_wait;;
+    reload)
+      [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || { backend_fw_error 'guard: reload needs the guard PID'; return 1; }
+      kill -HUP "$2" || { backend_fw_error 'guard: guard session is not running'; return 1; }
+      fw_guard_wait;;
+    *) backend_fw_error 'usage: firewall-guard {hold|wait|reload PID}'; return 2;;
+  esac
+}
+
+write_firewall_guard_helper() {
+  local tmp nft_bin
+  nft_bin="$(command -v nft)" || return 1
+  [[ -d "$LIBEXEC_DIR" && ! -L "$LIBEXEC_DIR" ]] || return 1
+  [[ ! -L "$LIBEXEC_DIR/firewall-guard" ]] || return 1
+  tmp="$(mktemp "$LIBEXEC_DIR/.firewall-guard.XXXXXXXX")" || return 1
+  if ! (
+    printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n' || exit 1
+    printf 'BF_BASE=%q\nBF_BACKENDS=%q\nBF_NFT=%q\nBF_GUARD=%q\n' "$BASE_DIR" "$BACKENDS_DIR" "$nft_bin" "$FW_GUARD_TABLE" || exit 1
+    declare -f is_valid_port backend_fw_error backend_fw_collect fw_guard_ports_elements \
+      fw_guard_batch_create fw_guard_batch_update fw_guard_live fw_guard_wait fw_guard_hold fw_guard_main || exit 1
+    printf 'fw_guard_main "$@"\n' || exit 1
+  ) > "$tmp" || ! chmod 0755 "$tmp" || ! bash -n "$tmp" ||
+      ! mv -fT -- "$tmp" "$LIBEXEC_DIR/firewall-guard"; then
+    rm -f -- "$tmp"; return 1
+  fi
+}
+
+# --- Backend start gate (v0.2.24) ---------------------------------------------
+# ExecStartPre=+ of every MTProxy backend; runs as root in PID 1's mount
+# namespace (the "+" prefix skips the unit's own ProtectProc=/ProtectSystem=).
+# Refuses the start unless both kernel-level protections that do not depend on
+# any long-running TWebProxy process are in effect for this very unit:
+#  1. P1-EXPOSURE-01: PID 1 attached this unit's cgroup socket filter
+#     (IPAddressDeny=any + IPAddressAllow=loopback/Telegram DCs): IPAddressDeny
+#     covers all of IPv4 and IPv6, and IP accounting - installed by the same
+#     cgroup-BPF machinery - reports numbers instead of "[no data]";
+#  2. P1-INHERITED-01: the effective /proc hides other users' command lines,
+#     unless the operator recorded an explicit opt-out (logged as a warning).
+backend_start_check_fail() { printf 'twebproxy backend-start-check: %s; refusing to start\n' "$*" >&2; exit 1; }
+
+backend_start_check_main() {
+  local unit="${1:-}" deny bytes
+  [[ "$unit" =~ ^twebproxy-mtproxy@[^/[:space:]]+\.service$ ]] || backend_start_check_fail "invalid unit '${unit}'"
+  deny="$(systemctl show -P IPAddressDeny -- "$unit" 2>/dev/null)" || backend_start_check_fail "systemd did not answer"
+  [[ " $deny " == *" 0.0.0.0/0 "* && " $deny " == *" ::/0 "* ]] ||
+    backend_start_check_fail "IPAddressDeny=any is not in effect for $unit (got '${deny}')"
+  bytes="$(systemctl show -P IPIngressBytes -- "$unit" 2>/dev/null)" || backend_start_check_fail "systemd did not answer"
+  [[ "$bytes" =~ ^[0-9]+$ ]] ||
+    backend_start_check_fail "this kernel/systemd does not enforce per-unit IP access lists (IPIngressBytes=${bytes})"
+  if proc_hide_active; then
+    return 0
+  elif [[ -f "$PROC_POLICY_FILE" && "$(head -n1 "$PROC_POLICY_FILE" 2>/dev/null)" == off ]]; then
+    printf 'twebproxy backend-start-check: WARNING: procfs hardening disabled by the operator (%s); the client secret of %s is readable by local accounts\n' "$PROC_POLICY_FILE" "$unit" >&2
+    return 0
+  fi
+  backend_start_check_fail "the effective /proc shows other users' command lines (hidepid='$(proc_hidepid_value)'); run: twebproxy proc-hardening enable"
+}
+
+write_backend_start_check_helper() {
+  local tmp
+  [[ -d "$LIBEXEC_DIR" && ! -L "$LIBEXEC_DIR" ]] || return 1
+  [[ ! -L "$LIBEXEC_DIR/backend-start-check" ]] || return 1
+  tmp="$(mktemp "$LIBEXEC_DIR/.backend-start-check.XXXXXXXX")" || return 1
+  if ! (
+    printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nexport LC_ALL=C\n' || exit 1
+    printf 'PROC_POLICY_FILE=%q\n' "$PROC_POLICY_FILE" || exit 1
+    declare -f proc_top_mount_options proc_hidepid_value proc_unprivileged_can_read proc_hide_active \
+      backend_start_check_fail backend_start_check_main || exit 1
+    printf 'backend_start_check_main "$@"\n' || exit 1
+  ) > "$tmp" || ! chmod 0755 "$tmp" || ! bash -n "$tmp" ||
+      ! mv -fT -- "$tmp" "$LIBEXEC_DIR/backend-start-check"; then
+    rm -f -- "$tmp"; return 1
+  fi
+}
+
+# Re-applies the ordinary TWebProxy tables after nftables.service loaded or
+# flushed the host ruleset. Isolation does not depend on it (the owned guard
+# survives a flush); it keeps twebproxy_backend and the optional compatibility
+# table present for audit and defence in depth.
+write_nftables_dropin() {
+  local dir="$SYSTEMD_DIR/nftables.service.d" tmp
+  [[ -d "$SYSTEMD_DIR" && ! -L "$SYSTEMD_DIR" && ! -L "$dir" ]] || return 1
+  install -d -m 0755 "$dir" || return 1
+  [[ ! -L "$dir/$FW_NFT_DROPIN" ]] || return 1
+  tmp="$(mktemp "$dir/.twebproxy.XXXXXXXX")" || return 1
+  if ! cat > "$tmp" <<EOF
+# Written by TWebProxy Manager; removed by "twebproxy core-uninstall".
+# "+": run outside nftables.service's sandbox (its /etc is read-only).
+[Service]
+ExecStartPost=-+$LIBEXEC_DIR/apply-firewall
+ExecStartPost=-+$LIBEXEC_DIR/apply-dpi-firewall
+ExecStopPost=-+$LIBEXEC_DIR/apply-firewall
+ExecStopPost=-+$LIBEXEC_DIR/apply-dpi-firewall
+EOF
+  then rm -f -- "$tmp"; return 1; fi
+  if ! chmod 0644 "$tmp" || ! mv -fT -- "$tmp" "$dir/$FW_NFT_DROPIN"; then
+    rm -f -- "$tmp"; return 1
+  fi
+}
+
 write_backend_firewall_helper() {
   local tmp nft_bin
   nft_bin="$(command -v nft)" || return 1
@@ -3399,25 +3866,43 @@ write_backend_firewall_helper() {
 }
 
 write_backend_firewall_unit() {
-  local tmp
+  local tmp systemctl_bin
+  systemctl_bin="$(command -v systemctl 2>/dev/null || printf '/usr/bin/systemctl')"
   [[ -d "$SYSTEMD_DIR" && ! -L "$SYSTEMD_DIR" &&
      ! -L "$SYSTEMD_DIR/twebproxy-firewall.service" ]] || return 1
   tmp="$(mktemp "$SYSTEMD_DIR/.twebproxy-firewall.XXXXXXXX")" || return 1
   if ! cat > "$tmp" <<EOF
 [Unit]
 Description=Firewall for TWebProxy backend-only ports
-# Reapply after nftables restart (PartOf) and reload (ReloadPropagatedFrom):
-# both re-read /etc/nftables.conf, which usually starts with "flush ruleset".
+# The owned guard table lives exactly as long as this service: a foreign
+# "flush ruleset" (nftables.service start/reload/restart/stop) cannot remove
+# it, so there is no PartOf=nftables.service and an nftables stop no longer
+# takes the proxies down. Backends are BindsTo= this unit (fail-closed) and
+# WantedBy= it, so starting it after a stop brings every enabled backend back
+# only once the guard is verified in the kernel.
 After=nftables.service
-PartOf=nftables.service
 ReloadPropagatedFrom=nftables.service
+# No start rate limit: operator restarts must never leave the guard (and with
+# it every backend) down. A failing guard is retried at most every RestartSec;
+# the backends stay stopped (fail-closed) until it is verified again.
+StartLimitIntervalSec=0
 
 [Service]
-Type=oneshot
-ExecStart=$LIBEXEC_DIR/apply-firewall
+Type=exec
+ExecStart=$LIBEXEC_DIR/firewall-guard hold
+ExecStartPost=$LIBEXEC_DIR/firewall-guard wait
+ExecStartPost=$LIBEXEC_DIR/apply-firewall
+# Every firewall (re)start also (re)starts the bound backends; repeated
+# transitions must not leave them in "start-limit-hit". Runs after the guard is
+# verified and before the backends start (they are ordered After= this unit);
+# crash-loop protection of a backend itself is unchanged.
+ExecStartPost=-$systemctl_bin reset-failed twebproxy-mtproxy@*.service
+ExecReload=$LIBEXEC_DIR/firewall-guard reload \$MAINPID
 ExecReload=$LIBEXEC_DIR/apply-firewall
-# A normal stop/restart retains isolation. Core uninstall explicitly tears down.
-RemainAfterExit=yes
+# A stop ends the guard session (backends are stopped first); twebproxy_backend
+# itself is retained. Core uninstall explicitly tears down.
+Restart=on-failure
+RestartSec=5s
 UMask=0077
 TimeoutStartSec=240
 
@@ -3453,6 +3938,8 @@ EOF
   chmod 0755 "$LIBEXEC_DIR/run-mtproxy"
 
   write_backend_firewall_helper || return 1
+  write_firewall_guard_helper || return 1
+  write_backend_start_check_helper || return 1
 
   cat > "$LIBEXEC_DIR/refresh-mtproxy-config" <<'EOF'
 #!/usr/bin/env bash
@@ -3460,7 +3947,8 @@ set -Eeuo pipefail
 dest=/etc/twebproxy/mtproxy/proxy-multi.conf
 tmp="$(mktemp /etc/twebproxy/mtproxy/proxy-multi.conf.XXXXXX)"
 trap 'rm -f "$tmp"' EXIT
-curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+curl -4 --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+  --connect-timeout 8 --max-time 20 --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 75 --max-filesize 65536 \
   --output "$tmp" https://core.telegram.org/getProxyConfig
 test "$(wc -c < "$tmp")" -ge 100
 grep -q '^default ' "$tmp"
@@ -3484,7 +3972,6 @@ write_systemd_templates() {
 Description=Telegram WEB Proxy relay for %i
 After=network-online.target twebproxy-firewall.service
 Wants=network-online.target
-Requires=twebproxy-firewall.service
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
@@ -3535,7 +4022,7 @@ EOF
 Description=Official Telegram MTProxy backend for %i
 After=network-online.target twebproxy-firewall.service
 Wants=network-online.target
-Requires=twebproxy-firewall.service
+BindsTo=twebproxy-firewall.service
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
@@ -3546,6 +4033,9 @@ Group=mtproxy
 EnvironmentFile=/etc/twebproxy/backends/%i.env
 LoadCredential=proxy-secret:/etc/twebproxy/mtproxy/proxy-secret
 LoadCredential=proxy-multi.conf:/etc/twebproxy/mtproxy/proxy-multi.conf
+# Fail-closed start gate: refuses to start unless PID 1's socket filter below
+# is enforced for this unit and the effective /proc hides command lines.
+ExecStartPre=+/usr/local/libexec/twebproxy/backend-start-check %n
 ExecStart=/usr/local/libexec/twebproxy/run-mtproxy
 Restart=on-failure
 RestartSec=3s
@@ -3558,14 +4048,26 @@ ProtectProc=invisible
 ProtectSystem=strict
 ProcSubset=pid
 RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK
+# Isolation that lives exactly as long as the backend's cgroup (P1-EXPOSURE-01):
+# PID 1 attaches these cgroup-BPF ingress/egress filters before any process of
+# the unit runs. Packets from or to any address other than loopback (the local
+# relay) and Telegram's DC networks never reach the backend's sockets, whatever
+# happens to nftables, the guard session or the order of service transitions.
+IPAccounting=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+IPAddressAllow=@TELEGRAM_DC_CIDRS@
 RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
 
 [Install]
-WantedBy=multi-user.target
+# Also pulled in by the firewall unit: starting it after a stop restores every
+# enabled backend, but only once the owned guard is verified (After=/BindsTo=).
+WantedBy=multi-user.target twebproxy-firewall.service
 EOF
+  sed -i "s|@TELEGRAM_DC_CIDRS@|$TELEGRAM_DC_CIDRS|" "$SYSTEMD_DIR/twebproxy-mtproxy@.service"
 
   write_backend_firewall_unit || return 1
 
@@ -3615,15 +4117,31 @@ rebuild_firewall() {
   install -d -o root -g root -m 0755 "$LIBEXEC_DIR" || return 1
   # Also upgrade an already installed helper/unit after a script-only update.
   write_backend_firewall_helper || return 1
+  write_firewall_guard_helper || return 1
+  write_backend_start_check_helper || return 1
   write_backend_firewall_unit || return 1
+  write_nftables_dropin || return 1
   systemctl daemon-reload || return 1
   systemctl enable twebproxy-firewall.service >/dev/null || return 1
   systemctl is-active --quiet twebproxy-firewall.service || active_rc=$?
   case "$active_rc" in
-    0) systemctl reload twebproxy-firewall.service || return 1;;
+    0)
+      # A unit still running the pre-0.2.23 oneshot has no guard session: restart
+      # it once (backends bound to it are restarted by systemd after the guard).
+      if fw_guard_present; then
+        systemctl reload twebproxy-firewall.service || return 1
+      else
+        systemctl restart twebproxy-firewall.service || return 1
+      fi;;
     3) systemctl start twebproxy-firewall.service || return 1;;
     *) return 1;;
   esac
+}
+
+fw_guard_present() {
+  local text
+  text="$(nft list table inet "$FW_GUARD_TABLE" 2>/dev/null)" || return 1
+  grep -qE '^[[:space:]]*flags owner' <<<"$text"
 }
 
 # True when both paths resolve to the same underlying file. Compared by
@@ -3640,6 +4158,7 @@ install_manager_copy() {
   local self="${BASH_SOURCE[0]}" target tmp held=0 rc=0
   [[ -f "$self" ]] || return 0
   install -d -o root -g root -m 0700 "$PROJECT_DIR" "$LOG_DIR" "$LOG_MANAGER_DIR" "$LOG_RUNTIME_DIR" "$LOG_BUNDLE_DIR" "$LOG_FULL_DIR" || return 1
+  install_default_site_bundle || return 1
   # While manager-update or its offline rollback runs, the installed copies are
   # theirs: take the update lock for the copy. A lock that cannot be used at all
   # also stops manager-update, so then nothing can overlap.
@@ -3673,6 +4192,7 @@ install_manager_copy() {
     (( rc == 0 )) || break
   done
   (( ! held )) || stage4_release_update_lock
+  (( rc != 0 )) || install_bridge_bundle || rc=$?
   return "$rc"
 }
 
@@ -3945,8 +4465,14 @@ s4_restore_id() {
   tmp2=""
   s4_manager_health "$expected_hash" "$expected_version" || return 1
   trap - RETURN
-  s4_sync_metadata "$expected_version" \
-    || s4_err "MANAGER_VERSION in global.env not updated to $expected_version; 'twebproxy repair' rewrites it"
+  # Complete only when the metadata follows the restored copies. Otherwise the
+  # executables are restored (and healthy) but the outcome is partial: distinct
+  # marker and status 3, never RESTORE_SUCCESS.
+  if ! s4_sync_metadata "$expected_version"; then
+    s4_err "executables restored to $expected_version, but MANAGER_VERSION in $GLOBAL_ENV could not be updated (read-only, immutable or full?); make it writable (e.g. chattr -i $GLOBAL_ENV) and run 'twebproxy repair <hostname>'"
+    printf 'RESTORE_PARTIAL backup_id=%s manager_version=%s metadata=stale\n' "$id" "$expected_version"
+    return 3
+  fi
   printf 'RESTORE_SUCCESS backup_id=%s manager_version=%s\n' "$id" "$expected_version"
 }
 
@@ -4014,6 +4540,7 @@ s4_prune_verified() {
 }
 
 s4_main() {
+  if [[ "${1:-}" != list && -e /etc/twebproxy/bridge/node.json ]]; then s4_err "Bridge compatibility guard: detach/remove before Manager executable rollback"; return 1; fi
   [[ ${EUID:-$(id -u)} -eq 0 ]] || { s4_err "root required"; return 1; }
   case "${1:-}" in
     list)
@@ -4276,17 +4803,41 @@ manager_backup_list_cmd() {
 }
 
 manager_restore_backup_cmd() {
+  [[ ! -e "$BASE_DIR/bridge/node.json" ]] || die "Remove/detach Bridge before Manager version update/rollback (Gate2 compatibility guard)."
   need_root; banner
   local selector="${1:-latest}"
   stage4_install_restore_helper no || die "Offline rollback helper отсутствует или небезопасен: $UPDATE_RESTORE_HELPER"
+  local question rc=0
   if [[ "$selector" == latest ]]; then
-    yesno "Восстановить самый новый проверенный manager backup?" n || return 0
-    "$UPDATE_RESTORE_HELPER" restore-latest
+    question="Восстановить самый новый проверенный manager backup?"
   else
     [[ "$selector" =~ ^update-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$ ]] || die "Некорректный backup ID."
-    yesno "Восстановить manager из $selector?" n || return 0
-    "$UPDATE_RESTORE_HELPER" restore "$selector"
+    question="Восстановить manager из $selector?"
   fi
+  stage4_confirm_restore "$question" || return $?
+  if [[ "$selector" == latest ]]; then
+    "$UPDATE_RESTORE_HELPER" restore-latest || rc=$?
+  else
+    "$UPDATE_RESTORE_HELPER" restore "$selector" || rc=$?
+  fi
+  (( rc != 3 )) || warn "$(ui_msgf restore_partial_hint "$GLOBAL_ENV" "$GLOBAL_ENV")"
+  return "$rc"
+}
+
+# A declined or unanswerable confirmation restores nothing and is not success:
+# ROLLBACK_NOT_PERFORMED with status 1 (declined) or 130 (input closed).
+stage4_confirm_restore() {
+  local reply=""
+  if ! read -r -p "$(ui_localize_legacy "$1") [y/N]: " reply && [[ -z "$reply" ]]; then
+    printf '\n' >&2
+    warn "$(ui_msg rollback_not_performed_eof)"
+    printf 'ROLLBACK_NOT_PERFORMED reason=eof\n'
+    return 130
+  fi
+  [[ "$reply" =~ ^[YyДд]$ ]] && return 0
+  log "$(ui_msg rollback_not_performed_declined)"
+  printf 'ROLLBACK_NOT_PERFORMED reason=declined\n'
+  return 1
 }
 
 stage4_backup_tui_summary() {
@@ -4557,6 +5108,7 @@ stage4_update_refuse() { # $1=reason $2=message: the update is refused, no manag
 }
 
 manager_update_cmd() {
+  [[ ! -e "$BASE_DIR/bridge/node.json" ]] || die "Remove/detach Bridge before Manager version update/rollback (Gate2 compatibility guard)."
   need_root; banner
   local force=0 pinned="" pinned_given=0 work version tag trust url expected size="" label="" fields commit actual
   local backup_id="" old_hash="" outcome
@@ -4732,8 +5284,11 @@ check_no_legacy_v1() {
 core_install_cmd() {
   need_root; need_systemd; ui_language_ensure_interactive_install; check_platform; banner
   check_no_legacy_v1
+  local site_bundle; site_bundle="$(default_site_bundle_dir)"
+  [[ ! -f "$site_bundle/MANIFEST.json" ]] || default_site_action verify >/dev/null || die "Default site bundle verification failed before installation."
   install_base_deps
   prepare_users_and_dirs
+  proc_hardening_ensure || proc_fail_closed
   stage4_install_restore_helper yes || die "Не удалось установить безопасный offline rollback helper."
   ensure_go
   sync_tproxy_upstream
@@ -4756,6 +5311,14 @@ ensure_core() {
 
 port_registered() {
   local needle="$1" f
+  if [[ -f "$BASE_DIR/bridge/node.json" ]]; then
+    local brc=0
+    python3 -c 'import json,sys
+try:
+ s=json.load(open(sys.argv[1])); used=[s["entry"]["local_port"],s["previous_port"]]; sys.exit(0 if int(sys.argv[2]) in used else 1)
+except Exception:sys.exit(2)' "$BASE_DIR/bridge/node.json" "$needle" || brc=$?
+    case "$brc" in 0) return 0;; 1) ;; *) warn "Bridge allocation state unknown; port allocation blocked." >&2; return 2;; esac
+  fi
   shopt -s nullglob
   # The authoritative profile record counts even when its derived backend env
   # is missing (interrupted commit): such a port is never handed out twice.
@@ -4799,7 +5362,9 @@ port_available() {
   local p rc=0
   is_valid_port "$1" || return 1
   p="$((10#$1))"
-  port_registered "$p" && return 1
+  local registered_rc=0
+  port_registered "$p" || registered_rc=$?
+  case "$registered_rc" in 0) return 1;; 1) ;; *) return 2;; esac
   port_listening "$p" || rc=$?
   case "$rc" in 0) return 1;; 1) return 0;; *) return 2;; esac
 }
@@ -4847,43 +5412,88 @@ carrier_choose() {
   case "$cm" in 1) printf https;; 2) printf https-lanes;; 3) printf websocket;; 4) printf websocket-lanes;; esac
 }
 
-make_unique_placeholder() {
-  local host="$1" d nonce words1 words2
-  d="$(site_dir "$host")"; install -d -m 0755 "$d"
-  nonce="$(openssl rand -hex 8)"
-  words1=("Status" "Service" "Gateway" "Workspace" "Endpoint" "Portal" "Node")
-  words2=("available" "online" "ready" "active" "running")
-  local w1="${words1[RANDOM % ${#words1[@]}]}" w2="${words2[RANDOM % ${#words2[@]}]}"
-  cat > "$d/index.html" <<EOF
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>$w1</title>
-<style>
-html{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f7f8;color:#202124}
-main{max-width:720px;margin:12vh auto;padding:24px}section{background:#fff;padding:28px;border:1px solid #e5e7eb;border-radius:14px}
-h1{font-size:1.8rem;margin:0 0 10px}p{line-height:1.55;color:#4b5563}small{color:#9ca3af}
-</style>
-</head>
-<body><main><section><h1>$w1</h1><p>The service is $w2.</p><small>$nonce</small></section></main></body>
-</html>
-EOF
-  chmod 0644 "$d/index.html"
+# Versioned distribution assets; live per-domain website files are never an update target.
+DEFAULT_SITE_MANIFEST_SHA256="988bf2a45f56d7fc1dd795d1ddaed766e7a5dff44294a96b46352a2b7075efe8"
+default_site_bundle_dir() {
+  local adjacent="$(dirname "${BASH_SOURCE[0]}")/sites/podmoskovye"
+  if [[ -f "$adjacent/MANIFEST.json" ]]; then printf '%s' "$adjacent"; else printf '%s/default-site-%s' "$PROJECT_DIR" "$DEFAULT_SITE_MANIFEST_SHA256"; fi
+}
+default_site_action() { # verify | install | deploy; target is an owned cache/new site
+  local op="$1" target="${2:-}" bundle
+  bundle="$(default_site_bundle_dir)"
+  python3 - "$bundle" "$DEFAULT_SITE_MANIFEST_SHA256" "$op" "$target" <<'PY_SITE'
+import hashlib,json,os,shutil,sys,tempfile
+from pathlib import Path
+root=Path(sys.argv[1]);expected,op=sys.argv[2:4];target=Path(sys.argv[4]) if sys.argv[4] else None
+try:
+ if root.is_symlink():raise ValueError('site bundle symlink refused')
+ raw=(root/'MANIFEST.json').read_bytes()
+ if hashlib.sha256(raw).hexdigest()!=expected:raise ValueError('default website manifest mismatch')
+ records=json.loads(raw)
+ def verify(base):
+  files=set()
+  for p in base.rglob('*'):
+   if p.is_symlink():raise ValueError('site bundle symlink refused')
+   if p.is_file():files.add(str(p.relative_to(base)))
+  if files!=set(records)|{'MANIFEST.json'}:raise ValueError('unmanifested default website component')
+  for name,sha in records.items():
+   if Path(name).is_absolute() or '..' in Path(name).parts:raise ValueError('unsafe website path')
+   if hashlib.sha256((base/name).read_bytes()).hexdigest()!=sha:raise ValueError('default website component digest mismatch: '+name)
+ verify(root)
+ if op=='verify':print(json.dumps({'verified':True,'bundle_sha256':expected}));sys.exit(0)
+ if op not in ('install','deploy') or target is None:raise ValueError('invalid site action')
+ if target.is_symlink():raise ValueError('live website symlink refused; files preserved')
+ if target.exists() and any(target.iterdir()):
+  if op=='install':verify(target)
+  elif not (target/'index.html').is_file():raise ValueError('existing nonempty website has no index; files preserved')
+  print(json.dumps({'preserved':True,'bundle_sha256':expected}));sys.exit(0)
+ target.parent.mkdir(parents=True,exist_ok=True,mode=0o755)
+ tmp=Path(tempfile.mkdtemp(prefix='.default-site-',dir=target.parent))
+ try:
+  for name in records:
+   dst=tmp/name;dst.parent.mkdir(parents=True,exist_ok=True,mode=0o755);shutil.copyfile(root/name,dst);dst.chmod(0o644)
+  if op=='install':shutil.copyfile(root/'MANIFEST.json',tmp/'MANIFEST.json');(tmp/'MANIFEST.json').chmod(0o644)
+  tmp.chmod(0o755)
+  for d in tmp.rglob('*'):
+   if d.is_dir():d.chmod(0o755)
+  # A concurrent nonempty target makes rename fail; it is never removed.
+  os.rename(tmp,target)
+ finally:
+  if tmp.exists():shutil.rmtree(tmp)
+ print(json.dumps({'deployed':True,'schema':'twebproxy.default-site.v1','bundle_sha256':expected,'files':records}))
+except Exception as e:
+ print('Default website: '+str(e),file=sys.stderr);sys.exit(1)
+PY_SITE
+}
+install_default_site_bundle() {
+  local bundle; bundle="$(default_site_bundle_dir)"
+  [[ -f "$bundle/MANIFEST.json" ]] || return 0 # custom-site single-file installs stay supported
+  default_site_action install "$PROJECT_DIR/default-site-$DEFAULT_SITE_MANIFEST_SHA256" >/dev/null
+}
+make_unique_placeholder() { # compatibility name for old SITE_MODE=placeholder records
+  local host="$1" result
+  result="$(default_site_action deploy "$(site_dir "$host")")" || die "Default website unavailable or changed; use the complete verified Manager distribution. Existing files preserved."
+  if [[ "$result" == *'"deployed": true'* ]]; then
+    state_write_file "$(instance_dir "$host")/default-site.json" 0600 printf '%s\n' "$result" || return 1
+  fi
 }
 
 prepare_site_for_instance() {
-  local host="$1" d; d="$(site_dir "$host")"
+  local host="$1" d tmp; d="$(site_dir "$host")"
   case "$SITE_MODE" in
-    placeholder)
-      make_unique_placeholder "$host"
-      warn "Автозаглушка пригодна для теста, но для постоянной эксплуатации лучше заменить её своим настоящим сайтом."
-      ;;
+    default|placeholder) make_unique_placeholder "$host" ;;
     directory)
+      if [[ -e "$d" ]]; then
+        [[ -d "$d" && ! -L "$d" && -r "$d/index.html" ]] || die "Existing website preserved; readable index.html required in $d."
+        return 0
+      fi
       [[ -d "$SOURCE_SITE_DIR" && -r "$SOURCE_SITE_DIR/index.html" ]] || die "В $SOURCE_SITE_DIR нет читаемого index.html."
-      install -d -m 0755 "$d"; rm -rf "${d:?}/"*; cp -a "$SOURCE_SITE_DIR/." "$d/"; chown -R root:root "$d"
-      find "$d" -type d -exec chmod 0755 {} +; find "$d" -type f -exec chmod 0644 {} +
+      install -d -m 0755 "${d%/*}"
+      tmp="$(mktemp -d "${d%/*}/.custom-site.XXXXXX")" || return 1
+      if cp -a "$SOURCE_SITE_DIR/." "$tmp/" && chown -R root:root "$tmp" &&
+         find "$tmp" -type d -exec chmod 0755 {} + && find "$tmp" -type f -exec chmod 0644 {} + &&
+         chmod 0755 "$tmp" && mv -T -- "$tmp" "$d"; then :
+      else rm -rf -- "$tmp"; die "Custom website deployment failed; existing files preserved."; fi
       ;;
     upstream)
       [[ "$SITE_UPSTREAM" =~ ^http://(127\.[0-9]+\.[0-9]+\.[0-9]+|\[::1\]):[1-9][0-9]{0,4}$ ]] || die "public_upstream должен быть numeric loopback URL."
@@ -4897,7 +5507,7 @@ write_instance_config() {
   load_instance "$host"
   d="$(instance_dir "$host")"
   case "$SITE_MODE" in
-    placeholder|directory) source_line="\"public_dir\": \"$(site_dir "$host")\"," ;;
+    default|placeholder|directory) source_line="\"public_dir\": \"$(site_dir "$host")\"," ;;
     upstream) source_line="\"public_upstream\": \"$SITE_UPSTREAM\"," ;;
     *) die "Неизвестный SITE_MODE=$SITE_MODE" ;;
   esac
@@ -4996,6 +5606,7 @@ wait_profile_backend_ready() {
 
 start_profile_backend() {
   local host="$1" profile="$2" id; id="$(backend_id "$host" "$profile")"
+  proc_secret_safe || proc_fail_closed
   systemctl reset-failed "twebproxy-mtproxy@$id.service" >/dev/null 2>&1 || true
   systemctl enable --now "twebproxy-mtproxy@$id.service" >/dev/null
   systemctl restart "twebproxy-mtproxy@$id.service"
@@ -5374,6 +5985,7 @@ render_caddy_block() { # $1=host $2=relay port
   cat <<EOF
 # BEGIN TWEBPROXY $1
 $1 {
+$(if [[ -n "${ACME_EMAIL:-}" ]]; then printf '    tls %s {\n        ca https://acme-v02.api.letsencrypt.org/directory\n    }\n' "$ACME_EMAIL"; fi)
     encode zstd gzip
     reverse_proxy 127.0.0.1:$2 {
         transport http {
@@ -5944,7 +6556,7 @@ collect_instance_settings() {
     "$(ui_msg site_placeholder)" "$(ui_msg site_directory)" "$(ui_msg site_upstream)")" || return $?
   SITE_UPSTREAM=""; SOURCE_SITE_DIR=""
   case "$sm" in
-    1) SITE_MODE=placeholder ;;
+    1) SITE_MODE=default ;;
     2) SITE_MODE=directory; SOURCE_SITE_DIR="$(ask 'Путь к каталогу с index.html' '')" ;;
     3) SITE_MODE=upstream; SITE_UPSTREAM="$(ask 'Loopback URL' 'http://127.0.0.1:3000')" ;;
   esac
@@ -5954,7 +6566,7 @@ collect_instance_settings() {
     "$(ui_msg tls_caddy)" "$(ui_msg tls_nginx_le)" "$(ui_msg tls_nginx_custom)" "$(ui_msg tls_manual)")" || return $?
   ACME_EMAIL=""; NGINX_CERT=""; NGINX_KEY=""
   case "$tm" in
-    1) TLS_MODE=caddy ;;
+    1) TLS_MODE=caddy; ACME_EMAIL="$(ask 'Email для Let’s Encrypt' '')"; [[ "$ACME_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] || die "Некорректный email." ;;
     2) TLS_MODE=nginx-le; ACME_EMAIL="$(ask 'Email для Let’s Encrypt' '')"; [[ "$ACME_EMAIL" == *@*.* ]] || die "Некорректный email." ;;
     3) TLS_MODE=nginx-custom; NGINX_CERT="$(ask 'Путь к fullchain.pem' '')"; NGINX_KEY="$(ask 'Путь к privkey.pem' '')" ;;
     4) TLS_MODE=manual ;;
@@ -6032,6 +6644,27 @@ claim_profile_ports() {
   fi
 }
 
+# Caddy obtains its certificate asynchronously after the configuration is
+# loaded, so an audit right after setup can see no valid certificate yet.
+# Bounded wait (TWEBPROXY_CADDY_CERT_WAIT seconds, default 90; 0 disables) for a
+# strictly verified HTTPS handshake; on timeout the audit still runs and reports
+# exactly what it sees.
+caddy_wait_certificate() { # $1=host
+  local host="$1" limit="${TWEBPROXY_CADDY_CERT_WAIT:-90}" deadline
+  [[ "$limit" =~ ^[0-9]{1,4}$ ]] || limit=90
+  (( limit > 0 )) || return 0
+  log "$(ui_msgf caddy_wait_cert "$limit" "$host")"
+  deadline=$((SECONDS + limit))
+  while (( SECONDS < deadline )); do
+    if curl -sS -o /dev/null --proto '=https' --max-time 5 "https://$host/" >/dev/null 2>&1; then
+      ok "$(ui_msgf caddy_wait_cert_ok "$host")"; return 0
+    fi
+    sleep 3
+  done
+  warn "$(ui_msgf caddy_wait_cert_timeout "$host" "$limit" "$host")"
+  return 1
+}
+
 add_instance_cmd() {
   need_root; need_systemd; check_platform; banner; ensure_core
   collect_instance_settings
@@ -6081,6 +6714,9 @@ EOF
     check_dns_for_host "$host" || yesno "DNS пока не совпадает. Продолжить?" n || exit 1
   fi
 
+  # procfs first (v0.2.24): with an unprotected /proc no backend may start, and
+  # failing here leaves no half-created instance behind.
+  proc_hardening_ensure || proc_fail_closed
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
   instance_exists "$host" && die "Инстанс $host уже существует."
   # The leaf port lock is shared by every create path: it also serializes the
@@ -6110,6 +6746,7 @@ EOF
   configure_tls_for_instance "$host"
   configure_ufw
   dpi_with_mutation_lock dpi_repair_all || true
+  [[ "$TLS_MODE" != caddy ]] || caddy_wait_certificate "$host" || true
   if ! audit_instance_impl "$host"; then
     die "Инстанс создан, но isolation audit для $host не пройден."
   fi
@@ -6124,6 +6761,7 @@ repair_instance_cmd() {
   need_root; need_systemd; check_platform; banner; ensure_core
   local host="${1:-}"
   [[ -n "$host" ]] || host="$(select_instance)"
+  if bridge_managed "$host"; then foreign_node_cmd repair; return; fi
   require_instance "$host"
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
   require_unshared_backends "$host"
@@ -6146,11 +6784,14 @@ repair_instance_cmd() {
     die "Backends без профиля у $host не удалось безопасно убрать; их env и защита firewall сохранены."
   rebuild_firewall
   systemctl daemon-reload
+  # Before any backend (re)starts: an unprotected /proc stops them all instead.
+  proc_hardening_ensure || proc_fail_closed
   start_all_backends "$host"
   restart_relay_wait_ready "$host"
   configure_tls_for_instance "$host"
   configure_ufw
   dpi_with_mutation_lock dpi_repair_all || true
+  [[ "${TLS_MODE:-}" != caddy ]] || caddy_wait_certificate "$host" || true
   if ! audit_instance_impl "$host"; then
     die "Runtime восстановлен, но isolation audit для $host не пройден."
   fi
@@ -6164,6 +6805,7 @@ repair_instance_cmd() {
 profile_add_cmd() {
   need_root; ensure_core; banner
   local host="${1:-}" profile count orphan_id; [[ -n "$host" ]] || host="$(select_instance)"
+  bridge_reject_profile_change "$host"
   require_instance "$host"
   count="$(count_profiles "$host")"; (( count < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
   collect_profile_settings "$host" "profile$((count+1))"
@@ -6198,6 +6840,7 @@ profile_delete_cmd() {
   need_root; banner
   local host="${1:-}" profile="${2:-}" prev unit
   [[ -n "$host" ]] || host="$(select_instance)"
+  bridge_reject_profile_change "$host"
   require_instance "$host"
   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
   (( $(count_profiles "$host") > 1 )) || die "Нельзя удалить последний профиль. Удали весь hostname через 'twebproxy delete'."
@@ -6229,6 +6872,7 @@ profile_rotate_cmd() {
   need_root; banner
   local host="${1:-}" profile="${2:-}" new_secret prev
   [[ -n "$host" ]] || host="$(select_instance)"
+  bridge_reject_profile_change "$host"
   require_instance "$host"
   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
   require_profile "$host" "$profile"
@@ -6321,7 +6965,7 @@ profiles_list_cmd() {
     [[ -n "$p" ]] || continue
     load_profile "$host" "$p"
     masked="${SECRET:0:6}…${SECRET: -4}"
-    state="$(systemctl is-active "twebproxy-mtproxy@$(backend_id "$host" "$p").service" 2>/dev/null || true)"
+    state="$(systemctl is-active "$(bridge_runtime_unit "$host" "$p")" 2>/dev/null || true)"
     printf "%-18s %-18s %-16s %-9s %-9s %-12s\n" "$p" "$CARRIER_MODE" "$masked" "$BACKEND_PORT" "$STATS_PORT" "$state"
   done < <(list_profiles_array "$host")
 }
@@ -6440,16 +7084,16 @@ collect_overview() {
     while read -r p; do
       [[ -n "$p" ]] || continue
       load_profile "$host" "$p"
-      state="$(diag_unit_state "twebproxy-mtproxy@$(backend_id "$host" "$p").service")"
+      state="$(diag_unit_state "$(bridge_runtime_unit "$host" "$p")")"
       if [[ "$state" == active ]]; then
         tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd active active \
-          "MTProxy backend service is active" none
+          "$(bridge_backend_label "$host") service is active" none
       elif [[ "$state" == unknown ]]; then
         tcore_add_check "profile.backend.service.active" UNKNOWN warning "profile:$host/$p" systemd unknown active \
           "MTProxy backend service state could not be determined" none
       else
         tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "${state:-unknown}" active \
-          "MTProxy backend service is not active" none
+          "$(bridge_backend_label "$host") service is not active" none
       fi
       tcore_add_check "profile.carrier" OK info "profile:$host/$p" configuration "$CARRIER_MODE" configured \
         "Configured WEB carrier" none
@@ -6488,13 +7132,13 @@ collect_profiles_state() {
       "Profile identity" none
     tcore_add_check "profile.carrier" OK info "profile:$host/$p" configuration "$CARRIER_MODE" configured \
       "Configured WEB carrier" none
-    state="$(systemctl is-active "twebproxy-mtproxy@$(backend_id "$host" "$p").service" 2>/dev/null || true)"
+    state="$(systemctl is-active "$(bridge_runtime_unit "$host" "$p")" 2>/dev/null || true)"
     if [[ "$state" == active ]]; then
       tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd active active \
-        "MTProxy backend service is active" none
+        "$(bridge_backend_label "$host") service is active" none
     else
       tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "${state:-unknown}" active \
-        "MTProxy backend service is not active" none
+        "$(bridge_backend_label "$host") service is not active" none
     fi
     tcore_add_check "profile.backend.port" OK info "profile:$host/$p" configuration "$BACKEND_PORT" configured \
       "MTProxy backend port" none
@@ -6832,6 +7476,7 @@ restart_cmd() {
   need_root; need_systemd; banner
   local host="${1:-}" p
   [[ -n "$host" ]] || host="$(select_instance)"
+  if bridge_managed "$host"; then foreign_node_cmd repair; return; fi
   require_instance "$host"
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
   instance_exists "$host" || die "Нет $host"
@@ -6888,18 +7533,24 @@ collect_status() {
 
   while read -r p; do
     [[ -n "$p" ]] || continue
+    if bridge_managed "$host"; then
+      unit="$(bridge_forward_unit "$host" 2>/dev/null)" || unit=bridge-state-unknown.service
+      tcore_add_check "bridge.mtproto.probe" UNKNOWN warning "profile:$host/$p" bridge unknown "protocol evidence" "MTProto semantic status unavailable" none
+      tcore_add_check "bridge.web.client" UNKNOWN warning "profile:$host/$p" bridge unknown "genuine client evidence" "Genuine Telegram client status unavailable" none
+    else
     unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
+    fi
     state="$(diag_unit_state "$unit")"
     evidence="$(diag_run "$DIAG_TIMEOUT" systemctl --no-pager --full status "$unit" 2>&1 || true)"
     if [[ "$state" == active ]]; then
       tcore_add_check "profile.backend.service.active" OK critical "profile:$host/$p" systemd "$state" active \
-        "MTProxy backend service is active" service "" "$evidence"
+        "$(bridge_backend_label "$host") service is active" service "" "$evidence"
     elif [[ "$state" == unknown ]]; then
       tcore_add_check "profile.backend.service.active" UNKNOWN warning "profile:$host/$p" systemd unknown active \
         "MTProxy backend service state could not be determined" service "" "$evidence"
     else
       tcore_add_check "profile.backend.service.active" ERROR critical "profile:$host/$p" systemd "${state:-unknown}" active \
-        "MTProxy backend service is not active" service "" "$evidence"
+        "$(bridge_backend_label "$host") service is not active" service "" "$evidence"
     fi
   done < <(list_profiles_array "$host")
 
@@ -7148,6 +7799,38 @@ collect_audit() {
       "Backend firewall service or table is missing" warn "AUDIT FAIL: backend firewall service/table отсутствует"
   fi
 
+  local guard_live guard_expected filter_evidence="" filter_rc=0 dc_outside=""
+  guard_expected="$(BF_BACKENDS="$BACKENDS_DIR" backend_fw_collect 2>/dev/null)" || guard_expected="?"
+  if guard_live="$(BF_NFT=nft BF_GUARD="$FW_GUARD_TABLE" fw_guard_live 2>/dev/null)" && [[ "$guard_live" == "$guard_expected" ]]; then
+    tcore_add_check "firewall.guard.owned" OK critical global nftables "owned:${guard_live:-none}" "owned:${guard_expected:-none}" \
+      "Owned guard table covers every backend port" ok "owned guard table inet $FW_GUARD_TABLE covers ${guard_live:-no ports}"
+  else
+    tcore_add_check "firewall.guard.owned" ERROR critical global nftables "${guard_live:-absent}" "owned:${guard_expected:-none}" \
+      "Owned guard table is missing or does not cover the backend ports" warn "AUDIT FAIL: owned guard table inet $FW_GUARD_TABLE: ${guard_live:-absent} (expected ${guard_expected:-none})"
+  fi
+
+  if dc_outside="$(dc_addresses_outside_allowlist)"; then
+    if [[ -z "$dc_outside" ]]; then
+      tcore_add_check "backend.egress.dc_coverage" OK warning global configuration covered covered \
+        "Every MTProxy DC address is inside the backend egress allowlist" none
+    else
+      tcore_add_check "backend.egress.dc_coverage" WARNING warning global configuration "$(paste -sd, <<<"$dc_outside")" covered \
+        "Some MTProxy DC addresses are outside the backend egress allowlist" warn "AUDIT WARN: адреса DC вне allowlist backend (недоступны для MTProxy): $(paste -sd, <<<"$dc_outside"); обновите manager"
+    fi
+  else
+    tcore_add_check "backend.egress.dc_coverage" UNKNOWN warning global configuration unknown covered \
+      "MTProxy routing configuration could not be read" none
+  fi
+
+  case "$(proc_hardening_state)" in
+    hidden) tcore_add_check "procfs.secret.protection" OK critical global procfs "$(proc_hidepid_value)" hidepid \
+      "Other users' processes are hidden" ok "$(ui_msgf proc_status_hidden "$(proc_hidepid_value)")";;
+    disabled) tcore_add_check "procfs.secret.protection" WARNING warning global procfs visible hidepid \
+      "procfs hardening explicitly disabled by the operator" warn "$(ui_msg proc_status_disabled)";;
+    *) tcore_add_check "procfs.secret.protection" ERROR critical global procfs visible hidepid \
+      "MTProxy client secret readable through procfs" warn "$(ui_msg proc_status_exposed)";;
+  esac
+
   if (( $(count_profiles "$host") == 0 )); then
     tcore_add_check "profiles.present" ERROR critical "hostname:$host" state 0 ">=1" \
       "No profiles/backends are configured" warn "AUDIT FAIL: у $host нет profiles/backends"
@@ -7159,6 +7842,16 @@ collect_audit() {
   while read -r p; do
     [[ -n "$p" ]] || continue
     load_profile "$host" "$p"
+    if bridge_managed "$host"; then
+      tcore_add_check "bridge.mtproto.probe" UNKNOWN warning "profile:$host/$p" bridge unavailable "protocol probe" "MTProto semantic probe not executed by isolation audit" warn "Bridge: MTProto/client readiness UNKNOWN; use foreign-node diagnose."
+      tcore_add_check "bridge.web.client" UNKNOWN warning "profile:$host/$p" bridge unavailable "genuine client evidence" "Genuine Telegram client result unavailable" none
+      if port_has_only_loopback_listeners "$BACKEND_PORT"; then
+        tcore_add_check "bridge.forwarder.loopback" OK critical "profile:$host/$p" socket "$BACKEND_PORT" loopback "Bridge forwarder listens on loopback" ok "Bridge loopback listener verified"
+      else
+        tcore_add_check "bridge.forwarder.loopback" ERROR critical "profile:$host/$p" socket absent loopback "Bridge loopback listener absent or exposed" warn "Bridge listener isolation failure"
+      fi
+      continue
+    fi
     unit="twebproxy-mtproxy@$(backend_id "$host" "$p").service"
 
     state="$(diag_unit_state "$unit")"
@@ -7179,6 +7872,18 @@ collect_audit() {
     else
       tcore_add_check "profile.backend.sandbox.af_netlink" WARNING warning "profile:$host/$p" systemd absent present \
         "MTProxy unit does not allow AF_NETLINK" warn "AUDIT WARN: $p unit без AF_NETLINK; запусти repair текущей версией manager"
+    fi
+
+    filter_rc=0; filter_evidence="$(backend_socket_filter_check "$unit" "$BACKEND_PORT")" || filter_rc=$?
+    if (( filter_rc == 0 )); then
+      tcore_add_check "profile.backend.socket_filter" OK critical "profile:$host/$p" systemd "$filter_evidence" enforced \
+        "PID 1 socket filter isolates the backend independently of nftables" ok "$p: socket filter PID 1 (IPAddressDeny=any) активен независимо от nftables"
+    elif (( filter_rc == 2 )); then
+      tcore_add_check "profile.backend.socket_filter" UNKNOWN warning "profile:$host/$p" systemd unknown enforced \
+        "Backend socket filter state could not be determined" warn "AUDIT WARN: состояние socket filter $unit неизвестно (systemd недоступен или не ответил)"
+    else
+      tcore_add_check "profile.backend.socket_filter" ERROR critical "profile:$host/$p" systemd "$filter_evidence" enforced \
+        "Backend socket filter is missing or bypassed" warn "AUDIT FAIL: $p socket filter backend отсутствует или обходится ($filter_evidence); запусти repair текущей версией manager"
     fi
 
     for spec in "backend:$BACKEND_PORT" "stats:$STATS_PORT"; do
@@ -7427,6 +8132,7 @@ delete_instance_cmd() {
   warn "Будет удалён hostname $host, все его secrets/backends и управляемый reverse-proxy block."
   yesno "Удалить $host?" n || exit 0
   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+  bridge_reject_profile_change "$host"
   require_instance "$host"
   require_unshared_backends "$host"
   old_ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
@@ -7528,12 +8234,22 @@ core_uninstall_cmd() {
   local dpi_rc=0
   dpi_with_mutation_lock dpi_full_uninstall || dpi_rc=$?
   (( dpi_rc == DPI_LOCK_BUSY_RC )) && die "$(ui_msg dpi_mutation_busy)"
-  systemctl disable --now twebproxy-refresh-mtproxy.timer twebproxy-firewall.service twebproxy-cert-renew.timer >/dev/null 2>&1 || true
+  # One unit at a time while its file still exists: a single "disable --now A B C"
+  # fails as a whole when one file is missing, leaving active units and dangling
+  # .wants symlinks behind. Stopping the firewall ends the owned guard session.
+  local unit
+  for unit in twebproxy-refresh-mtproxy.timer twebproxy-cert-renew.timer twebproxy-firewall.service; do
+    [[ -e "$SYSTEMD_DIR/$unit" ]] || continue
+    systemctl disable --now "$unit" >/dev/null 2>&1 || systemctl stop "$unit" >/dev/null 2>&1 || true
+  done
+  find "$SYSTEMD_DIR" -xtype l -name 'twebproxy*' -delete 2>/dev/null || true
+  rm -f -- "$SYSTEMD_DIR/nftables.service.d/$FW_NFT_DROPIN"
+  rmdir "$SYSTEMD_DIR/nftables.service.d" 2>/dev/null || true
   if nft list table inet twebproxy_backend >/dev/null 2>&1; then nft delete table inet twebproxy_backend || true; fi
   rm -f "$SYSTEMD_DIR/twebproxy@.service" "$SYSTEMD_DIR/twebproxy-mtproxy@.service" "$SYSTEMD_DIR/twebproxy-firewall.service" "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.service" "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.timer" "$SYSTEMD_DIR/twebproxy-cert-renew.service" "$SYSTEMD_DIR/twebproxy-cert-renew.timer"
   rm -f /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload
   rm -rf "$BASE_DIR" "$TPROXY_SRC" "$MTPROXY_SRC"
-  rm -f "$MTPROXY_BIN" "$LIBEXEC_DIR/run-mtproxy" "$LIBEXEC_DIR/apply-firewall" "$LIBEXEC_DIR/refresh-mtproxy-config"
+  rm -f "$MTPROXY_BIN" "$LIBEXEC_DIR/run-mtproxy" "$LIBEXEC_DIR/apply-firewall" "$LIBEXEC_DIR/firewall-guard" "$LIBEXEC_DIR/backend-start-check" "$LIBEXEC_DIR/refresh-mtproxy-config"
   rm -f "$TPROXY_BIN"
   systemctl daemon-reload
   ok "Core удалён. Manager оставлен: $MANAGER_BIN"
@@ -8802,7 +9518,7 @@ menu_update_recovery() {
       1) manager_check_update_cmd; pause;;
       2) manager_update_cmd; pause;;
       3) manager_backup_list_cmd; pause;;
-      4) manager_restore_backup_cmd latest; pause;;
+      4) manager_restore_backup_cmd latest || true; pause;;
       5) update_cmd; pause;;
       0) return;;
     esac
@@ -8943,7 +9659,7 @@ menu() {
       local c; c="$(menu_choose "$(ui_msg main_menu):" "$(ui_msg exit)" \
         "$(ui_msg connect_telegram)" "$(ui_msg status_stats)" "$(ui_msg instances)" \
         "$(ui_msg profiles)" "$(ui_msg diagnostics_logs)" "$(ui_msg maintenance)" \
-        "$(ui_msg network_compatibility_advanced)" "$(ui_msg settings)")"
+        "$(ui_msg network_compatibility_advanced)" "$(ui_msg settings)" "$(ui_msg foreign_nodes)")"
       case "$c" in
         1) menu_connect;;
         2) menu_status_statistics;;
@@ -8953,6 +9669,7 @@ menu() {
         6) menu_maintenance;;
         7) menu_network_compatibility;;
         8) menu_settings;;
+        9) menu_foreign_nodes;;
         0) exit 0;;
       esac
     else
@@ -8960,8 +9677,8 @@ menu() {
       clear 2>/dev/null || true; banner; echo
       first_run_prerequisites
       local c; c="$(menu_choose "$(ui_msg first_action):" "$(ui_msg exit)" \
-        "$(ui_msg first_quick_setup)" "$(ui_msg first_core_only)")"
-      case "$c" in 1) add_instance_cmd; pause;; 2) core_install_cmd; pause;; 0) exit 0;; esac
+        "$(ui_msg first_quick_setup)" "$(ui_msg first_core_only)" "$(ui_msg foreign_nodes)")"
+      case "$c" in 1) add_instance_cmd; pause;; 2) core_install_cmd; pause;; 3) menu_foreign_nodes;; 0) exit 0;; esac
     fi
   done
 }
@@ -8996,6 +9713,8 @@ Instances:
   cert-status [hostname]
   cert-renew [hostname] [--dry-run|--force]
   audit [hostname] | diagnose [hostname]
+  proc-hardening [status|enable|disable]
+                               hide other users' processes (protects MTProxy secrets)
 
 Optional network compatibility (IPv4; STOCK remains default):
   dpi status [hostname] | dpi list-methods
@@ -9048,6 +9767,8 @@ TWebProxy Manager / основа:
   cert-status [hostname]
   cert-renew [hostname] [--dry-run|--force]
   audit [hostname] | diagnose [hostname]
+  proc-hardening [status|enable|disable]
+                               скрыть процессы других пользователей (защита secrets MTProxy)
 
 Дополнительная совместимость сети (IPv4; по умолчанию STOCK):
   dpi status [hostname] | dpi list-methods
@@ -9064,6 +9785,9 @@ TWebProxy Manager / основа:
                                полевой диагностический архив одной командой
 
 Интерактивный режим:
+  connection-link HOST [PROFILE]  print one private WEB connection link (terminal only)
+  foreign-node add|status|diagnose|repair|remove
+                               автоматическое управление одним зарубежным узлом
   menu                         двуязычный интерфейс по задачам
 
 Флаги вывода можно указывать до или после команды. --json и --raw взаимно
@@ -9071,6 +9795,142 @@ TWebProxy Manager / основа:
 Telegram WEB Proxy всегда использует публичный HTTPS-порт 443.
 EOF
   fi
+}
+
+# Optional Bridge bundle: normal single-file/local installations do not import it.
+BRIDGE_MANIFEST_SHA256="a81f87e252d0682d2daf33b8c1570d20922765e36ccfbe63474429d122ef5148"
+BRIDGE_LAUNCHER_SHA256="22b591b3312a8d62c9c30f1872a128bd45645563820c1f37889c61431c6bc30a"
+bridge_bundle_dir() {
+  local adjacent="$(dirname "${BASH_SOURCE[0]}")/bridge" installed="$PROJECT_DIR/bridge-$BRIDGE_MANIFEST_SHA256"
+  if [[ -f "$adjacent/launcher.py" ]]; then printf '%s' "$adjacent"; else printf '%s' "$installed"; fi
+}
+bridge_launcher() {
+  local bundle; bundle="$(bridge_bundle_dir)"
+  [[ -f "$bundle/launcher.py" && ! -L "$bundle/launcher.py" ]] || die "Bridge release bundle missing; use the complete verified Gate2 release."
+  [[ "$(sha256sum "$bundle/launcher.py" | awk '{print $1}')" == "$BRIDGE_LAUNCHER_SHA256" ]] || die "Bridge launcher digest mismatch."
+  TWEBPROXY_BRIDGE_LANG="$UI_LANGUAGE" TWEBPROXY_MANAGER="${BASH_SOURCE[0]}" /usr/bin/python3 -I "$bundle/launcher.py" "$BRIDGE_MANIFEST_SHA256" "$@"
+}
+install_bridge_bundle() {
+  local bundle; bundle="$(bridge_bundle_dir)"
+  [[ -f "$bundle/launcher.py" ]] || return 0
+  bridge_launcher --install "$PROJECT_DIR/bridge-$BRIDGE_MANIFEST_SHA256"
+}
+bridge_managed() {
+  [[ -e "$(instance_dir "$1")/bridge.json" || -e "$(instance_dir "$1")/bridge.owner" ]]
+}
+bridge_backend_label() {
+  if bridge_managed "$1"; then printf 'Bridge loopback forwarder'; else printf 'MTProxy backend'; fi
+}
+bridge_runtime_unit() {
+  if bridge_managed "$1"; then bridge_forward_unit "$1" 2>/dev/null || printf 'twebproxy-bridge-state-unknown.service'
+  else printf 'twebproxy-mtproxy@%s.service' "$(backend_id "$1" "$2")"; fi
+}
+bridge_forward_unit() {
+  python3 -c 'import json,re,sys
+s=json.load(open(sys.argv[1])); i=s["id"]
+assert s["schema"]=="twebproxy.bridge.instance.v1" and re.fullmatch("[0-9a-f]{32}",i)
+print("twb-"+i[:12]+"-forward.service")' "$(instance_dir "$1")/bridge.json"
+}
+bridge_reject_profile_change() {
+  bridge_managed "$1" && die "Bridge MVP: detach via 'twebproxy foreign-node remove' before adding/deleting/rotating profiles."; return 0
+}
+connection_link_cmd() {
+  need_root
+  local host="${1:-}" profile="${2:-default}"
+  [[ -n "$host" ]] || die "Usage: twebproxy connection-link HOST [PROFILE]"
+  require_instance "$host"; require_profile "$host" "$profile"; load_profile "$host" "$profile"
+  printf 'tg://webproxy?server=%s&secret=%s\n' "$host" "$SECRET"
+}
+foreign_node_cmd() { need_root; if (( $# == 0 )); then menu_foreign_nodes; else bridge_launcher "$@"; fi; }
+bridge_internal_cmd() {
+  need_root
+  local action="${1:-}" host="${2:-}" profile="${3:-}" port="${4:-}" old unit i
+  case "$action" in
+    prepare-runtime)
+      stage4_acquire_update_lock || die "Manager update/restore currently running; Bridge preparation blocked."
+      stage4_install_restore_helper refresh || die "Offline restore compatibility guard installation failed."
+      install_manager_copy
+      stage4_release_update_lock
+      return;;
+    allocate)
+      port_lock_acquire || die "Port allocator busy."
+      next_free_port 24000 27999
+      port_lock_release; return;;
+    inspect)
+      require_instance "$host"
+      local list='[]' p entry
+      while read -r p; do
+        load_profile "$host" "$p"
+        entry="$(jq -cn --arg n "$p" --argjson b "$BACKEND_PORT" '{name:$n,backend_port:$b}')"
+        list="$(jq -c --argjson e "$entry" '.+[$e]' <<< "$list")"
+      done < <(list_profiles_array "$host")
+      jq -cn --argjson p "$list" '{profiles:$p}'; return;;
+    credential)
+      require_instance "$host"; load_profile "$host" "$profile"
+      jq -cn --arg s "$SECRET" '{secret:$s}'; return;;
+    show) show_instance_cmd "$host"; return;;
+  esac
+  require_instance "$host"
+  instance_lock_acquire "$host" || die "Instance mutation busy."
+  case "$action" in
+    activate)
+      is_valid_port "$port" || die "Invalid forward port."
+      load_profile "$host" "$profile"
+      old="$BACKEND_PORT"; BACKEND_PORT="$port"
+      save_profile "$host" "$profile" && rebuild_profiles_json "$host" && validate_instance "$host" || die "Bridge profile commit failed."
+      restart_relay_wait_ready "$host"
+      stop_backend_unit "$(backend_id "$host" "$profile")" || die "Previous local backend could not be stopped."
+      ;;
+    detach)
+      is_valid_port "$port" || die "Invalid prior local port."
+      load_profile "$host" "$profile"
+      if [[ "$BACKEND_PORT" == "$port" && ! -e "$(instance_dir "$host")/bridge.json" ]]; then
+        rm -f "$(instance_dir "$host")/bridge.owner"
+        instance_lock_release; return
+      fi
+      unit="twebproxy-mtproxy@$(backend_id "$host" "$profile").service"
+      proc_secret_safe || proc_fail_closed
+      systemctl enable --now "$unit" >/dev/null
+      for i in {1..15}; do systemctl is-active --quiet "$unit" && port_listening "$port" && break; sleep 1; done
+      systemctl is-active --quiet "$unit" && port_listening "$port" || die "Local recovery backend not ready; mapping retained."
+      BACKEND_PORT="$port"; save_profile "$host" "$profile"
+      rebuild_profiles_json "$host" && validate_instance "$host" || die "Local restore validation failed."
+      restart_relay_wait_ready "$host"
+      rm -f "$(instance_dir "$host")/bridge.json" "$(instance_dir "$host")/bridge.owner"
+      instance_derive_state "$host"; rebuild_firewall
+      ;;
+    refresh) rebuild_profiles_json "$host" && validate_instance "$host"; restart_relay_wait_ready "$host";;
+    *) die "Unknown Bridge internal operation.";;
+  esac
+  instance_lock_release
+}
+foreign_node_menu_run() {
+  # Only the interactive boundary consumes a failure. Keep stderr and the exact
+  # status visible; CLI foreign-node continues to propagate it to the caller.
+  # Isolate explicit die/exit in launcher preflight from the containing menu.
+  local rc
+  if ( foreign_node_cmd "$@" ); then
+    return 0
+  else
+    rc=$?
+    warn "$(ui_msgf foreign_operation_failed "$rc")" >&2
+  fi
+  return 0
+}
+
+menu_foreign_nodes() {
+  local c
+  while true; do
+    c="$(menu_choose "$(ui_msg foreign_nodes)" "$(ui_msg back)" "$(ui_msg foreign_add)" "$(ui_msg status)" "$(ui_msg diagnostics_logs)" "$(ui_msg repair)" "$(ui_msg delete)")"
+    case "$c" in
+      1) foreign_node_menu_run add; pause;;
+      2) foreign_node_menu_run status; pause;;
+      3) foreign_node_menu_run diagnose; pause;;
+      4) foreign_node_menu_run repair; pause;;
+      5) foreign_node_menu_run remove; pause;;
+      0) return;;
+    esac
+  done
 }
 
 main() {
@@ -9098,7 +9958,7 @@ main() {
   cmd="${1:-menu}"; shift || true
 
   if [[ "$OUTPUT_MODE" != human ]]; then
-    case "$cmd" in overview|status|audit|stats|profile-list) ;; *) die "$cmd пока не поддерживает --$OUTPUT_MODE.";; esac
+    case "$cmd" in overview|status|audit|stats|profile-list) ;; foreign-node) case "${1:-}" in status|diagnose) ;; *) die "foreign-node --json supports status/diagnose only.";; esac;; *) die "$cmd пока не поддерживает --$OUTPUT_MODE.";; esac
     # Machine-readable stdout must contain only the selected renderer payload.
     export TWEBPROXY_NO_LOG=1
     disable_colors
@@ -9106,12 +9966,16 @@ main() {
     disable_colors
   fi
 
+  case "$cmd" in foreign-node|bridge-internal|connection-link) export TWEBPROXY_NO_LOG=1;; esac
   setup_logging "$cmd"
   case "$cmd" in
     check-update) manager_check_update_cmd ;;
     manager-update) manager_update_cmd "$@" ;;
     manager-backup-list) manager_backup_list_cmd ;;
-    manager-rollback) manager_restore_backup_cmd "${1:-latest}" ;;
+    manager-rollback) rollback_rc=0; manager_restore_backup_cmd "${1:-latest}" || rollback_rc=$?; exit "$rollback_rc" ;;
+    connection-link) connection_link_cmd "$@" ;;
+    foreign-node) foreign_node_cmd "$@" ;;
+    bridge-internal) bridge_internal_cmd "$@" ;;
     core-install) core_install_cmd ;;
     add) add_instance_cmd ;;
     overview) overview_cmd ;;
@@ -9126,6 +9990,7 @@ main() {
     stats) stats_cmd "${1:-}" "${2:-}" ;;
     diagnose) diagnose_cmd "${1:-}" ;;
     audit) audit_cmd "${1:-}" ;;
+    proc-hardening) proc_hardening_cmd "${1:-status}" ;;
     logs) logs_list_cmd ;;
     logs-tail) logs_tail_cmd "${1:-200}" ;;
     logs-collect) logs_collect_cmd "${1:-}" ;;

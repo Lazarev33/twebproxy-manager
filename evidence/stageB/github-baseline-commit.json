@@ -1,0 +1,35 @@
+{
+  "sha": "b7179106c8937da526ab04713cbee51947593e5e",
+  "node_id": "C_kwDOUBSoqNoAKGI3MTc5MTA2Yzg5MzdkYTUyNmFiMDQ3MTNjYmVlNTE5NDc1OTNlNWU",
+  "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/commits/b7179106c8937da526ab04713cbee51947593e5e",
+  "html_url": "https://github.com/Lazarev33/twebproxy-manager/commit/b7179106c8937da526ab04713cbee51947593e5e",
+  "author": {
+    "name": "Lazarev33",
+    "email": "74478054+Lazarev33@users.noreply.github.com",
+    "date": "2026-08-27T21:21:53Z"
+  },
+  "committer": {
+    "name": "Lazarev33",
+    "email": "74478054+Lazarev33@users.noreply.github.com",
+    "date": "2026-08-27T21:21:53Z"
+  },
+  "tree": {
+    "sha": "6b4ed07435c721f66bdf93db92f27cdd54d3b610",
+    "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/trees/6b4ed07435c721f66bdf93db92f27cdd54d3b610"
+  },
+  "message": "0.2.9",
+  "parents": [
+    {
+      "sha": "bc3316a91a17958f0e9c6b1c5633be00744d7c21",
+      "url": "https://api.github.com/repos/Lazarev33/twebproxy-manager/git/commits/bc3316a91a17958f0e9c6b1c5633be00744d7c21",
+      "html_url": "https://github.com/Lazarev33/twebproxy-manager/commit/bc3316a91a17958f0e9c6b1c5633be00744d7c21"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+  }
+}

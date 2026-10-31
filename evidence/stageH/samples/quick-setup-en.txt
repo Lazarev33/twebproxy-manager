@@ -1,0 +1,67 @@
+gamma.example
+1
+1
+1
+y
+The hostname needs a DNS A record pointing to this server. Telegram WEB Proxy uses HTTPS on port 443; automatic certificates also need port 80.
+WEB Proxy hostname (without https://): Setup type:
+  [1] Quick (recommended): automatic ports, profile "default", new secret, https carrier
+  [2] Advanced: choose ports, profile, secret, carrier and MTProxy limits yourself
+> 
+WEB Proxy uses public HTTPS/443; the client does not specify a port.
+
+The same hostname also serves an ordinary website. A real site or application is better; the placeholder only shows that HTTPS works.
+Regular website on the hostname:
+  [1] Temporary placeholder page (generated; replace it with a real site later)
+  [2] My static website: copy a directory with index.html
+  [3] My web application on this server (loopback URL)
+> SSL / reverse proxy:
+  [1] Caddy — automatic HTTPS certificate (recommended)
+  [2] Nginx + Let's Encrypt (automatic renewal; needs port 80)
+  [3] Nginx + my certificate and key
+  [4] Manual: my web server already serves port 443 (advanced)
+> 
+First profile for gamma.example
+
+Plan:
+  Hostname:       gamma.example
+  Public:         HTTPS/443
+  Relay:          127.0.0.1:18080
+  Admin/metrics:  127.0.0.1:18081
+  TLS:            caddy
+  Site:           placeholder
+  Profile:        default
+  Carrier:        https
+  MTProxy:        :23980 (blocked externally by firewall)
+  MTProxy stats:  :28980 (blocked externally by firewall)
+  Setup:          quick
+  Network mode:   STOCK (default; traffic unchanged)
+Create it? [Y/n]: [!] The generated placeholder is suitable for testing, but replace it with a real website for permanent use.
+[+] Instance gamma.example was created and passed the isolation audit.
+Hostname:              gamma.example
+Public:                https://gamma.example/ (Telegram WEB: fixed port 443)
+Relay:                 127.0.0.1:18080
+Admin/metrics:         127.0.0.1:18081
+TLS:                   caddy
+Site:                  placeholder
+Profiles:              1
+
+Hostname:  gamma.example
+Profile:   default
+Carrier:   https
+Secret:    <secret>
+Link:      https://t.me/webproxy?server=gamma.example&secret=<secret>
+TG link:   tg://webproxy?server=gamma.example&secret=<secret>
+
+
+How to connect Telegram
+  1. Open the Link on the device with Telegram, or send it to yourself in Telegram and tap it; the TG link opens Telegram directly.
+  2. Telegram should offer to add this proxy; accept it. Nothing else (port, protocol) has to be entered: it is all in the link.
+  3. One profile is one secret: give separate users or groups their own profiles, so access can be changed or revoked individually.
+  Client support: a Telegram client with WEB Proxy support is required; this manager does not check client versions. Desktop and mobile clients are verified during pre-release testing.
+  If it does not connect: open https://gamma.example/ in a browser (the certificate must be valid), then run: twebproxy status gamma.example; details: twebproxy diagnose gamma.example
+
+Next steps
+  - Check the state: twebproxy status gamma.example
+  - More users or devices: twebproxy profile-add gamma.example
+  - Only if connections fail on a restrictive network: Network compatibility / Anti-DPI (advanced); see twebproxy dpi list-methods

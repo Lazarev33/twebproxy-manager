@@ -1,0 +1,110 @@
+{
+  "runtime_install": "offline verified wheel extraction; no pip at runtime",
+  "packages": [
+    {
+      "file": "paramiko-5.1.0-py3-none-any.whl",
+      "package": "paramiko",
+      "version": "5.1.0",
+      "sha256": "d9fe6d67a9d0bbf3eb85b051d26ab850b678c02d060f32915b944e5ca6d0d9e1",
+      "origin": "https://pypi.org/project/paramiko/5.1.0/",
+      "license_expression": "LGPL-2.1",
+      "license_metadata": null,
+      "license_files": [
+        "paramiko-5.1.0.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "file": "pynacl-1.6.2-cp38-abi3-manylinux_2_34_x86_64.whl",
+      "package": "PyNaCl",
+      "version": "1.6.2",
+      "sha256": "c8a231e36ec2cab018c4ad4358c386e36eede0319a0c41fed24f840b1dac59f6",
+      "origin": "https://pypi.org/project/PyNaCl/1.6.2/",
+      "license_expression": null,
+      "license_metadata": "Apache-2.0",
+      "license_files": [
+        "pynacl-1.6.2.dist-info/licenses/",
+        "pynacl-1.6.2.dist-info/licenses/LICENSE",
+        "pynacl-1.6.2.dist-info/licenses/licenses/",
+        "pynacl-1.6.2.dist-info/licenses/licenses/LICENSE.libsodium.txt"
+      ]
+    },
+    {
+      "file": "cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "package": "cffi",
+      "version": "2.1.1",
+      "sha256": "c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf",
+      "origin": "https://pypi.org/project/cffi/2.1.1/",
+      "license_expression": "MIT-0",
+      "license_metadata": null,
+      "license_files": [
+        "cffi-2.1.1.dist-info/licenses/",
+        "cffi-2.1.1.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "file": "pycparser-3.12-py3-none-any.whl",
+      "package": "pycparser",
+      "version": "3.12",
+      "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+      "origin": "https://pypi.org/project/pycparser/3.12/",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_files": [
+        "pycparser-3.12.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "file": "invoke-3.0.3-py3-none-any.whl",
+      "package": "invoke",
+      "version": "3.0.3",
+      "sha256": "f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053",
+      "origin": "https://pypi.org/project/invoke/3.0.3/",
+      "license_expression": "BSD-2-Clause",
+      "license_metadata": null,
+      "license_files": [
+        "invoke-3.0.3.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "file": "cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl",
+      "package": "cryptography",
+      "version": "50.0.2",
+      "sha256": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079",
+      "origin": "https://pypi.org/project/cryptography/50.0.2/",
+      "license_expression": "Apache-2.0 OR BSD-3-Clause",
+      "license_metadata": null,
+      "license_files": [
+        "cryptography-50.0.2.dist-info/licenses/",
+        "cryptography-50.0.2.dist-info/licenses/LICENSE",
+        "cryptography-50.0.2.dist-info/licenses/LICENSE.APACHE",
+        "cryptography-50.0.2.dist-info/licenses/LICENSE.BSD"
+      ]
+    },
+    {
+      "file": "bcrypt-5.0.0-cp39-abi3-manylinux_2_34_x86_64.whl",
+      "package": "bcrypt",
+      "version": "5.0.0",
+      "sha256": "611f0a17aa4a25a69362dcc299fda5c8a3d4f160e2abb3831041feb77393a14a",
+      "origin": "https://pypi.org/project/bcrypt/5.0.0/",
+      "license_expression": null,
+      "license_metadata": "Apache-2.0",
+      "license_files": [
+        "bcrypt-5.0.0.dist-info/licenses/",
+        "bcrypt-5.0.0.dist-info/licenses/LICENSE"
+      ]
+    },
+    {
+      "file": "cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "package": "cffi",
+      "version": "2.1.1",
+      "sha256": "b0431303acaea1089ad4b3e9ce4e6518193def1118d4073ca848635ee4ea2e96",
+      "origin": "https://pypi.org/project/cffi/2.1.1/",
+      "license_expression": "MIT-0",
+      "license_metadata": null,
+      "license_files": [
+        "cffi-2.1.1.dist-info/licenses/",
+        "cffi-2.1.1.dist-info/licenses/LICENSE"
+      ]
+    }
+  ]
+}

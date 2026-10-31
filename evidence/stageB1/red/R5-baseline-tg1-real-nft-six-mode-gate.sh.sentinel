@@ -1,0 +1,12 @@
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/probe.nft
+1792515816 nft --version
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/window1152.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/mss88.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/nfqws.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/window1152_nfqws.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/mss88_nfqws.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/window1152.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/mss88.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/nfqws.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/window1152_nfqws.nft
+1792515816 nft -c -f /tmp/tg1-real-nft.zJyVXF/mss88_nfqws.nft

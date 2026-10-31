@@ -1,0 +1,314 @@
+{
+ "units": 2,
+ "ports": [
+  23980,
+  23981,
+  28980,
+  28981
+ ],
+ "control_port": 39998,
+ "quick": true,
+ "final_recovered": true,
+ "sample_count": 24006,
+ "backend_sample_count": 12941,
+ "control_open_count": 11026,
+ "backend_open_count": 224,
+ "backend_status_counts": {
+  "TIMEOUT": 6759,
+  "OPEN": 224,
+  "ERR111": 5958
+ },
+ "scenarios": [
+  {
+   "name": "normal-nftables-start",
+   "start_mono_ns": 135088362201576,
+   "end_mono_ns": 135091585151322,
+   "kill": null,
+   "concurrent": [
+    "start"
+   ],
+   "recovered": true,
+   "backend_samples": 304,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-nftables-reload",
+   "start_mono_ns": 135091721192329,
+   "end_mono_ns": 135094850316751,
+   "kill": null,
+   "concurrent": [
+    "reload"
+   ],
+   "recovered": true,
+   "backend_samples": 292,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-nftables-restart",
+   "start_mono_ns": 135095041403672,
+   "end_mono_ns": 135098461683522,
+   "kill": null,
+   "concurrent": [
+    "restart"
+   ],
+   "recovered": true,
+   "backend_samples": 320,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-nftables-stop",
+   "start_mono_ns": 135098625643085,
+   "end_mono_ns": 135101945015366,
+   "kill": null,
+   "concurrent": [
+    "stop"
+   ],
+   "recovered": true,
+   "backend_samples": 312,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-firewall-restart",
+   "start_mono_ns": 135102113037345,
+   "end_mono_ns": 135105534119724,
+   "kill": null,
+   "concurrent": [
+    "restart"
+   ],
+   "recovered": true,
+   "backend_samples": 324,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-firewall-reload",
+   "start_mono_ns": 135105632317095,
+   "end_mono_ns": 135108950734776,
+   "kill": null,
+   "concurrent": [
+    "reload"
+   ],
+   "recovered": true,
+   "backend_samples": 312,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-firewall-stop",
+   "start_mono_ns": 135109104522207,
+   "end_mono_ns": 135112264723964,
+   "kill": null,
+   "concurrent": [
+    "stop"
+   ],
+   "recovered": null,
+   "backend_samples": 300,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-firewall-start",
+   "start_mono_ns": 135112308874520,
+   "end_mono_ns": 135115677534712,
+   "kill": null,
+   "concurrent": [
+    "start"
+   ],
+   "recovered": true,
+   "backend_samples": 316,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-daemon-reload",
+   "start_mono_ns": 135115793516670,
+   "end_mono_ns": 135119273653684,
+   "kill": null,
+   "concurrent": [
+    "daemon-reload"
+   ],
+   "recovered": true,
+   "backend_samples": 328,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-backend-restarts",
+   "start_mono_ns": 135119436853071,
+   "end_mono_ns": 135122654701171,
+   "kill": null,
+   "concurrent": [
+    "backend-restart-0",
+    "backend-restart-1"
+   ],
+   "recovered": true,
+   "backend_samples": 300,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "normal-foreign-flush",
+   "start_mono_ns": 135122811780124,
+   "end_mono_ns": 135125997457550,
+   "kill": null,
+   "concurrent": [
+    "foreign-flush"
+   ],
+   "recovered": true,
+   "backend_samples": 300,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "child-kill+nft-restart-1",
+   "start_mono_ns": 135126231087445,
+   "end_mono_ns": 135132020119793,
+   "kill": "child",
+   "concurrent": [
+    "nftables-restart"
+   ],
+   "recovered": true,
+   "backend_samples": 584,
+   "backend_open": 16,
+   "open_by_port": {
+    "23981": 8,
+    "23980": 8
+   },
+   "first_open_mono_ns": 135126404238008,
+   "last_open_mono_ns": 135126457623517
+  },
+  {
+   "name": "child-kill+nft-restart+backend-restarts-1",
+   "start_mono_ns": 135132187305294,
+   "end_mono_ns": 135138388422960,
+   "kill": "child",
+   "concurrent": [
+    "nftables-restart",
+    "backend-restart-0",
+    "backend-restart-1"
+   ],
+   "recovered": true,
+   "backend_samples": 694,
+   "backend_open": 23,
+   "open_by_port": {
+    "23981": 12,
+    "23980": 11
+   },
+   "first_open_mono_ns": 135132554619898,
+   "last_open_mono_ns": 135132640883212
+  },
+  {
+   "name": "child-kill+foreign-flush-1",
+   "start_mono_ns": 135138683456030,
+   "end_mono_ns": 135145451741988,
+   "kill": "child",
+   "concurrent": [
+    "foreign-flush"
+   ],
+   "recovered": true,
+   "backend_samples": 3194,
+   "backend_open": 185,
+   "open_by_port": {
+    "23981": 93,
+    "23980": 92
+   },
+   "first_open_mono_ns": 135139002661012,
+   "last_open_mono_ns": 135139699281511
+  },
+  {
+   "name": "shell-kill+nft-restart-1",
+   "start_mono_ns": 135145590721029,
+   "end_mono_ns": 135151517250514,
+   "kill": "shell",
+   "concurrent": [
+    "nftables-restart"
+   ],
+   "recovered": true,
+   "backend_samples": 598,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "shell-kill+foreign-flush+backend-restarts",
+   "start_mono_ns": 135151663346279,
+   "end_mono_ns": 135160211604330,
+   "kill": "shell",
+   "concurrent": [
+    "foreign-flush",
+    "backend-restart-0",
+    "backend-restart-1"
+   ],
+   "recovered": true,
+   "backend_samples": 3063,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "concurrent-fw+nft+backend+daemon-reload-1",
+   "start_mono_ns": 135160369239939,
+   "end_mono_ns": 135164660530939,
+   "kill": null,
+   "concurrent": [
+    "firewall-restart",
+    "nftables-restart",
+    "daemon-reload",
+    "backend-restart-0",
+    "backend-restart-1"
+   ],
+   "recovered": true,
+   "backend_samples": 460,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  },
+  {
+   "name": "child-kill+firewall-restart+flush",
+   "start_mono_ns": 135164835730177,
+   "end_mono_ns": 135168309882918,
+   "kill": "child",
+   "concurrent": [
+    "firewall-restart",
+    "foreign-flush"
+   ],
+   "recovered": true,
+   "backend_samples": 353,
+   "backend_open": 0,
+   "open_by_port": {},
+   "first_open_mono_ns": null,
+   "last_open_mono_ns": null
+  }
+ ],
+ "all_recovered": true,
+ "verdict": "RED"
+}

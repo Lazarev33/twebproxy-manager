@@ -1,0 +1,1450 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 247c6cb..607ca59 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,33 @@
+ # Changelog
+ 
++## 0.2.21-beta — 2026-10-28 — Stage G: усиление безопасности
++
++- Исправлены два P1, воспроизведённые на реальном Linux при проверке Stage F:
++  - проверка работоспособности кандидата больше не зависает, если его
++    потомок держит stdout открытым: вывод пишется в файл ограниченного
++    размера (4 MiB), а не в канал, группа процессов проверки завершается
++    после каждой проверки, ограничение 15/20 с + 5 с соблюдается; неудачная
++    проверка приводит к честному откату;
++  - блокировку обновления держит только сам менеджер: `curl`, проверки и
++    вспомогательные вызовы не наследуют её дескриптор (кроме офлайн-помощника
++    во время отката); после SIGKILL менеджера блокировка свободна сразу, а не
++    после завершения оставшегося `curl`.
++- Let's Encrypt (Nginx): если `/var/lib/twebproxy` уже существует с правами
++  0700 (создан старым механизмом обновления), к нему добавляется только право
++  прохода (0711), чтобы веб-сервер читал ACME webroot; `cert-renew` исправляет
++  это тоже; чтение и запись не добавляются, символические ссылки не меняются.
++- Офлайн-откат (`restore-update-backup`) приводит `MANAGER_VERSION` в
++  `global.env` к восстановленной версии (меняется только эта строка, файл
++  заменяется атомарно; символическая ссылка не используется).
++- `restart`, `cert-renew`, `dpi set|disable` и `field-report` проверяют
++  hostname до того, как имя попадает в пути (раньше имена вида
++  `alpha.example/.` проходили проверку существования).
++- Формат резервных копий, CLI, JSON/raw, RU/EN, политика доверия Stage F
++  (подписанный манифест или `--sha256`) не изменены. Затронуты функции
++  обновления Stage 4/F (хэши в отчёте Stage G), `configure_nginx_le`,
++  `cert_renew_cmd` и проверки hostname. Статус: G завершён по тестам
++  разработки (модели и реальные процессы в песочнице); следующий этап — H (UX).
++
+ ## 0.2.20-beta — 2026-10-28 — Stage F: обновление менеджера и supply chain
+ 
+ - Источник обновлений:
+diff --git a/README.md b/README.md
+index e7543d1..31db780 100644
+--- a/README.md
++++ b/README.md
+@@ -7,13 +7,17 @@
+ 
+ ## Статус разработки
+ 
+-**Последний независимо принятый checkpoint: Stage E — v0.2.19-beta.**
+-В Stage E исправлена обработка EOF в меню и подтверждениях, ограничено ожидание
+-в read-only диагностике, добавлены достоверные UNKNOWN/INCOMPLETE статусы и
+-повторное скрытие секретов при сборке безопасных журналов.
+-**Stage F — Updater & Supply Chain (v0.2.20-beta): разработка завершена по
+-модельным тестам, ожидает независимой проверки.** После принятия F следующий
+-этап — **Stage G — Security Hardening**.
++**Последний принятый checkpoint разработки: Stage F — v0.2.20-beta (с backlog).**
++Независимая кампания на disposable Ubuntu 24.04.5 подтвердила реальные обновление
++с operator-pinned SHA-256, backup, offline rollback, `flock`, SIGTERM/SIGKILL,
++ENOSPC и systemd: **24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (P1)**.
++Найдены два воспроизводимых P1: неограниченное ожидание health-check из-за дочернего
++stdout и наследование update-lock дочерним `curl` после SIGKILL родителя.
++**Stage G — Security Hardening (v0.2.21-beta): разработка завершена, ожидает
++независимой проверки.** Оба P1 исправлены. После принятия G следующий этап —
++**Stage H — UX**.
++Реальное подписание GitHub releases, full CLI на live-путях и production release
++ещё не проверены.
+ 
+ | Ветка / артефакт | Состояние |
+ | --- | --- |
+@@ -21,7 +25,8 @@
+ | C2 `v0.2.17-beta` | Development accepted; входит в историю Stage D |
+ | D `v0.2.18-beta` | **Development accepted** (модели 122/122, регрессии C2 100/100); проверенный единый ZIP и Git bundle, но полное дерево кода ещё не загружено в GitHub |
+ | E `v0.2.19-beta` | **Development accepted** (независимые 48/48 модельных проверок; цельный ZIP, Git bundle; исходники ещё не загружены в GitHub) |
+-| F `v0.2.20-beta` | **Development complete** (модельные тесты; ожидает независимой проверки). `manager-update` ставит только опубликованный стабильный GitHub Release с подписанным манифестом (закреплённый Ed25519-ключ) или с `--sha256` из независимого источника; ключ ещё не создан, поэтому автообновление отключено (fail closed) — см. [docs/UPDATES.md](docs/UPDATES.md) |
++| F `v0.2.20-beta` | **Development accepted with backlog**: 24 реальных PASS / 2 P1 FAIL, 4 модельных набора PASS; исходники в проверенном ZIP/Git bundle, GitHub-ветка ещё не опубликована |
++| G `v0.2.21-beta` | **Development complete** (ожидает независимой проверки): оба P1 исправлены — health-check ограничен и при потомках, держащих stdout; update-lock не наследуется дочерними процессами (RED на F, GREEN на G, включая реальный curl/TLS и SIGKILL родителя); ACME webroot доступен веб-серверу при `/var/lib/twebproxy` 0700; `global.env` после офлайн-отката; проверка hostname в изменяющих командах |
+ 
+ **Внимание:** development accepted не означает production-ready. Для RC
+ по-прежнему нужны независимые испытания на disposable Linux VM, включая
+diff --git a/VERSION b/VERSION
+index 3bfb9a4..599028f 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.20
++0.2.21
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index e29f770..355a666 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -27,9 +27,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay binary update, readiness checks, rollback and concurrency controls; separate checked ZIP, not yet uploaded as GitHub source branch |
+ | v0.2.18 Stage D | **Development accepted (model gates)** | Independent ZIP verification, Stage D 122/122 and C2 100/100; real Caddy/Nginx/systemd/ACME gates remain for RC; source still pending GitHub upload |
+ | v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
+-| v0.2.20 Stage F | **Development complete (model gates), pending independent acceptance** | Stable-release-only update source, signed-manifest / operator-pinned SHA-256 trust (fails closed: no signing key exists yet, see `docs/UPDATES.md`), bounded and released update lock, interruption-safe install with verified rollback; source pending GitHub branch publication |
++| v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
++| v0.2.21 Stage G | **Development complete (pending independent acceptance)** | Both Stage F P1 failures fixed and shown RED on v0.2.20 / GREEN on v0.2.21 with real processes, locks, curl/TLS and parent-only SIGKILL in sandboxes: health probes bounded even with stdout-holding descendants (file capture, process-group cleanup), update lock no longer inherited by curl/helper children; ACME webroot traversal with a pre-existing 0700 `/var/lib/twebproxy`; `global.env` version follows an offline restore; hostname validation in mutating commands; GitHub source branch still not published |
+ 
+-**Current development stage: F — updater / supply chain (development complete, awaiting independent acceptance).** Stage E is independently development-accepted, not a production release. Stage G — security hardening — follows F.
++**Current development stage: G — security hardening (development complete, awaiting independent acceptance).** Stage F passed independent model and real-host integration checks with two P1 failures, which Stage G fixes. Nothing is production-ready. Stage H — UX — follows G.
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+@@ -45,17 +46,23 @@ All development checkpoints are **not authorized for production deployment**. Th
+ - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
+ - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
+ 
+-## Immediate work: Stage F — updater / supply chain
++## Immediate work: Stage G — security hardening
+ 
+-Stage E (`v0.2.19-beta`) is **DEVELOPMENT_ACCEPTED**. Independent verification: Stage E 48/48 PASS, project SHA-256 manifests and bundled Git tree matched, Stage 4 protected hash unchanged, and scope 358 unchanged / 34 modified / 8 added. Real TTY, systemd, nftables, TLS and related lab gates are still mandatory before RC.
++Stage F (`v0.2.20-beta`) is **DEVELOPMENT_ACCEPTED_WITH_BACKLOG**, not an RC or production release. A disposable Ubuntu 24.04.5 host ran the real Stage F update function with dedicated root-owned paths and localhost TLS: 24 real-host passes, 2 real-host failures (P1), 4 model suite passes, 3 unexecuted lab/real release scenarios. Observed success: operator-pinned trusted update, backup, offline rollback, concurrency, SIGTERM/SIGKILL recovery, true ENOSPC and actual systemd relay lifecycle. The running v0.2.9 host binaries were preserved.
+ 
+-Stage F (`v0.2.20-beta`) is **DEVELOPMENT_COMPLETE on model gates and awaits independent acceptance**. Automatic manager updates now fail closed until the project creates a release-signing key and publishes signed release manifests (`docs/UPDATES.md`). Scope: explicitly authorized modifications to the old Stage 4 *manager self-updater only*, update lock lifecycle/cleanup, trustworthy release provenance and artifact verification (signatures or secure pinned identities), reliable rollback to the preceding installed version with bounded post-update checks and truthful failure reporting. Keep operation-local backup → update → health → rollback; do not revive rejected Stage 3 advanced recovery. Do not rework relay updates or unrelated subsystem lifecycles.
++**Confirmed P1 findings to address early in G:**
++1. `s4_manager_health`: a descendant retaining stdout can outlive the intended timeout; updater lock remains held.
++2. `curl` inherits updater lock FD 9; after parent-only SIGKILL, a blocked child retains the lock until it exits.
+ 
+-Stage F changes may alter the previously protected Stage 4 function hash, but MUST document the before/after hashes, the exact updater-function scope, and specific RED/GREEN and regressions. No production deployment, no unreviewed merge/release.
++**P2 backlog:** offline restore of both old executables can leave `global.env` version metadata showing the newer version; verify and correct coherently when relevant. Review the conditional ACME directory traversal issue recorded in Stage F DEFERRED.md.
+ 
+-Acceptance: tested self-update success/failure/rollback and lock release, independent model verification, no known reproducible critical blocker, versioned complete single ZIP and honest NOT_EXECUTED lab gates. After acceptance proceed to Stage G — hardening; do not treat a development checkpoint as production-ready.
++Stage G scope: privilege/permissions boundaries, controlled input validation and path ownership, safe resource limits, updater child-process/FD cleanup, and regression tests. Prioritize confirmed exploit/failure paths rather than an unrestricted audit or redesign. Preserve the simple operation-local backup → verified update → health → rollback workflow. No resurrection of advanced Stage 3 recovery.
+ 
+-The GitHub `main` source still contains `v0.2.9`. The accepted Stage D/E source commits (`d3bf510`, `a3a2bf4`) are carried in the verified Stage E Git bundle and are **not yet published as source branches**. Updating README/ROADMAP does not publish source; publication must be verified separately.
++Still NOT_EXECUTED: actual signed immutable GitHub release publication (no owner-pinned signing key/release), full CLI update on live default manager paths, and loop-device ENOSPC (tmpfs ENOSPC already verified). Before production RC, complete separately justified acceptance gates and signed-release trust bootstrap.
++
++GitHub `main` continues to expose the older `v0.2.9` source baseline. The accepted Stage D/E/F Git commits are retained in `handoff/history.bundle` from the Stage F all-in-one ZIP, **not yet published to separate GitHub source branches**. Updating README and ROADMAP is not source publication. Do not overwrite `main` or call a development acceptance a release.
++
++Stage G (`v0.2.21-beta`) is implemented and awaits independent acceptance; real-VM gates (ENOSPC, immutable files, live systemd/installed paths, real GitHub releases) remain for the reviewer's disposable host. After Stage G is accepted, move to Stage H — UX.
+ 
+ ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
+ 
+diff --git a/docs/SECURITY.md b/docs/SECURITY.md
+index bdb416b..81b4b99 100644
+--- a/docs/SECURITY.md
++++ b/docs/SECURITY.md
+@@ -42,3 +42,7 @@ For Manual mode, forward the complete hostname to `tproxy-server`; splitting spe
+ 
+ Installation replaces both manager copies atomically under the update lock, with signals deferred until a verified outcome: success, unchanged, or rollback to the verified backup (also restorable offline with `/usr/local/libexec/twebproxy/restore-update-backup`). Policy, result lines and the release-publishing requirements: [UPDATES.md](UPDATES.md).
+ 
++Stage G: health probes are bounded even when a candidate leaves a process holding stdout (file capture, process-group cleanup), and the update lock is held only by the updater (and by the offline helper during a rollback), so a killed updater never leaves it with a surviving `curl`. Mutating commands that take a hostname (`restart`, `cert-renew`, `dpi set|disable`, `field-report`) validate it before it reaches any path.
++
++Known limitation (stock MTProxy): the client secret is passed to `mtproto-proxy` with `-S` and is therefore visible in `/proc/<pid>/cmdline` to local users of the host. Run the proxy on a host without untrusted local accounts, or mount `/proc` with `hidepid=2`.
++
+diff --git a/docs/UPDATES.md b/docs/UPDATES.md
+index fbbd6e1..71dc141 100644
+--- a/docs/UPDATES.md
++++ b/docs/UPDATES.md
+@@ -38,9 +38,11 @@ v0.2.20 (Stage F) on. The relay update (`twebproxy update`) is unrelated.
+    offline rollback or manager-copy synchronisation is waited for at most
+    `TWEBPROXY_UPDATE_LOCK_WAIT` seconds (default 30), then the update is refused.
+    The kernel releases the lock with its holder; the lock file is never
+-   deleted. The lock is released on every return (also inside the TUI) and is
+-   never inherited by health probes, so a process left behind by a candidate
+-   cannot block later updates.
++   deleted. The lock is released on every return (also inside the TUI). Only
++   the updater holds it: no child inherits the lock descriptor (curl, health
++   probes, helper checks) except the offline helper during a rollback, which
++   restores under it. If the updater dies, even by SIGKILL during a download,
++   the lock is free at once (Stage G).
+ 3. Private staging `/var/lib/twebproxy/update-staging` (root, 0700). Staging and
+    install temp files left by a killed update are removed here, under the lock.
+ 4. The offline restore helper is verified and refreshed to the running
+@@ -67,7 +69,10 @@ v0.2.20 (Stage F) on. The relay update (`twebproxy update`) is unrelated.
+ 9. Verified pre-update backup (format `twebproxy.update-backup.v1`, unchanged).
+ 10. Both copies are installed (each by an atomic rename) and the bounded health
+     gate runs (`--help`, `--json overview`; 15/20 s, SIGKILL 5 s later, no stdin,
+-    no lock descriptor). From the first copy until a verified outcome, SIGINT,
++    no lock descriptor). Probe output goes to a size-capped file (4 MiB), not a
++    pipe, and the probe's process group is killed after each probe, so a
++    descendant that keeps stdout open cannot extend the gate (Stage G). From
++    the first copy until a verified outcome, SIGINT,
+     SIGTERM, SIGHUP and SIGPIPE are ignored, so an interruption cannot leave the
+     copies mixed. SIGKILL or power loss can; see Recovery.
+ 11. Result lines:
+@@ -141,6 +146,8 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
+   different: run the offline helper,
+   `/usr/local/libexec/twebproxy/restore-update-backup restore-latest` (or
+   `restore <id>`). It needs no network and does not use the installed manager.
++  It also sets `MANAGER_VERSION` in `global.env` to the restored version (only
++  that line; a symlinked or unsafe `global.env` is left alone and reported).
+   The next `manager-update` then works again; it removes the stale staging and
+   temp files itself.
+ - A busy lock after a crash cannot happen (flock); a lock file with a wrong
+@@ -155,5 +162,8 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
+   key must be installed out of band.
+ - A running TUI keeps executing the old in-memory code after a successful
+   update; restart `twebproxy`.
+-- Model-tested only (`tests/stagef`); the real-host gates are reported as
+-  NOT_EXECUTED in the Stage F report.
++- A probe descendant that leaves the probe's process group (for example with
++  `setsid`) is not killed; it can no longer hold the update or the lock.
++- Tested with models (`tests/stagef`, `tests/stageg`) and with real processes,
++  locks and curl/TLS in sandboxes (`tests/stageg/real-process-oracle.py`); the
++  real-VM gates are listed in the Stage G report.
+diff --git a/tests/stageg/README.md b/tests/stageg/README.md
+new file mode 100644
+index 0000000..db1b661
+--- /dev/null
++++ b/tests/stageg/README.md
+@@ -0,0 +1,29 @@
++# Stage G verification
++
++Security hardening. The two P1 defects that the independent Stage F campaign
++reproduced on real Linux, plus the narrow items approved for Stage G:
++
++| Check | What it proves | Evidence class |
++|---|---|---|
++| `process-fixture.sh` G1 | a health probe whose descendant keeps stdout open cannot extend the update or its lock; leftover probe processes are killed; a hanging probe still ends in a verified rollback | real updater, helper, pipes, flock, `/proc`; candidates and GitHub are models |
++| `process-fixture.sh` G2 | only the updater holds the update lock during release query, download and health gate; a parent-only SIGKILL frees it at once; the rollback helper (the one child that needs it) keeps it | as above |
++| `process-fixture.sh` G3 | an offline restore sets `MANAGER_VERSION` in `global.env` to the restored version, other lines byte-identical; a symlinked `global.env` is not written through | as above |
++| `real-process-oracle.py` A–C | G1/G2 with the real manager CLI (main, logging, dispatch), a candidate built from the real manager, real curl and TLS against a loopback-only server, real flock/signals/`/proc` | REAL processes in sandboxes; path constants and release URLs of the test artifacts are rewritten into the sandbox |
++| `acme-webroot-fixture.sh` G4 | with a pre-existing 0700 `/var/lib/twebproxy`, Nginx LE issuance and `cert-renew` leave the webroot readable by `www-data` (kernel check via `setpriv`); only search permission is added; a symlinked parent is not changed | real permission check; Nginx/certbot/systemd are Stage D models |
++| `input-validation-fixture.sh` G5 | `restart`, `cert-renew`, `dpi set`, `dpi disable` and `field-report` refuse path-like or mixed-case hostnames before any path is touched | Stage E models |
++
++```sh
++bash tests/stageg/run-stage-g-suite.sh                 # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stageg/process-fixture.sh [<manager>] [<case regex>]
++bash tests/stageg/real-process-oracle.sh [<manager>] [A|B|C ...]
++bash tests/stageg/acme-webroot-fixture.sh [<manager>]
++bash tests/stageg/input-validation-fixture.sh [<manager>]
++bash tests/stageg/g-scope-invariants.sh <v0.2.20 source tree>
++```
++
++All of them need root (sandboxed `chown`, `flock`, `setpriv`) and touch only
++their temporary directories; the oracle's TLS server listens on 127.0.0.1.
++
++Not proven here (disposable VM gates): ENOSPC and immutable files on a real
++filesystem, live systemd units and the real installed paths, SSH loss and
++power loss, a real GitHub release with a signed manifest.
+diff --git a/tests/stageg/acme-webroot-fixture.sh b/tests/stageg/acme-webroot-fixture.sh
+new file mode 100755
+index 0000000..d4b0454
+--- /dev/null
++++ b/tests/stageg/acme-webroot-fixture.sh
+@@ -0,0 +1,84 @@
++#!/usr/bin/env bash
++# Stage G regression: the Nginx Let's Encrypt webroot stays traversable for the
++# web server when /var/lib/twebproxy already exists with mode 0700 (created that
++# way by the Stage 4 updater of v0.2.8-0.2.19 before Nginx LE was configured;
++# Stage F DEFERRED item 1).
++#
++# The real configure_tls_for_instance -> configure_nginx_le code runs in the
++# Stage D frontend harness (Nginx/certbot/systemd are models there); the
++# decisive observation is real: the kernel decides whether the web server user
++# (www-data, uid 33, as on Debian/Ubuntu) can read a challenge file, checked with
++# setpriv. Needs root; nothing outside the temporary directory is touched.
++#
++# Usage: acme-webroot-fixture.sh [path/to/twebproxy-manager.sh]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'NOT_EXECUTED acme-webroot-fixture: needs root'; exit 77; }
++command -v setpriv >/dev/null 2>&1 || { echo 'NOT_EXECUTED acme-webroot-fixture: setpriv missing'; exit 77; }
++WEB_UID="$(id -u www-data 2>/dev/null || echo 33)"; WEB_GID="$(id -g www-data 2>/dev/null || echo 33)"
++TMP="$(mktemp -d /tmp/twebproxy-g-acme.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; [[ -n "${KEEP_G_TMP:-}" ]] || rm -rf -- "$TMP"' EXIT
++chmod 0711 "$TMP"                     # the test root itself must be traversable for www-data
++source "$ROOT/tests/staged/frontend-harness.sh"
++d_harness
++export TWEBPROXY_RELAY_READY_WAIT=3
++pass=0; fail=0
++check() { local name="$1"; shift; if "$@"; then printf 'PASS %s\n' "$name"; pass=$((pass+1)); else printf 'FAIL %s\n' "$name"; fail=$((fail+1)); fi; }
++A=alpha.example
++PARENT="$TMP/var/lib/twebproxy"; export G_ACME="$PARENT/acme"
++
++world() { # $1=mode of a pre-existing /var/lib/twebproxy
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$TMP/var" "$NGINX_DIR" "$LE_DIR" "$TMP/run" "$TMP"/units/*
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"
++  install -d -m 0755 "$NGINX_DIR/conf.d" "$NGINX_DIR/sites-available" "$NGINX_DIR/sites-enabled" "$LE_DIR/live" "$LE_DIR/archive" "$TMP/run" "$TMP/var/lib"
++  install -d -m "$1" "$PARENT"
++  install -d -m 0700 "$PARENT/update-backups"      # what the updater keeps there
++  c2_relay_binary old > "$TPROXY_BIN"; chmod 0755 "$TPROXY_BIN"
++  d_seed_instance "$A" 18080 18081 nginx-le admin@example.org
++  c1_seed_profile "$A" main "$(printf '%032d' 1)" https 23980 28980
++  c1_run rebuild_profiles_json "$A" >/dev/null 2>&1
++  "$TMP/bin/systemctl" start "twebproxy-mtproxy@$A--main.service"
++  "$TMP/bin/systemctl" start "twebproxy@$A.service"
++}
++issue() { d_eval "ACME_WEBROOT=\"\$G_ACME\"; configure_tls_for_instance $A" > "$TMP/out" 2>&1; rc=$?; }
++# What certbot --webroot does, then what nginx (www-data) does for the CA.
++challenge_readable() {
++  install -d -m 0755 "$G_ACME/.well-known/acme-challenge"
++  printf 'token-content\n' > "$G_ACME/.well-known/acme-challenge/token"; chmod 0644 "$G_ACME/.well-known/acme-challenge/token"
++  setpriv --reuid="$WEB_UID" --regid="$WEB_GID" --clear-groups cat "$G_ACME/.well-known/acme-challenge/token" > "$TMP/served" 2>"$TMP/served.err" \
++    && grep -qx token-content "$TMP/served"
++}
++mode() { stat -c %a "$1"; }
++
++# 1. Parent pre-exists with 0700 (an earlier updater created it).
++world 0700
++check "g4_precondition_parent_0700_denies_www_data" eval '! setpriv --reuid="$WEB_UID" --regid="$WEB_GID" --clear-groups ls "$PARENT" >/dev/null 2>&1'
++issue
++check "g4_0700_parent_issue_ok (rc=$rc)" test "$rc" -eq 0
++check "g4_0700_parent_challenge_readable_by_www_data" challenge_readable
++check "g4_0700_parent_only_traversal_added (mode $(mode "$PARENT"))" test "$(mode "$PARENT")" = 711
++check "g4_0700_parent_not_listable_by_others" eval '! setpriv --reuid="$WEB_UID" --regid="$WEB_GID" --clear-groups ls "$PARENT" >/dev/null 2>&1'
++check "g4_backup_root_still_private" test "$(mode "$PARENT/update-backups")" = 700
++
++# 1b. The parent fell back to 0700 after issuance: cert-renew repairs traversal too.
++chmod 0700 "$PARENT"
++d_eval "ACME_WEBROOT=\"\$G_ACME\"; cert_renew_cmd $A --force" > "$TMP/out" 2>&1; rc=$?
++check "g4_renew_ok (rc=$rc)" test "$rc" -eq 0
++check "g4_renew_restores_traversal (mode $(mode "$PARENT"))" test "$(mode "$PARENT")" = 711
++
++# 2. Parent already traversable (0755, as install -d creates it): unchanged.
++world 0755
++issue
++check "g4_0755_parent_issue_ok (rc=$rc)" test "$rc" -eq 0
++check "g4_0755_parent_challenge_readable_by_www_data" challenge_readable
++check "g4_0755_parent_mode_unchanged" test "$(mode "$PARENT")" = 755
++
++# 3. A parent that is a symbolic link is not modified through the link.
++world 0700
++mv "$PARENT" "$TMP/real-parent"; ln -s "$TMP/real-parent" "$PARENT"
++issue
++check "g4_symlinked_parent_target_not_chmodded (mode $(mode "$TMP/real-parent"))" test "$(mode "$TMP/real-parent")" = 700
++
++printf 'acme-webroot-fixture: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageg/g-scope-invariants.sh b/tests/stageg/g-scope-invariants.sh
+new file mode 100755
+index 0000000..7b9d032
+--- /dev/null
++++ b/tests/stageg/g-scope-invariants.sh
+@@ -0,0 +1,97 @@
++#!/usr/bin/env bash
++# Stage G scope against the exact v0.2.20 (Stage F, 24e2fb8) tree. Allowed
++# changes: the health probe and lock-descriptor handling of the updater and its
++# offline helper (G-P1-A/B) plus its global.env metadata sync, the Nginx Let's
++# Encrypt webroot preparation (configure_nginx_le, cert_renew_cmd, new
++# acme_webroot_prepare) and hostname validation in five mutating commands.
++# Everything else is byte-identical (function text via declare -f, every other
++# file, every top-level variable). README and ROADMAP carry the owner's newer
++# text from GitHub main.
++# Usage: g-scope-invariants.sh <v0.2.20 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.20 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-g-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++UPDATER_MODIFIED=(stage4_render_restore_helper stage4_restore_helper_valid stage4_verify_backup stage4_prune_backups
++  stage4_current_manager_preflight stage4_manager_health manager_latest_release_tag manager_release_download
++  manager_update_cmd fetch_manager_update_info fetch_manager_update_hint_info)
++MODIFIED=("${UPDATER_MODIFIED[@]}" configure_nginx_le cert_renew_cmd
++  dpi_set_cmd dpi_disable_host_locked restart_cmd field_report_cmd)
++ADDED=(acme_webroot_prepare)
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS README.md docs/ROADMAP.md docs/UPDATES.md docs/SECURITY.md)
++ADDED_FILES=(tests/stageg/README.md tests/stageg/process-fixture.sh tests/stageg/real-process-oracle.py
++  tests/stageg/real-process-oracle.sh tests/stageg/acme-webroot-fixture.sh tests/stageg/input-validation-fixture.sh
++  tests/stageg/run-stage-g-suite.sh
++  tests/stageg/g-scope-invariants.sh)
++# Documented protected-set hashes (legacy extractor and heredoc-aware full bodies).
++LEGACY_BEFORE=c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b
++LEGACY_AFTER=2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0
++FULL_BEFORE=29479800bfd4afec9edc48d9154e61f198d7f275ebf9acfdab6f1a0ed3b5933f
++FULL_AFTER=b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++(( modified == ${#MODIFIED[@]} && added == ${#ADDED[@]} )) || { echo "FAIL expected ${#MODIFIED[@]} modified / ${#ADDED[@]} added"; exit 1; }
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars"
++echo "PASS top-level variables unchanged except the release identity"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageG/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (assets, other docs, all earlier tests and evidence included)"
++
++legacy_before="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$BASE/twebproxy-manager.sh")"
++legacy_after="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++full_before="$(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$BASE/twebproxy-manager.sh" | tail -1)"
++full_after="$(bash "$PROJECT/tests/stagef/updater-function-hashes.sh" "$PROJECT/twebproxy-manager.sh" | tail -1)"
++[[ "${legacy_before%% *}" == "$LEGACY_BEFORE" && "${full_before%% *}" == "$FULL_BEFORE" ]] || { echo "FAIL baseline hashes: $legacy_before / $full_before"; exit 1; }
++[[ "${legacy_after%% *}" == "$LEGACY_AFTER" && "${full_after%% *}" == "$FULL_AFTER" ]] || { echo "FAIL candidate hashes (update the documented values): $legacy_after / $full_after"; exit 1; }
++echo "PASS Stage 4 protected set: legacy ${LEGACY_BEFORE:0:12} -> ${LEGACY_AFTER:0:12}, full ${FULL_BEFORE:0:12} -> ${FULL_AFTER:0:12} (documented)"
++printf 'PASS g-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stageg/input-validation-fixture.sh b/tests/stageg/input-validation-fixture.sh
+new file mode 100755
+index 0000000..6766906
+--- /dev/null
++++ b/tests/stageg/input-validation-fixture.sh
+@@ -0,0 +1,49 @@
++#!/usr/bin/env bash
++# Stage G regression: mutating commands that take a hostname argument validate
++# it before the name reaches any path (instance state, state locks, DPI scope,
++# certificate and report locations). Names that resolve to an existing
++# instance through path tricks ("alpha.example/.", "../instances/alpha.example")
++# or differ only in case are refused with the hostname message and change
++# nothing. Model harness (Stage E operations harness: systemctl, nft, ip,
++# hostnamectl, curl are models); nothing outside $TMP.
++#
++# dpi disable is exercised through dpi_disable_host_locked: the C1 harness stubs
++# the DPI mutation lock wrapper that dpi_disable_cmd goes through.
++#
++# Usage: input-validation-fixture.sh [path/to/twebproxy-manager.sh]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-g-input.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagee/ops-harness.sh"
++e_harness
++export TWEBPROXY_RELAY_READY_WAIT=3
++pass=0; fail=0
++check() { local name="$1"; shift; if "$@"; then printf 'PASS %s\n' "$name"; pass=$((pass+1)); else printf 'FAIL %s\n' "$name"; fail=$((fail+1)); fi; }
++A=alpha.example
++install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"
++c2_relay_binary old > "$TPROXY_BIN"; chmod 0755 "$TPROXY_BIN"
++d_seed_instance "$A" 18080 18081 nginx-le admin@example.org
++c1_seed_profile "$A" main "$(printf '%032d' 1)" https 23980 28980
++c1_run rebuild_profiles_json "$A" >/dev/null 2>&1
++state() { find "$TMP/etc" "$TMP/units" -printf '%P %m %s\n' 2>/dev/null | LC_ALL=C sort | sha256sum; }
++
++for host in "$A/." "../instances/$A" "$A/../$A" "Alpha.Example"; do
++  for cmd in "restart_cmd" "cert_renew_cmd" "dpi_set_cmd:aggressive" "dpi_disable_host_locked" "field_report_cmd:--instant"; do
++    fn="${cmd%%:*}"; arg=""; [[ "$cmd" == *:* ]] && arg="${cmd#*:}"
++    before="$(state)"
++    if [[ -n "$arg" && "$fn" == field_report_cmd ]]; then e_run "$fn" "$arg" "$host" > "$TMP/out" 2>&1
++    elif [[ -n "$arg" ]]; then e_run "$fn" "$host" "$arg" > "$TMP/out" 2>&1
++    else e_run "$fn" "$host" > "$TMP/out" 2>&1; fi
++    rc=$?
++    check "g5_${fn}_refuses_[$host] (rc=$rc)" eval "test $rc -ne 0 && grep -q 'lowercase ASCII/ACE hostname' '$TMP/out'"
++    check "g5_${fn}_no_state_change_[$host]" test "$(state)" = "$before"
++  done
++done
++# The valid name still works where the model allows it (restart).
++e_run restart_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check "g5_restart_valid_host_ok (rc=$rc)" test "$rc" -eq 0
++
++printf 'input-validation-fixture: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageg/process-fixture.sh b/tests/stageg/process-fixture.sh
+new file mode 100755
+index 0000000..a591975
+--- /dev/null
++++ b/tests/stageg/process-fixture.sh
+@@ -0,0 +1,255 @@
++#!/usr/bin/env bash
++# Stage G regressions for the two P1 defects found on real Linux in Stage F and
++# the offline-restore metadata drift:
++#   G1  a health probe whose descendant keeps stdout open must not extend the
++#       update (or hold its lock) beyond the probe bound; leftover probe
++#       processes are gone afterwards;
++#   G2  children of the updater (curl, helper probes) must not inherit the update
++#       lock: after a parent-only SIGKILL the lock is free at once;
++#   G3  an offline restore puts MANAGER_VERSION in global.env back in line.
++#
++# Runs the real updater, offline helper, flock, kernel pipes, signals and /proc
++# in tests/stagef/updater-harness.sh sandboxes (root needed for sandboxed
++# chown/flock). Candidates and GitHub are models there (fake managers, curl
++# model): this is MODEL evidence for control flow, with real process/lock
++# observations. tests/stageg/real-process-oracle.py repeats G1/G2 with the real
++# manager and real curl/TLS.
++#
++# Usage: process-fixture.sh [path/to/twebproxy-manager.sh] [case-filter-regex]
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++FILTER="${2:-.}"
++# shellcheck source=../stagef/updater-harness.sh
++source "$ROOT/tests/stagef/updater-harness.sh"
++[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo 'process-fixture: needs root (sandboxed chown/flock)'; exit 77; }
++f_init "$MGR" || { echo 'process-fixture: setup failed'; exit 1; }
++trap 'g_kill_case_processes 2>/dev/null; f_case_cleanup 2>/dev/null; f_fini' EXIT
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 TWEBPROXY_UPDATE_LOCK_WAIT=2
++NEW=0.2.90
++
++pass=0; fail=0
++check() { # check ID description command...
++  local id="$1" what="$2"; shift 2
++  if "$@"; then printf 'PASS %s: %s\n' "$id" "$what"; pass=$((pass + 1))
++  else printf 'FAIL %s: %s\n' "$id" "$what"; fail=$((fail + 1)); fi
++}
++begin() { CASE_ID="$1"; [[ "$CASE_ID" =~ $FILTER ]] || return 1; export F_PIN_KEY=A; f_case "$1"; }
++out_has() { grep -Eq -- "$1" "$F_OUT"; }
++alive() { # $1=pid file: the process exists and is not a zombie
++  local st
++  [[ -f "$1" ]] && st="$(awk '{print $3}' "/proc/$(<"$1")/stat" 2>/dev/null)" && [[ -n "$st" && "$st" != Z ]]
++}
++dead_within() { # $1=pid file $2=seconds: the process is gone (or reaped) within the time
++  local i; for ((i = 0; i < $2 * 10; i++)); do alive "$1" || return 0; sleep 0.1; done; return 1
++}
++
++# PIDs of every process that has the case's update lock file open (independent
++# /proc observation, not the manager's view).
++lock_holders() {
++  local lock fd pid
++  lock="$(readlink -f "$F_CASE/run/lock/twebproxy-manager-update.lock")"
++  for fd in /proc/[0-9]*/fd/*; do
++    [[ "$(readlink "$fd" 2>/dev/null)" == "$lock" ]] || continue
++    pid="${fd#/proc/}"; printf '%s\n' "${pid%%/*}"
++  done | sort -un
++}
++
++# Every process started for this case carries F_CASE in its environment.
++g_kill_case_processes() {
++  local e p
++  [[ -n "${F_CASE:-}" ]] || return 0
++  for e in /proc/[0-9]*/environ; do
++    p="${e#/proc/}"; p="${p%%/*}"
++    [[ "$p" != "$$" && "$p" != "$BASHPID" ]] || continue
++    { tr '\0' '\n' < "$e"; } 2>/dev/null | grep -qxF "F_CASE=$F_CASE" && kill -KILL "$p" 2>/dev/null
++  done
++  return 0
++}
++case_end() { g_kill_case_processes; f_case_cleanup; }
++
++# A candidate (or installed manager) whose probe leaves a descendant holding stdout.
++stdout_child() { # $1=--help|--json  $2=seconds the descendant lives  [$3=pid file]
++  printf 'if [[ "${1:-}" == %s ]]; then sleep %s & echo "$!" > %q; fi' "$1" "$2" "${3:-$F_CASE/child.pid}"
++}
++
++# ================== G1: health probes with stdout-holding descendants =======
++
++if begin g1-help-descendant-holds-stdout; then
++  f_publish "$NEW" "extra=$(stdout_child --help 40)"
++  start=$SECONDS; F_TIMEOUT=90 f_update; took=$((SECONDS - start))
++  check "$CASE_ID.bounded" "the update ends within the probe bound, not with the descendant (${took}s)" test "$took" -lt 20
++  check "$CASE_ID.success" 'a healthy candidate is still installed (UPDATE_SUCCESS)' out_has '^UPDATE_SUCCESS backup_id=update-'
++  check "$CASE_ID.installed" 'both copies are the candidate' f_copies_are "$F_CANDIDATE_HASH"
++  check "$CASE_ID.no-orphan" 'the probe descendant does not outlive the probe' dead_within "$F_CASE/child.pid" 3
++  check "$CASE_ID.lock" 'lock free afterwards' f_lock_free
++  case_end
++fi
++
++if begin g1-overview-descendant-holds-stdout; then
++  f_publish "$NEW" "extra=$(stdout_child --json 40)"
++  start=$SECONDS; F_TIMEOUT=90 f_update; took=$((SECONDS - start))
++  check "$CASE_ID.bounded" "the update ends within the probe bound (${took}s)" test "$took" -lt 20
++  check "$CASE_ID.success" 'UPDATE_SUCCESS' out_has '^UPDATE_SUCCESS backup_id=update-'
++  check "$CASE_ID.no-orphan" 'the probe descendant does not outlive the probe' dead_within "$F_CASE/child.pid" 3
++  check "$CASE_ID.lock" 'lock free afterwards' f_lock_free
++  case_end
++fi
++
++if begin g1-preflight-descendant-holds-stdout; then
++  # The INSTALLED manager's probe misbehaves: the preflight before any change.
++  f_fake_manager "$F_CASE/usr/twebproxy" "$F_LOCAL_VERSION" good "$F_LOCAL_VERSION-beta" "$(stdout_child --help 40)"
++  install -o root -g root -m 0755 "$F_CASE/usr/twebproxy" "$F_CASE/opt/twebproxy-manager.sh"
++  F_OLD_HASH="$(f_sha "$F_CASE/usr/twebproxy")"
++  f_publish "$NEW"
++  start=$SECONDS; F_TIMEOUT=90 f_update; took=$((SECONDS - start))
++  check "$CASE_ID.bounded" "the preflight probe is bounded too (${took}s)" test "$took" -lt 20
++  check "$CASE_ID.success" 'the update proceeds (UPDATE_SUCCESS)' out_has '^UPDATE_SUCCESS'
++  check "$CASE_ID.no-orphan" 'no probe descendant left' dead_within "$F_CASE/child.pid" 3
++  case_end
++fi
++
++if begin g1-hanging-probe-with-descendant-rolls-back; then
++  f_publish "$NEW" "extra=if [[ \"\${1:-}\" == --help ]]; then sleep 90 & echo \"\$!\" > $(printf %q "$F_CASE/child.pid"); trap '' TERM; sleep 60; fi"
++  start=$SECONDS; F_TIMEOUT=120 f_update; took=$((SECONDS - start))
++  check "$CASE_ID.bounded" "a probe that ignores SIGTERM is killed within its bound (${took}s)" test "$took" -lt 45
++  check "$CASE_ID.rolled-back" 'failed health -> rollback, no false success' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS'
++  check "$CASE_ID.no-success" 'no UPDATE_SUCCESS' eval "! grep -q '^UPDATE_SUCCESS' '$F_OUT'"
++  check "$CASE_ID.restored" 'both copies are the previous manager' f_copies_are "$F_OLD_HASH"
++  check "$CASE_ID.no-orphan" 'no probe descendant left' dead_within "$F_CASE/child.pid" 3
++  check "$CASE_ID.lock" 'lock free afterwards' f_lock_free
++  case_end
++fi
++
++if begin g1-escaped-descendant-does-not-block; then
++  # A descendant that leaves the probe's process group cannot be killed by group,
++  # but it must not hold the update either.
++  f_publish "$NEW" "extra=if [[ \"\${1:-}\" == --help ]]; then setsid sleep 40 & echo \"\$!\" > $(printf %q "$F_CASE/child.pid"); fi"
++  start=$SECONDS; F_TIMEOUT=90 f_update; took=$((SECONDS - start))
++  check "$CASE_ID.bounded" "the update is not held by an escaped descendant (${took}s)" test "$took" -lt 20
++  check "$CASE_ID.success" 'UPDATE_SUCCESS' out_has '^UPDATE_SUCCESS'
++  check "$CASE_ID.lock" 'lock free while the escaped descendant still runs' f_lock_free
++  case_end
++fi
++
++# ================== G2: the update lock stays with the updater ==============
++
++if begin g2-blocked-download-parent-sigkill; then
++  f_publish "$NEW"
++  f_fault "https://raw.githubusercontent.com/$F_SLUG/$F_COMMIT/twebproxy-manager.sh" hang
++  ( F_TIMEOUT=120 f_update ) & bg=$!
++  for ((i = 0; i < 200; i++)); do grep -q '/twebproxy-manager\.sh$' "$F_REMOTE/requests" && break; sleep 0.05; done
++  sleep 0.5
++  mgr="$(<"$F_CASE/pid")"
++  holders="$(lock_holders | tr '\n' ' ')"
++  check "$CASE_ID.blocked" 'the download is in progress (precondition)' grep -q '/twebproxy-manager\.sh$' "$F_REMOTE/requests"
++  check "$CASE_ID.only-owner" "only the updater holds the lock during the download (holders: ${holders% })" test "${holders% }" = "$mgr"
++  F_OUT="$F_CASE/second.out"
++  TWEBPROXY_UPDATE_LOCK_WAIT=1 f_run manager_update_cmd > "$F_OUT" 2>&1; rc2=$?
++  check "$CASE_ID.concurrent-refused" "a concurrent update is still refused while the owner lives (rc=$rc2)" \
++    eval "test $rc2 -ne 0 && ! grep -q '^UPDATE_SUCCESS' '$F_OUT'"
++  kill -KILL "$mgr" 2>/dev/null
++  sleep 0.3
++  check "$CASE_ID.free-after-kill" 'the lock is free right after a parent-only SIGKILL' f_lock_free
++  check "$CASE_ID.unchanged" 'installed copies unchanged' f_copies_are "$F_OLD_HASH"
++  g_kill_case_processes; wait "$bg" 2>/dev/null
++  rm -f "$F_REMOTE/fault/raw.githubusercontent.com/$F_SLUG/$F_COMMIT/twebproxy-manager.sh"
++  f_update
++  check "$CASE_ID.next-update" 'the next update recovers the stale staging and succeeds' out_has '^UPDATE_SUCCESS'
++  check "$CASE_ID.no-leftovers" 'no staging or temp leftovers' test -z "$(f_leftovers)"
++  case_end
++fi
++
++if begin g2-release-check-parent-sigkill; then
++  f_publish "$NEW"
++  f_fault "https://api.github.com/repos/$F_SLUG/releases/latest" hang
++  ( F_TIMEOUT=120 f_update ) & bg=$!
++  for ((i = 0; i < 200; i++)); do grep -q 'releases/latest$' "$F_REMOTE/requests" && break; sleep 0.05; done
++  sleep 0.5
++  mgr="$(<"$F_CASE/pid")"
++  holders="$(lock_holders | tr '\n' ' ')"
++  check "$CASE_ID.only-owner" "only the updater holds the lock during the release query (holders: ${holders% })" test "${holders% }" = "$mgr"
++  kill -KILL "$mgr" 2>/dev/null; sleep 0.3
++  check "$CASE_ID.free-after-kill" 'the lock is free right after a parent-only SIGKILL' f_lock_free
++  g_kill_case_processes; wait "$bg" 2>/dev/null
++  case_end
++fi
++
++if begin g2-health-probe-lock-holders; then
++  f_publish "$NEW" "extra=if [[ \"\${1:-}\" == --help ]]; then : > $(printf %q "$F_CASE/probing"); sleep 3; fi"
++  ( F_TIMEOUT=120 f_update ) & bg=$!
++  for ((i = 0; i < 400; i++)); do [[ -e "$F_CASE/probing" ]] && break; sleep 0.05; done
++  sleep 0.3
++  mgr="$(<"$F_CASE/pid")"
++  holders="$(lock_holders | tr '\n' ' ')"
++  check "$CASE_ID.probing" 'the candidate health probe is running (precondition)' test -e "$F_CASE/probing"
++  check "$CASE_ID.only-owner" "only the updater holds the lock during the health gate (holders: ${holders% })" test "${holders% }" = "$mgr"
++  wait "$bg"
++  F_OUT="$F_CASE/out.1"
++  check "$CASE_ID.success" 'the update completes normally' out_has '^UPDATE_SUCCESS'
++  case_end
++fi
++
++if begin g2-rollback-helper-keeps-lock; then
++  # The one child that needs the lock: the rollback helper restores under it.
++  f_publish "$NEW" behavior=bad-overview
++  cat > "$F_CASE/bin/install" <<'SH'
++#!/bin/bash
++# barrier: the rollback's first staged copy waits until $F_CASE/release exists
++dest="${*: -1}"
++if [[ "${TWEBPROXY_STAGE4_LOCK_HELD:-}" == 1 && "$(basename -- "$dest")" == .twebproxy-stage4.* && ! -e "$F_CASE/parked" ]]; then
++  : > "$F_CASE/parked"; echo "$PPID" > "$F_CASE/helper.pid"
++  while [[ ! -e "$F_CASE/release" ]]; do sleep 0.05; done
++fi
++exec /usr/bin/install "$@"
++SH
++  chmod 0755 "$F_CASE/bin/install"
++  ( F_TIMEOUT=120 f_update ) & bg=$!
++  for ((i = 0; i < 600; i++)); do [[ -e "$F_CASE/parked" ]] && break; sleep 0.05; done
++  mgr="$(<"$F_CASE/pid")"; helper="$(<"$F_CASE/helper.pid")"
++  holders=" $(lock_holders | tr '\n' ' ')"
++  check "$CASE_ID.parked" 'the rollback is in progress (precondition)' test -e "$F_CASE/parked"
++  check "$CASE_ID.helper-holds" "the rollback helper holds the lock with the updater (holders:${holders% })" eval "[[ '$holders' == *' $mgr '* && '$holders' == *' $helper '* ]]"
++  kill -KILL "$mgr" 2>/dev/null; sleep 0.3
++  check "$CASE_ID.still-locked" 'with the updater killed, the lock stays with the running restore' eval '! f_lock_free'
++  : > "$F_CASE/release"
++  for ((i = 0; i < 300; i++)); do f_lock_free && break; sleep 0.1; done
++  check "$CASE_ID.restored" 'the restore completes: both copies are the previous manager' f_copies_are "$F_OLD_HASH"
++  check "$CASE_ID.free" 'and then the lock is free' f_lock_free
++  g_kill_case_processes; wait "$bg" 2>/dev/null
++  case_end
++fi
++
++# ================== G3: metadata after an offline restore ===================
++
++if begin g3-offline-restore-metadata; then
++  f_publish "$NEW"
++  f_update
++  check "$CASE_ID.updated" 'update succeeded, global.env says the new version (precondition)' \
++    eval "grep -q '^UPDATE_SUCCESS' '$F_OUT' && grep -qx 'MANAGER_VERSION=$NEW' '$F_CASE/etc/global.env'"
++  grep -v '^MANAGER_VERSION=' "$F_CASE/etc/global.env" > "$F_CASE/other-keys.before"
++  : > "$F_REMOTE/offline"
++  "$F_CASE/libexec/restore-update-backup" restore-latest > "$F_CASE/restore.out" 2>&1; rc=$?
++  check "$CASE_ID.restore" "offline restore-latest succeeds (rc=$rc)" grep -q '^RESTORE_SUCCESS' "$F_CASE/restore.out"
++  check "$CASE_ID.copies" 'both copies are the previous manager' f_copies_are "$F_OLD_HASH"
++  check "$CASE_ID.metadata" 'global.env MANAGER_VERSION follows the restored manager' grep -qx "MANAGER_VERSION=$F_LOCAL_VERSION" "$F_CASE/etc/global.env"
++  check "$CASE_ID.other-keys" 'all other global.env lines are unchanged' \
++    eval "diff -q <(grep -v '^MANAGER_VERSION=' '$F_CASE/etc/global.env') '$F_CASE/other-keys.before' >/dev/null"
++  check "$CASE_ID.mode" 'global.env stays root 0600' test "$(stat -c '%u:%g:%a' "$F_CASE/etc/global.env")" = 0:0:600
++  case_end
++fi
++
++if begin g3-metadata-symlink-not-followed; then
++  f_publish "$NEW"
++  f_update
++  printf 'MANAGER_VERSION=9.9.9\n' > "$F_CASE/elsewhere.env"; chmod 0600 "$F_CASE/elsewhere.env"
++  mv "$F_CASE/etc/global.env" "$F_CASE/etc/global.env.real"; ln -s "$F_CASE/elsewhere.env" "$F_CASE/etc/global.env"
++  "$F_CASE/libexec/restore-update-backup" restore-latest > "$F_CASE/restore.out" 2>&1
++  check "$CASE_ID.restore" 'the executables are still restored' grep -q '^RESTORE_SUCCESS' "$F_CASE/restore.out"
++  check "$CASE_ID.not-followed" 'a symlinked global.env is not written through' grep -qx 'MANAGER_VERSION=9.9.9' "$F_CASE/elsewhere.env"
++  check "$CASE_ID.link-kept" 'and the link itself is left alone' test -L "$F_CASE/etc/global.env"
++  case_end
++fi
++
++printf '\nprocess-fixture: %s pass, %s fail\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stageg/real-process-oracle.py b/tests/stageg/real-process-oracle.py
+new file mode 100755
+index 0000000..6383d76
+--- /dev/null
++++ b/tests/stageg/real-process-oracle.py
+@@ -0,0 +1,331 @@
++#!/usr/bin/env python3
++"""Stage G real-process oracle for the two P1 defects found on real Linux in Stage F.
++
++Everything that decides the outcome is real: the manager under test runs as its
++own CLI (`twebproxy manager-update --sha256 …`, real main/logging/dispatch), its
++health probes run a candidate built from the real manager, downloads use the
++real curl with real TLS against a loopback-only test server, and the lock,
++pipes, signals and process states are observed by the kernel (/proc, flock -n).
++
++Confinement: both the installed manager and the candidate are test artifacts of
++the manager under test whose path constants (BASE_DIR, MANAGER_BIN, …, the lock
++file) and release URLs are rewritten into a private sandbox, so nothing outside
++it is read or written; the TLS server listens on 127.0.0.1 only. The candidate
++artifact differs from the manager under test only in those constants, its
++version markers (0.2.90) and, for scenario A, one injected line.
++
++  A  The candidate's first `--help` leaves a background child holding stdout.
++     Expected: the update ends within the probe bound, the child does not
++     outlive the probe, the lock is free, both copies verified.
++  B  The candidate download is held open by the server; only the updater
++     process is SIGKILLed. Expected: only the updater holds the lock before the
++     kill, the lock is free right after it, a concurrent update is refused while
++     the owner lives, and the next update recovers.
++  C  The candidate's first `--help` hangs ignoring SIGTERM and leaves a child
++     holding stdout. Expected: the probe is killed within its bound, health
++     fails, the previous manager is restored (UPDATE_FAILED_ROLLBACK_SUCCESS),
++     no child is left and the lock is free.
++
++Usage: real-process-oracle.py [manager] [A|B|C ...]   exit 0 PASS, 1 FAIL, 77 NOT_EXECUTED
++"""
++import hashlib, http.server, json, os, pathlib, re, shutil, signal, socketserver, ssl
++import subprocess, sys, tempfile, threading, time
++
++ROOT = pathlib.Path(__file__).resolve().parents[2]
++MGR = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 and not re.fullmatch(r'[ABC]', sys.argv[1]) else ROOT / 'twebproxy-manager.sh').resolve()
++WANT = [a for a in sys.argv[1:] if re.fullmatch(r'[ABC]', a)] or ['A', 'B', 'C']
++SLUG = 'Lazarev33/twebproxy-manager'
++NEW = '0.2.90'
++CONSTANTS = ('BASE_DIR SITES_DIR TPROXY_SRC MTPROXY_SRC TPROXY_BIN MANAGER_BIN LIBEXEC_DIR SYSTEMD_DIR CADDY_DIR '
++             'NGINX_DIR LE_DIR ACME_WEBROOT DPI_NFT_BIN DPI_DOC_DIR PROJECT_DIR UPDATE_BACKUP_PARENT UPDATE_LOCK_FILE').split()
++RESULTS = {'manager': str(MGR), 'scenarios': {}}
++FAILS = 0
++
++
++def log(*a):
++    print(*a, flush=True)
++
++
++def check(scn, name, ok, detail=''):
++    global FAILS
++    RESULTS['scenarios'][scn].setdefault('checks', []).append({'check': name, 'result': 'PASS' if ok else 'FAIL', 'detail': detail})
++    log(f"{'PASS' if ok else 'FAIL'} real-{scn}.{name}{': ' + detail if detail else ''}")
++    FAILS += 0 if ok else 1
++
++
++def need(tool):
++    if shutil.which(tool) is None:
++        log(f'NOT_EXECUTED real-process-oracle: {tool} missing'); sys.exit(77)
++
++
++if os.geteuid() != 0:
++    log('NOT_EXECUTED real-process-oracle: needs root (sandboxed chown/flock)'); sys.exit(77)
++for t in ('openssl', 'curl', 'flock', 'jq', 'timeout', 'bash'):
++    need(t)
++
++sha = lambda p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
++
++
++class Server:
++    """HTTPS on 127.0.0.1: releases/latest JSON and raw/<tag>/twebproxy-manager.sh."""
++    def __init__(self, workdir):
++        self.dir = workdir
++        self.cert, self.key = workdir / 'cert.pem', workdir / 'key.pem'
++        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1',
++                        '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', str(self.key), '-out', str(self.cert)],
++                       check=True, capture_output=True)
++        self.artifact = b''
++        self.hold = threading.Event(); self.hold.set()      # set = respond immediately
++        self.arrived = threading.Event()
++        self.requests = []
++        outer = self
++
++        class H(http.server.BaseHTTPRequestHandler):
++            def log_message(self, *a): pass
++            def do_GET(self):
++                outer.requests.append(self.path)
++                if self.path == f'/api/repos/{SLUG}/releases/latest':
++                    body = json.dumps({'tag_name': f'v{NEW}', 'draft': False, 'prerelease': False,
++                                       'html_url': f'https://github.com/{SLUG}/releases/tag/v{NEW}'}).encode()
++                elif self.path == f'/raw/v{NEW}/twebproxy-manager.sh':
++                    outer.arrived.set(); outer.hold.wait(120)
++                    body = outer.artifact
++                else:
++                    self.send_response(404); self.end_headers(); return
++                self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers()
++                try: self.wfile.write(body)
++                except OSError: pass
++
++        class S(socketserver.ThreadingMixIn, http.server.HTTPServer):
++            daemon_threads = True
++        self.httpd = S(('127.0.0.1', 0), H)
++        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.load_cert_chain(self.cert, self.key)
++        self.httpd.socket = ctx.wrap_socket(self.httpd.socket, server_side=True)
++        self.port = self.httpd.server_address[1]
++        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
++
++    def close(self):
++        self.hold.set(); self.httpd.shutdown(); self.httpd.server_close()
++
++
++class Sandbox:
++    def __init__(self, name, server):
++        self.base = pathlib.Path(tempfile.mkdtemp(prefix=f'twebproxy-g-oracle-{name}.', dir='/tmp'))
++        self.root = self.base / 'root'
++        self.server = server
++        for d in ('usr/local/sbin', 'usr/local/bin', 'usr/local/libexec', 'opt/twebproxy-manager', 'etc/twebproxy',
++                  'var/lib', 'run/lock', 'srv'):
++            (self.root / d).mkdir(parents=True, exist_ok=True)
++        self.lock = self.root / 'run/lock/twebproxy-manager-update.lock'
++        self.bin = self.root / 'usr/local/sbin/twebproxy'
++        self.copy = self.root / 'opt/twebproxy-manager/twebproxy-manager.sh'
++        self.env = {**os.environ, 'CURL_CA_BUNDLE': str(server.cert), 'TWEBPROXY_ERROR_SNAPSHOT': '1',
++                    'TWEBPROXY_UI_LANGUAGE': 'en', 'TWEBPROXY_UPDATE_LOCK_WAIT': '2', 'G_ORACLE_SANDBOX': str(self.base)}
++        self.env.pop('TWEBPROXY_NO_LOG', None)   # the real CLI logs into the sandboxed PROJECT_DIR
++
++    def artifact(self, version=None, inject=None):
++        text = MGR.read_text()
++        for c in CONSTANTS:
++            text, n = re.subn(rf'^{c}="/', f'{c}="{self.root}/', text, count=1, flags=re.M)
++            assert n == 1, c
++        port = self.server.port
++        text, n = re.subn(r'^MANAGER_API_URL=.*$', f'MANAGER_API_URL="https://127.0.0.1:{port}/api/repos/$MANAGER_REPO_SLUG"', text, count=1, flags=re.M); assert n == 1
++        text, n = re.subn(r'^MANAGER_RAW_URL=.*$', f'MANAGER_RAW_URL="https://127.0.0.1:{port}/raw"', text, count=1, flags=re.M); assert n == 1
++        if version:
++            text = re.sub(r'^MANAGER_VERSION=".*"$', f'MANAGER_VERSION="{version}"', text, count=1, flags=re.M)
++            text = re.sub(r'^MANAGER_RELEASE_VERSION=".*"$', f'MANAGER_RELEASE_VERSION="{version}-beta"', text, count=1, flags=re.M)
++            text = re.sub(r'^# TWebProxy Manager v.*$', f'# TWebProxy Manager v{version}-beta', text, count=1, flags=re.M)
++        if inject:
++            text, n = re.subn(r'^usage\(\) \{$', 'usage() {\n' + inject, text, count=1, flags=re.M); assert n == 1
++        return text
++
++    def install(self):
++        text = self.artifact()
++        for p in (self.bin, self.copy):
++            p.write_text(text); os.chown(p, 0, 0); os.chmod(p, 0o755)
++        (self.root / 'etc/twebproxy/global.env').write_text('MANAGER_VERSION=x\nTPROXY_UPSTREAM_COMMIT=unknown\nMTPROXY_COMMIT=unknown\n')
++        os.chmod(self.root / 'etc/twebproxy/global.env', 0o600)
++        r = subprocess.run(['bash', '-c', 'source "$1"; trap - ERR; stage4_install_restore_helper yes', '_', str(self.bin)],
++                           env={**self.env, 'TWEBPROXY_NO_LOG': '1'}, capture_output=True, text=True, timeout=120)
++        assert r.returncode == 0, r.stderr
++        self.old = sha(self.bin)
++
++    def cli(self, *args, extra=None):
++        return [str(self.bin), 'manager-update', *args], {**self.env, **(extra or {})}
++
++    def lock_free(self):
++        return subprocess.run(['flock', '-n', str(self.lock), 'true']).returncode == 0
++
++    def lock_holders(self):
++        target = os.path.realpath(self.lock); out = []
++        for pid in filter(str.isdigit, os.listdir('/proc')):
++            try:
++                for fd in os.listdir(f'/proc/{pid}/fd'):
++                    if os.readlink(f'/proc/{pid}/fd/{fd}') == target:
++                        comm = pathlib.Path(f'/proc/{pid}/comm').read_text().strip()
++                        out.append(f'{pid}:{comm}'); break
++            except OSError:
++                pass
++        return sorted(set(out))
++
++    def copies(self):
++        return {'bin': sha(self.bin), 'copy': sha(self.copy)}
++
++    def cleanup(self):
++        for pid in filter(str.isdigit, os.listdir('/proc')):
++            try:
++                if f'G_ORACLE_SANDBOX={self.base}'.encode() in pathlib.Path(f'/proc/{pid}/environ').read_bytes().split(b'\0'):
++                    os.kill(int(pid), signal.SIGKILL)
++            except OSError:
++                pass
++        time.sleep(0.3)
++        shutil.rmtree(self.base, ignore_errors=True)
++
++
++def alive(pid):
++    try:
++        return pathlib.Path(f'/proc/{pid}/stat').read_text().split(')')[-1].split()[0] != 'Z'
++    except OSError:
++        return False
++
++
++def scenario_a(server):
++    scn = 'A'; RESULTS['scenarios'][scn] = {'title': 'candidate --help leaves a child holding stdout (real manager candidate)'}
++    sb = Sandbox('A', server)
++    try:
++        sb.install()
++        pidfile = sb.base / 'child.pid'
++        inject = (f'  if [[ ! -e {sb.base}/child.spawned ]]; then : > {sb.base}/child.spawned; '
++                  f'sleep 40 & echo "$!" > {pidfile}; fi')
++        cand = sb.artifact(NEW, inject).encode(); server.artifact = cand
++        digest = hashlib.sha256(cand).hexdigest()
++        cmd, env = sb.cli('--sha256', digest)
++        RESULTS['scenarios'][scn]['command'] = ' '.join(['twebproxy', 'manager-update', '--sha256', digest])
++        start = time.monotonic()
++        p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
++        out = b''
++        try:
++            out, _ = p.communicate(timeout=25)
++        except subprocess.TimeoutExpired:
++            pass
++        t25 = round(time.monotonic() - start, 2)
++        child = int(pidfile.read_text()) if pidfile.exists() else None
++        state25 = {'running': p.poll() is None, 'child_alive': bool(child and alive(child)),
++                   'lock_free': sb.lock_free(), 'copies': sb.copies()}
++        if p.poll() is None:
++            out, _ = p.communicate(timeout=120)
++        elapsed = round(time.monotonic() - start, 2)
++        text = out.decode(errors='replace')
++        time.sleep(0.5)
++        final = {'exit_code': p.returncode, 'seconds': elapsed, 'child_alive': bool(child and alive(child)),
++                 'lock_free': sb.lock_free(), 'copies': sb.copies(), 'candidate_sha256': digest, 'old_sha256': sb.old,
++                 'result_line': next((l for l in text.splitlines() if l.startswith('UPDATE_')), None)}
++        RESULTS['scenarios'][scn].update({'observed_at_25s': state25 | {'seconds': t25}, 'final': final})
++        log(f'A observed: {json.dumps(RESULTS["scenarios"][scn]["observed_at_25s"])}'); log(f'A final: {json.dumps(final)}')
++        check(scn, 'child-spawned', child is not None, f'child pid {child}')
++        check(scn, 'bounded', not state25['running'], f'update still running at {t25}s' if state25['running'] else f'finished in {elapsed}s')
++        check(scn, 'success', p.returncode == 0 and final['result_line'] and final['result_line'].startswith('UPDATE_SUCCESS'), f"exit {p.returncode}, {final['result_line']}")
++        check(scn, 'installed', final['copies'] == {'bin': digest, 'copy': digest}, 'both copies == candidate')
++        check(scn, 'no-orphan-at-25s', not state25['child_alive'], 'stdout-holding child gone by 25s')
++        check(scn, 'lock-free-at-25s', state25['lock_free'], 'lock free by 25s')
++    finally:
++        sb.cleanup()
++
++
++def scenario_b(server):
++    scn = 'B'; RESULTS['scenarios'][scn] = {'title': 'parent-only SIGKILL while real curl waits for the artifact'}
++    sb = Sandbox('B', server)
++    try:
++        sb.install()
++        cand = sb.artifact(NEW).encode(); server.artifact = cand
++        digest = hashlib.sha256(cand).hexdigest()
++        server.hold.clear(); server.arrived.clear()
++        cmd, env = sb.cli('--sha256', digest)
++        RESULTS['scenarios'][scn]['command'] = ' '.join(['twebproxy', 'manager-update', '--sha256', digest])
++        p = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
++        arrived = server.arrived.wait(60); time.sleep(0.5)
++        holders = sb.lock_holders()
++        cmd2, env2 = sb.cli('--sha256', digest, extra={'TWEBPROXY_UPDATE_LOCK_WAIT': '1'})
++        second = subprocess.run(cmd2, env=env2, capture_output=True, text=True, timeout=60)
++        os.kill(p.pid, signal.SIGKILL); p.wait(10)
++        time.sleep(0.3); free_03 = sb.lock_free()
++        time.sleep(1.7); free_2 = sb.lock_free()
++        curl_alive = [h for h in sb.lock_holders()]
++        copies_kill = sb.copies()
++        server.hold.set(); time.sleep(2)
++        free_after_release = sb.lock_free()
++        staging = (sb.root / 'var/lib/twebproxy/update-staging').exists()
++        cmd3, env3 = sb.cli('--sha256', digest)
++        nxt = subprocess.run(cmd3, env=env3, capture_output=True, text=True, timeout=180)
++        rec = {'artifact_request_arrived': arrived, 'lock_holders_during_download': holders,
++               'second_update_exit_code': second.returncode,
++               'second_update_result': next((l for l in (second.stdout + second.stderr).splitlines() if 'update' in l.lower() and ('lock' in l.lower() or 'running' in l.lower())), ''),
++               'parent_exit_code': p.returncode, 'lock_free_0.3s_after_kill': free_03, 'lock_free_2s_after_kill': free_2,
++               'lock_holders_after_kill': curl_alive, 'lock_free_after_server_release': free_after_release,
++               'stale_staging_before_next_update': staging, 'copies_after_kill': copies_kill, 'old_sha256': sb.old,
++               'next_update_exit_code': nxt.returncode,
++               'next_update_result': next((l for l in nxt.stdout.splitlines() if l.startswith('UPDATE_')), None),
++               'staging_after_next_update': (sb.root / 'var/lib/twebproxy/update-staging').exists(),
++               'copies_after_next_update': sb.copies(), 'candidate_sha256': digest}
++        RESULTS['scenarios'][scn]['observed'] = rec
++        log(f'B observed: {json.dumps(rec)}')
++        check(scn, 'download-blocked', arrived, 'real curl request reached the test server')
++        mgr = [h for h in holders if h.startswith(f'{p.pid}:')]
++        check(scn, 'only-owner-holds-lock', holders == mgr and len(mgr) == 1, f'holders {holders}, updater pid {p.pid}')
++        check(scn, 'concurrent-refused', second.returncode != 0, f'second update exit {second.returncode}')
++        check(scn, 'lock-free-0.3s-after-parent-kill', free_03)
++        check(scn, 'lock-free-2s-after-parent-kill', free_2)
++        check(scn, 'copies-unchanged', rec['copies_after_kill'] == {'bin': sb.old, 'copy': sb.old})
++        check(scn, 'next-update-recovers', nxt.returncode == 0 and (rec['next_update_result'] or '').startswith('UPDATE_SUCCESS')
++              and rec['copies_after_next_update'] == {'bin': digest, 'copy': digest} and not rec['staging_after_next_update'],
++              f"exit {nxt.returncode}, {rec['next_update_result']}")
++    finally:
++        server.hold.set(); sb.cleanup()
++
++
++def scenario_c(server):
++    scn = 'C'; RESULTS['scenarios'][scn] = {'title': 'candidate --help hangs ignoring SIGTERM, with a stdout-holding child: failed health -> rollback'}
++    sb = Sandbox('C', server)
++    try:
++        sb.install()
++        pidfile = sb.base / 'child.pid'
++        inject = (f'  if [[ ! -e {sb.base}/child.spawned ]]; then : > {sb.base}/child.spawned; '
++                  f'sleep 90 & echo "$!" > {pidfile}; trap "" TERM; sleep 60; fi')
++        cand = sb.artifact(NEW, inject).encode(); server.artifact = cand
++        digest = hashlib.sha256(cand).hexdigest()
++        cmd, env = sb.cli('--sha256', digest)
++        RESULTS['scenarios'][scn]['command'] = ' '.join(['twebproxy', 'manager-update', '--sha256', digest])
++        start = time.monotonic()
++        p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180)
++        elapsed = round(time.monotonic() - start, 2)
++        time.sleep(0.5)
++        child = int(pidfile.read_text()) if pidfile.exists() else None
++        text = p.stdout + p.stderr
++        rec = {'exit_code': p.returncode, 'seconds': elapsed, 'child_alive': bool(child and alive(child)),
++               'lock_free': sb.lock_free(), 'copies': sb.copies(), 'old_sha256': sb.old, 'candidate_sha256': digest,
++               'result_line': next((l for l in text.splitlines() if l.startswith('UPDATE_')), None)}
++        RESULTS['scenarios'][scn]['observed'] = rec
++        log(f'C observed: {json.dumps(rec)}')
++        check(scn, 'bounded', elapsed < 45, f'{elapsed}s (probe 15 s + 5 s kill grace, then rollback)')
++        check(scn, 'truthful-failure', p.returncode != 0 and (rec['result_line'] or '') .startswith('UPDATE_FAILED_ROLLBACK_SUCCESS'), f"exit {p.returncode}, {rec['result_line']}")
++        check(scn, 'restored', rec['copies'] == {'bin': sb.old, 'copy': sb.old}, 'both copies == previous manager')
++        check(scn, 'no-orphan', child is not None and not rec['child_alive'], f'child pid {child}')
++        check(scn, 'lock-free', rec['lock_free'])
++    finally:
++        sb.cleanup()
++
++
++work = pathlib.Path(tempfile.mkdtemp(prefix='twebproxy-g-oracle-tls.', dir='/tmp'))
++server = Server(work)
++try:
++    log(f'real-process-oracle: manager {MGR} sha256 {sha(MGR)}; TLS test server 127.0.0.1:{server.port}')
++    if 'A' in WANT: scenario_a(server)
++    if 'B' in WANT: scenario_b(server)
++    if 'C' in WANT: scenario_c(server)
++finally:
++    server.close(); shutil.rmtree(work, ignore_errors=True)
++out = os.environ.get('G_ORACLE_RESULTS')
++if out:
++    pathlib.Path(out).write_text(json.dumps(RESULTS, indent=1) + '\n')
++log(f'\nreal-process-oracle: {sum(len(s.get("checks", [])) for s in RESULTS["scenarios"].values()) - FAILS} pass, {FAILS} fail')
++sys.exit(1 if FAILS else 0)
+diff --git a/tests/stageg/real-process-oracle.sh b/tests/stageg/real-process-oracle.sh
+new file mode 100755
+index 0000000..18c02db
+--- /dev/null
++++ b/tests/stageg/real-process-oracle.sh
+@@ -0,0 +1,4 @@
++#!/usr/bin/env bash
++# Runs tests/stageg/real-process-oracle.py (needs python3); exit 77 without it.
++command -v python3 >/dev/null 2>&1 || { echo 'NOT_EXECUTED real-process-oracle: python3 missing'; exit 77; }
++exec python3 -I "$(dirname "${BASH_SOURCE[0]}")/real-process-oracle.py" "$@"
+diff --git a/tests/stageg/run-stage-g-suite.sh b/tests/stageg/run-stage-g-suite.sh
+new file mode 100755
+index 0000000..d4a1148
+--- /dev/null
++++ b/tests/stageg/run-stage-g-suite.sh
+@@ -0,0 +1,23 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage G: process fixture (P1 regressions, model candidates with real
++# processes/locks), the real-process oracle (real manager CLI, real curl/TLS on
++# loopback, real flock/signals in sandboxes), the ACME webroot fixture (real
++# kernel permission check) and the hostname validation fixture. Root required;
++# nothing outside temporary sandboxes is touched. Scope: g-scope-invariants.sh
++# <v0.2.20 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "G1-G3 updater probes, lock descriptor, restore metadata (MODEL + real processes)" "$ROOT/tests/stageg/process-fixture.sh" 1500 "$MGR"
++stage_a_run_case "G real-process oracle A-C (REAL processes, curl/TLS, flock; sandboxed)" "$ROOT/tests/stageg/real-process-oracle.sh" 900 "$MGR"
++stage_a_run_case "G4 ACME webroot traversal (MODEL frontend + real permission check)" "$ROOT/tests/stageg/acme-webroot-fixture.sh" 600 "$MGR"
++stage_a_run_case "G5 hostname validation in mutating commands (MODEL)" "$ROOT/tests/stageg/input-validation-fixture.sh" 900 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-g-suite: PASS (all mandatory checks executed)';;
++  77) echo 'stage-g-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-g-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index b38bcec..38e583b 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.20-beta
++# TWebProxy Manager v0.2.21-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.20"
+-MANAGER_RELEASE_VERSION="0.2.20-beta"
++MANAGER_VERSION="0.2.21"
++MANAGER_RELEASE_VERSION="0.2.21-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -2621,7 +2621,7 @@ dpi_set_cmd() {
+   need_root; need_systemd
+   local host="${1:-}" mode="${2:-}" ack="${3:-}" ip shared
+   [[ -n "$host" && -n "$mode" ]] || die "Usage: twebproxy dpi set HOST MODE [--accept-shared-scope]"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
+   dpi_mode_valid "$mode" || die "$(ui_msgf dpi_invalid_mode "$mode")"
+   [[ "$mode" != stock ]] || { dpi_disable_cmd "$host"; return; }
+   ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
+@@ -2669,7 +2669,7 @@ dpi_disable_host_locked() {
+   need_root; need_systemd
+   local host="${1:-}" ip file
+   [[ -n "$host" ]] || die "Usage: twebproxy dpi disable HOST"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
+   ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
+   # Stored state is authoritative for what this host actually owns. DNS may have
+   # moved on - an address change is the usual reason a scope goes stale - so the
+@@ -3628,6 +3628,7 @@ UPDATE_BACKUP_ROOT=$(printf '%q' "$UPDATE_BACKUP_ROOT")
+ UPDATE_LOCK_FILE=$(printf '%q' "$UPDATE_LOCK_FILE")
+ MANAGER_BIN=$(printf '%q' "$MANAGER_BIN")
+ PROJECT_MANAGER_COPY=$(printf '%q' "$PROJECT_MANAGER_COPY")
++GLOBAL_ENV=$(printf '%q' "$GLOBAL_ENV")
+ UPDATE_BACKUP_RETENTION=$(printf '%q' "$UPDATE_BACKUP_RETENTION")
+ EOF
+   cat <<'STAGE4_RESTORE_HELPER'
+@@ -3747,27 +3748,46 @@ s4_manager_file_safe() {
+   s4_safe_file "$1" 755
+ }
+ 
+-# Probes are bounded (SIGKILL 5 s after the timeout, for a probe that ignores
+-# SIGTERM), get no stdin and run without descriptor 9, so no process they leave
+-# behind can keep the update lock.
++# One bounded health probe: $1=seconds $2=output file $3...=command. The output
++# goes to a size-capped file, not a pipe: a descendant that keeps stdout open
++# cannot hold the caller the way a command substitution waits for EOF.
++# timeout(1) runs the probe in its own process group (SIGKILL 5 s after the
++# timeout, for a probe that ignores SIGTERM); whatever is left of that group
++# afterwards is killed. No stdin, no update-lock descriptor 9.
++s4_probe() {
++  local seconds="$1" out="$2" pid rc=0
++  shift 2
++  ( ulimit -f 4096; export TWEBPROXY_NO_LOG=1; exec timeout -k 5 "$seconds" "$@" ) \
++    > "$out" 2>/dev/null < /dev/null 9>&- &
++  pid=$!
++  wait "$pid" || rc=$?
++  kill -KILL -- "-$pid" 2>/dev/null || true
++  return "$rc"
++}
++
+ s4_manager_health() {
+-  local expected_hash="$1" expected_version="$2" target hash output
++  local expected_hash="$1" expected_version="$2" target hash work rc=0
+   [[ "$expected_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+   s4_valid_version "$expected_version" || return 1
++  work="$(mktemp -d "${TMPDIR:-/tmp}/twebproxy-health.XXXXXX")" || return 1
+   for target in "$MANAGER_BIN" "$PROJECT_MANAGER_COPY"; do
+-    s4_target_parent_safe "$target" || return 1
+-    s4_manager_file_safe "$target" || return 1
+-    hash="$(sha256sum "$target" | awk '{print $1}')"
+-    [[ "$hash" == "$expected_hash" ]] || return 1
+-    bash -n "$target" || return 1
+-    output="$(TWEBPROXY_NO_LOG=1 timeout -k 5 15 "$target" --help 2>/dev/null < /dev/null 9>&-)" || return 1
+-    grep -Fq "TWebProxy Manager v$expected_version" <<< "$output" || return 1
+-    output="$(TWEBPROXY_NO_LOG=1 timeout -k 5 20 "$target" --json overview 2>/dev/null < /dev/null 9>&-)" || return 1
+-    jq -e --arg version "$expected_version" '
+-      type == "object" and .schema_version == "twebproxy.output.v1" and
+-      .command == "overview" and .data.manager_version == $version
+-    ' <<< "$output" >/dev/null || return 1
++    if s4_target_parent_safe "$target" && s4_manager_file_safe "$target" \
++       && hash="$(sha256sum "$target" | awk '{print $1}')" && [[ "$hash" == "$expected_hash" ]] \
++       && bash -n "$target" \
++       && s4_probe 15 "$work/help" "$target" --help \
++       && grep -Fq "TWebProxy Manager v$expected_version" "$work/help" \
++       && s4_probe 20 "$work/overview" "$target" --json overview \
++       && jq -e --arg version "$expected_version" '
++            type == "object" and .schema_version == "twebproxy.output.v1" and
++            .command == "overview" and .data.manager_version == $version
++          ' "$work/overview" >/dev/null; then
++      continue
++    fi
++    rc=1
++    break
+   done
++  rm -rf -- "$work"
++  return "$rc"
+ }
+ 
+ s4_stage_payload() {
+@@ -3812,6 +3832,38 @@ s4_acquire_lock() {
+   flock -n 9
+ }
+ 
++# MANAGER_VERSION in global.env follows the restored copies (an offline restore
++# after an update left the newer version there). Only that line changes; the
++# file is rewritten beside itself, verified and renamed. Absent file: nothing.
++s4_sync_metadata() {
++  local version="$1" tmp line found=0
++  [[ -n "${GLOBAL_ENV:-}" && ( -e "$GLOBAL_ENV" || -L "$GLOBAL_ENV" ) ]] || return 0
++  s4_valid_version "$version" || return 1
++  s4_safe_file "$GLOBAL_ENV" 600 || return 1
++  if [[ "$(grep -c '^MANAGER_VERSION=' "$GLOBAL_ENV")" == 1 ]] && grep -qx "MANAGER_VERSION=$version" "$GLOBAL_ENV"; then
++    return 0
++  fi
++  tmp="$(mktemp "$(dirname -- "$GLOBAL_ENV")/.global.env.XXXXXX")" || return 1
++  if {
++       while IFS= read -r line || [[ -n "$line" ]]; do
++         if [[ "$line" == MANAGER_VERSION=* ]]; then
++           (( found )) || printf 'MANAGER_VERSION=%s\n' "$version"
++           found=1
++         else
++           printf '%s\n' "$line"
++         fi
++       done < "$GLOBAL_ENV"
++       (( found )) || printf 'MANAGER_VERSION=%s\n' "$version"
++     } > "$tmp" \
++     && [[ "$(grep -v '^MANAGER_VERSION=' "$tmp")" == "$(grep -v '^MANAGER_VERSION=' "$GLOBAL_ENV")" ]] \
++     && [[ "$(grep -c '^MANAGER_VERSION=' "$tmp")" == 1 ]] && grep -qx "MANAGER_VERSION=$version" "$tmp" \
++     && chmod 0600 "$tmp" && mv -fT -- "$tmp" "$GLOBAL_ENV"; then
++    return 0
++  fi
++  rm -f -- "$tmp"
++  return 1
++}
++
+ s4_restore_id() {
+   local id="$1" dir payload expected_hash expected_version tmp1="" tmp2=""
+   s4_valid_id "$id" || { s4_err "invalid backup id"; return 2; }
+@@ -3829,6 +3881,8 @@ s4_restore_id() {
+   tmp2=""
+   s4_manager_health "$expected_hash" "$expected_version" || return 1
+   trap - RETURN
++  s4_sync_metadata "$expected_version" \
++    || s4_err "MANAGER_VERSION in global.env not updated to $expected_version; 'twebproxy repair' rewrites it"
+   printf 'RESTORE_SUCCESS backup_id=%s manager_version=%s\n' "$id" "$expected_version"
+ }
+ 
+@@ -3952,8 +4006,8 @@ stage4_restore_helper_valid() { # $1=helper file: safe, parseable, bound to thes
+        "$MANAGER_BIN" == "$6" && "$PROJECT_MANAGER_COPY" == "$7" ]]
+     declare -F s4_verify_backup_dir s4_manager_health s4_restore_id s4_prune_verified >/dev/null
+   ' _ "$helper" "$UPDATE_BACKUP_FORMAT" "$UPDATE_BACKUP_PARENT" \
+-    "$UPDATE_BACKUP_ROOT" "$UPDATE_LOCK_FILE" "$MANAGER_BIN" "$PROJECT_MANAGER_COPY" || return 1
+-  output="$(TWEBPROXY_NO_LOG=1 timeout 10 "$helper" list 2>/dev/null)" || return 1
++    "$UPDATE_BACKUP_ROOT" "$UPDATE_LOCK_FILE" "$MANAGER_BIN" "$PROJECT_MANAGER_COPY" 9>&- || return 1
++  output="$(exec 9>&-; TWEBPROXY_NO_LOG=1 timeout 10 "$helper" list 2>/dev/null)" || return 1
+   first="${output%%$'\n'*}"
+   [[ "$first" == "format=$UPDATE_BACKUP_FORMAT" ]]
+ }
+@@ -3998,12 +4052,12 @@ stage4_install_restore_helper() {
+ stage4_verify_backup() {
+   local dir="$1" id="$2" state="${3:-published}"
+   bash -c 'source "$1"; s4_verify_backup_dir "$2" "$3" "$4"' _ \
+-    "$UPDATE_RESTORE_HELPER" "$dir" "$id" "$state"
++    "$UPDATE_RESTORE_HELPER" "$dir" "$id" "$state" 9>&-
+ }
+ 
+ stage4_prune_backups() {
+   local protect="${1:-}"
+-  bash -c 'source "$1"; s4_prune_verified "$2"' _ "$UPDATE_RESTORE_HELPER" "$protect"
++  bash -c 'source "$1"; s4_prune_verified "$2"' _ "$UPDATE_RESTORE_HELPER" "$protect" 9>&-
+ }
+ 
+ # UPDATE_BACKUP_PARENT is shared with the ACME webroot, which the web server must
+@@ -4074,7 +4128,7 @@ stage4_current_manager_preflight() {
+   first_version="$(sed -nE 's/^MANAGER_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$MANAGER_BIN")"
+   second_version="$(sed -nE 's/^MANAGER_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$PROJECT_MANAGER_COPY")"
+   [[ "$first_version" == "$MANAGER_VERSION" && "$second_version" == "$MANAGER_VERSION" ]] || return 1
+-  bash -c 'source "$1"; s4_manager_health "$2" "$3"' _ "$UPDATE_RESTORE_HELPER" "$first_hash" "$MANAGER_VERSION"
++  bash -c 'source "$1"; s4_manager_health "$2" "$3"' _ "$UPDATE_RESTORE_HELPER" "$first_hash" "$MANAGER_VERSION" 9>&-
+ }
+ 
+ stage4_create_backup() {
+@@ -4140,9 +4194,11 @@ stage4_manager_copies_match() { # $1=SHA-256: both installed copies are exactly
+ stage4_manager_health() {
+   local expected_hash="$1" expected_version="$2"
+   bash -c 'source "$1"; s4_manager_health "$2" "$3"' _ \
+-    "$UPDATE_RESTORE_HELPER" "$expected_hash" "$expected_version"
++    "$UPDATE_RESTORE_HELPER" "$expected_hash" "$expected_version" 9>&-
+ }
+ 
++# The only child that keeps descriptor 9: the helper restores under the very
++# lock this updater holds, also if the updater dies meanwhile.
+ stage4_rollback_exact() {
+   local id="$1"
+   TWEBPROXY_STAGE4_LOCK_HELD=1 \
+@@ -4248,7 +4304,7 @@ manager_latest_release_tag() { # $1=connect timeout $2=max time $3=user agent ->
+   # The API answers with the newest published release that is neither a draft
+   # nor a prerelease; the answer is validated anyway. Redirects are not
+   # followed: a moved repository is not silently trusted.
+-  json="$(curl -fsS --connect-timeout "$1" --max-time "$2" --max-filesize 1048576 \
++  json="$(exec 9>&-; curl -fsS --connect-timeout "$1" --max-time "$2" --max-filesize 1048576 \
+     --proto '=https' --tlsv1.2 \
+     -H 'Accept: application/vnd.github+json' \
+     -H "User-Agent: $3" \
+@@ -4265,7 +4321,7 @@ fetch_manager_update_info() {
+   fi
+   # Only the latest stable GitHub Release is a candidate: a VERSION file on a
+   # development branch is never an update source.
+-  tag="$(manager_latest_release_tag 3 8 twebproxy-manager-update-check)" || return 1
++  tag="$(exec 9>&-; manager_latest_release_tag 3 8 twebproxy-manager-update-check)" || return 1
+   REMOTE_MANAGER_VERSION="${tag#v}"
+   REMOTE_MANAGER_REF="$tag"
+   REMOTE_MANAGER_SOURCE="release"
+@@ -4279,7 +4335,7 @@ manager_release_download() { # $1=URL $2=output $3=max bytes $4=direct|assets
+   # Checked after the transfer: HTTP 200 only, no redirect for a direct URL, and
+   # for release downloads only a redirect to a GitHub release-asset host. A body
+   # from anywhere else is discarded before anything reads it.
+-  meta="$(curl -fsSL --connect-timeout 5 --max-time 60 --retry 2 --max-redirs "$redirs" \
++  meta="$(exec 9>&-; curl -fsSL --connect-timeout 5 --max-time 60 --retry 2 --max-redirs "$redirs" \
+     --max-filesize "$max" --proto '=https' --proto-redir '=https' --tlsv1.2 \
+     -H 'User-Agent: twebproxy-manager-updater' \
+     -w '%{http_code} %{num_redirects} %{url_effective}' -o "$out" "$url" 2>/dev/null)" || return 1
+@@ -4459,7 +4515,9 @@ manager_update_cmd() {
+   stage4_acquire_update_lock || die "Manager update уже выполняется или lock небезопасен: $UPDATE_LOCK_FILE"
+   trap 'stage4_update_end' EXIT
+   trap 'stage4_update_abort 130' INT; trap 'stage4_update_abort 143' TERM; trap 'stage4_update_abort 129' HUP
+-  work="$(stage4_update_prepare)" \
++  # Children run without descriptor 9 (the lock) unless they need it: a child
++  # that outlives a killed updater must not keep the lock.
++  work="$(exec 9>&-; stage4_update_prepare)" \
+     || die "Закрытый каталог обновления в $UPDATE_BACKUP_PARENT не подготовлен; manager не изменён."
+   stage4_install_restore_helper refresh || die "Offline rollback helper отсутствует или небезопасен; обновление остановлено до создания backup."
+   stage4_current_manager_preflight \
+@@ -4486,7 +4544,7 @@ manager_update_cmd() {
+       || stage4_update_refuse download "Релиз $tag не публикует подписанный манифест ($MANAGER_RELEASE_MANIFEST и .sig) по ожидаемому адресу GitHub; manager не изменён."
+     manager_release_signature_ok "$work/manifest.json" "$work/manifest.json.sig" "$work" \
+       || stage4_update_refuse signature "Подпись манифеста релиза $tag не подтверждена закреплённым ключом; manager не изменён."
+-    fields="$(manager_release_manifest_fields "$work/manifest.json" "$tag")" \
++    fields="$(exec 9>&-; manager_release_manifest_fields "$work/manifest.json" "$tag")" \
+       || stage4_update_refuse manifest "Манифест релиза $tag некорректен или не соответствует релизу; manager не изменён."
+     read -r commit expected size label <<< "$fields"
+     [[ -z "$pinned" || "$pinned" == "$expected" ]] \
+@@ -4513,7 +4571,7 @@ manager_update_cmd() {
+   # The downloaded script has not executed at this point. Publish and verify
+   # the exact pre-update payload before the first target mutation.
+   old_hash="$(sha256sum "$MANAGER_BIN" | awk '{print $1}')"
+-  backup_id="$(stage4_create_backup "$version")" \
++  backup_id="$(exec 9>&-; stage4_create_backup "$version")" \
+     || die "Не удалось создать и проверить локальный pre-update backup; manager не изменён."
+   log "Проверенный pre-update backup: $backup_id"
+ 
+@@ -4573,7 +4631,7 @@ fetch_manager_update_hint_info() {
+   fi
+   # The automatic hint is deliberately cheap: one short request for the latest
+   # stable release (never a development branch).
+-  tag="$(manager_latest_release_tag 2 3 twebproxy-manager-update-hint)" || return 1
++  tag="$(exec 9>&-; manager_latest_release_tag 2 3 twebproxy-manager-update-hint)" || return 1
+   REMOTE_MANAGER_VERSION="${tag#v}"
+   REMOTE_MANAGER_REF="$tag"
+   REMOTE_MANAGER_SOURCE="release"
+@@ -5655,6 +5713,20 @@ ensure_nginx_le_auto_renew() {
+   ok "Let's Encrypt auto-renew: twebproxy-cert-renew.timer active"
+ }
+ 
++# The web server's unprivileged worker reads the ACME webroot, so the manager
++# directory above it must be searchable. Updaters before Stage F created that
++# parent (/var/lib/twebproxy, shared with the update backups) with mode 0700.
++# Only search permission is added, and only to a real root-owned directory:
++# never read or write, never through a symbolic link.
++acme_webroot_prepare() {
++  local parent
++  install -d -m 0755 "$ACME_WEBROOT" || return 1
++  parent="$(dirname -- "$ACME_WEBROOT")"
++  if [[ -d "$parent" && ! -L "$parent" && "$(stat -c %u -- "$parent" 2>/dev/null)" == 0 ]]; then
++    chmod go+x -- "$parent" || return 1
++  fi
++}
++
+ configure_nginx_le() {
+   local host="$1" relay="$2" email="$3" live="$LE_DIR/live/$1" cand had_cert=0 had_conf=0 days="" rc=0
+   nginx_common_install; nginx_domain_conflict "$host"
+@@ -5662,7 +5734,7 @@ configure_nginx_le() {
+     export DEBIAN_FRONTEND=noninteractive
+     apt-get install -y certbot || die "Не удалось установить certbot."
+   fi
+-  install -d -m 0755 "$ACME_WEBROOT" || die "Не удалось подготовить $ACME_WEBROOT."
++  acme_webroot_prepare || die "Не удалось подготовить $ACME_WEBROOT."
+   [[ -e "$NGINX_DIR/sites-available/twebproxy-$host.conf" ]] && had_conf=1
+   if le_cert_usable "$host"; then
+     # The managed TLS vhost already answers HTTP-01 on port 80: renewal and
+@@ -6585,7 +6657,7 @@ cert_renew_cmd() {
+   local host="${1:-}" force="${2:-}"
+   [[ -z "$force" || "$force" == --dry-run || "$force" == --force ]] || die "Использование: twebproxy cert-renew [hostname] [--dry-run|--force]"
+   [[ -n "$host" ]] || host="$(select_instance)"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
+   load_instance "$host"
+ 
+   case "$TLS_MODE" in
+@@ -6593,6 +6665,7 @@ cert_renew_cmd() {
+       command -v certbot >/dev/null 2>&1 || die "certbot не установлен. Запусти repair."
+       instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+       le_cert_usable "$host" || die "Нет пригодного сертификата Let's Encrypt для $host; запусти 'twebproxy repair $host'."
++      acme_webroot_prepare || die "Не удалось подготовить $ACME_WEBROOT."
+       install_nginx_certbot_deploy_hook
+       ensure_nginx_le_auto_renew
+       log "Проверяю необходимость продления Let's Encrypt для $host..."
+@@ -6644,7 +6717,7 @@ restart_cmd() {
+   need_root; need_systemd; banner
+   local host="${1:-}" p
+   [[ -n "$host" ]] || host="$(select_instance)"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   instance_exists "$host" || die "Нет $host"
+   relay_lock_acquire || die "Другая операция обновляет или перезапускает relay; повтори позже."
+@@ -7811,7 +7884,7 @@ field_report_cmd() {
+   done
+   [[ -n "$host" ]] || host="$(select_instance)"
+   [[ -n "$host" ]] || die "$(ui_msg field_usage)"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
+ 
+   local safe_host row ip_scope dpi_before dpi_after ts bundle
+   safe_host="$(field_safe_label "$host")"

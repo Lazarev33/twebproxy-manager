@@ -24,6 +24,8 @@ GATED=(
   tests/stagea/sa3-state-publication.sh
   tests/fieldgate/tg1-real-nft-six-mode-gate.sh
   tests/fieldgate/tg3-installed-manager-lifecycle.sh
+  tests/prerc/dpi-enospc-real.sh
+  tests/prerc2/proc_fail_closed_probe.sh
 )
 PRIVILEGED='\bunshare\b|\bmount\b|\bumount\b|command -v nft|/run/systemd/system'
 
@@ -84,7 +86,7 @@ else
 fi
 declare -A STATICALLY_GATED=()
 for f in "${GATED[@]}"; do
-  gate_line="$(grep -nE '^[^#]*lab_gate_(or_exit|allows)\b' "$ROOT/$f" | head -n1 | cut -d: -f1)"
+  gate_line="$(grep -nE '^[^#]*(lab_gate_(or_exit|allows)|installed_host_gate_or_exit)\b' "$ROOT/$f" | head -n1 | cut -d: -f1)"
   priv_line="$(grep -nE "$PRIVILEGED" "$ROOT/$f" | grep -vE '^[0-9]+:\s*#' | head -n1 | cut -d: -f1)"
   if [[ -n "$gate_line" && -n "$priv_line" && "$gate_line" -lt "$priv_line" ]]; then
     ok "gate_precedes_privilege:${f##*/}"; STATICALLY_GATED[$f]=1

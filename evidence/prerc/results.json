@@ -1,0 +1,819 @@
+{
+ "checkpoint": "v0.2.23-beta pre-RC corrections",
+ "baseline": {
+  "commit": "a2f5bddf90031acc805ea74a714e53862919c2c0",
+  "tree": "b7d2df7a6176bc09a59504135cec451aac4a0600",
+  "manager_sha256": "faa54d9a202f4f2a7486ed81269dd8ab6a099e4d9c416b838b067317211476de"
+ },
+ "input_pack_sha256": "4ce870669a65c0fc48a040f34750fd238dd6162723fa705e44417b85d59715ac",
+ "verdict": "CORRECTIONS_DEVELOPMENT_COMPLETE; awaiting independent acceptance; NOT an RC",
+ "independence": "not independent: implemented and tested by the same Claude session",
+ "environment": "disposable test VPS (owner-authorized), Ubuntu 24.04.5, kernel 6.8.0-147, systemd 255, nft 1.0.9; no reboot; production server untouched",
+ "p1": {
+  "P1-EXPOSURE-01": {
+   "red": "start nftables: 14183/14185 external backend samples connected; reload 4015/4046; 8 twebproxy_backend deletions",
+   "green": "0 open samples in all transitions (nftables start/reload/restart/stop, firewall restart/reload/stop/start, repair, multi-user.target cold start; 3 back-to-back runs); guard handle and owner PID constant across nftables transitions; foreign table preserved; isolated real systemd validation 10/10",
+   "status": "FIXED_REAL_HOST"
+  },
+  "P1-STOP-01": {
+   "red": "stop nftables -> firewall + 4 relay/backend units inactive; firewall restart/start left 4/4 inactive",
+   "green": "stop nftables -> all active; firewall stop -> backends inactive (fail-closed); start -> both active; no unit non-active after ~45 rapid transitions",
+   "status": "FIXED_REAL_HOST"
+  },
+  "P1-G-01": {
+   "red": "helper and manager-rollback exit 0 RESTORE_SUCCESS with stale metadata",
+   "green": "exit 3 RESTORE_PARTIAL metadata=stale (helper and CLI); repair while immutable exit 1 actionable; recovery consistent",
+   "status": "FIXED_REAL_HOST"
+  },
+  "P1-INHERITED-01": {
+   "red": "12/12 reader x backend combinations could read -S",
+   "green": "0/12, PIDs invisible; fstab boot path proven via systemd-remount-fs restart",
+   "status": "MITIGATED_BY_ENFORCED_HOST_POLICY_REAL_HOST"
+  }
+ },
+ "p2": {
+  "dpi_enospc": "FIXED (truthful message, kernel consistency in status)",
+  "rollback_eof_decline": "FIXED (130/1, ROLLBACK_NOT_PERFORMED)",
+  "caddy_async_acme": "FIXED (bounded 90 s wait; fresh real issuance PASS)",
+  "core_uninstall_residue": "FIXED (0 units, 0 dangling links)",
+  "tg3_residue": "FIXED (Stage A ran after tg3 with all mandatory checks)",
+  "zip_modes": "FIXED (umask 022 packaging)"
+ },
+ "lab_real": {
+  "tg3": "19 PASS / 1 NOT_EXECUTED",
+  "stage_a_suite": "PASS",
+  "stage_b_suite": "PASS (real kernel transactions + real systemd lifecycle)",
+  "tg1": "21/21"
+ },
+ "regression": {
+  "counts": {
+   "0": 40,
+   "77": 2
+  },
+  "rows": [
+   {
+    "name": "git-diff-check",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "git diff --check stage-h/v0.2.22: clean"
+   },
+   {
+    "name": "bash-n-all",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "bash -n OK (104 scripts)"
+   },
+   {
+    "name": "e-operations",
+    "rc": "0",
+    "seconds": "92",
+    "last_line": "e-operations: pass=48 fail=0"
+   },
+   {
+    "name": "suite-stage-e",
+    "rc": "0",
+    "seconds": "98",
+    "last_line": "stage-e-suite: PASS (all mandatory model checks executed)"
+   },
+   {
+    "name": "f-updater",
+    "rc": "0",
+    "seconds": "64",
+    "last_line": "updater-fixture: 278 pass, 0 fail"
+   },
+   {
+    "name": "suite-stage-f",
+    "rc": "0",
+    "seconds": "84",
+    "last_line": "stage-f-suite: PASS (all mandatory model checks executed)"
+   },
+   {
+    "name": "suite-stage-g",
+    "rc": "0",
+    "seconds": "92",
+    "last_line": "stage-g-suite: PASS (all mandatory checks executed)"
+   },
+   {
+    "name": "suite-stage-h",
+    "rc": "0",
+    "seconds": "42",
+    "last_line": "stage-h-suite: PASS (all mandatory checks executed)"
+   },
+   {
+    "name": "prerc-scope-vs-v0222",
+    "rc": "0",
+    "seconds": "7",
+    "last_line": "PASS prerc-scope unchanged=400 modified=20 added=22  [rerun after golden-fixture update]"
+   },
+   {
+    "name": "heredoc-guard",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "heredoc-guard: PASS (no backtick in an unquoted heredoc)"
+   },
+   {
+    "name": "python-compile",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "python syntax OK"
+   },
+   {
+    "name": "stage4-mandatory-suite",
+    "rc": "0",
+    "seconds": "19",
+    "last_line": "stage4-mandatory-suite: PASS (A-V all executed)  [rerun after golden-fixture update]",
+    "null": [
+     "OK",
+     "profile:fixture.example/default"
+    ]
+   },
+   {
+    "name": "stage-x-dpi-suite",
+    "rc": "0",
+    "seconds": "19",
+    "last_line": "stage-x-dpi-suite: PASS (all mandatory autonomous tests executed; mandatory_skips=0)  [rerun after golden-fixture update]",
+    "null": [
+     "OK",
+     "profile:fixture.example/default"
+    ]
+   },
+   {
+    "name": "stage-x-dpi-installed-asset",
+    "rc": "0",
+    "seconds": "3",
+    "last_line": "stage-x-dpi-installed-asset-fixture: PASS"
+   },
+   {
+    "name": "updater-function-hashes",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "830f6cd889f2c821c2fc69fe6b623c2595be0180517bfb7d2197079687c6b859  stage4-protected-function-set-full"
+   },
+   {
+    "name": "d-frontend-tls",
+    "rc": "0",
+    "seconds": "38",
+    "last_line": "d-frontend-tls: pass=122 fail=0"
+   },
+   {
+    "name": "suite-stage-d",
+    "rc": "0",
+    "seconds": "38",
+    "last_line": "stage-d-suite: PASS (all mandatory model checks executed)"
+   },
+   {
+    "name": "suite-stage-c2",
+    "rc": "0",
+    "seconds": "30",
+    "last_line": "stage-c2-suite: PASS (all mandatory model checks executed)"
+   },
+   {
+    "name": "suite-stage-c1",
+    "rc": "0",
+    "seconds": "51",
+    "last_line": "stage-c1-suite: PASS (all mandatory model checks executed)"
+   },
+   {
+    "name": "audit-c11-cross-instance-orphan",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "PASS"
+   },
+   {
+    "name": "audit-c11-backend-id-collision",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "PASS: existing B/x backend env preserved"
+   },
+   {
+    "name": "audit-c1-failed-backend-stop",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "FW collection ports=[23980,23981,28980,28981]"
+   },
+   {
+    "name": "audit-c1-orphan-backend",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "API profiles=[alpha]"
+   },
+   {
+    "name": "suite-stage-b",
+    "rc": "77",
+    "seconds": "14",
+    "last_line": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+   },
+   {
+    "name": "suite-stage-a",
+    "rc": "77",
+    "seconds": "71",
+    "last_line": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+   },
+   {
+    "name": "protocol-meta",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+   },
+   {
+    "name": "sa6-release-metadata",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "sa6-release-metadata: 6 pass, 0 fail"
+   },
+   {
+    "name": "fg-tg5",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "tg5: pass=13 fail=0"
+   },
+   {
+    "name": "fg-tg5b",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "tg5b: pass=19 fail=0"
+   },
+   {
+    "name": "fg-tg7",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "tg7: pass=12 fail=0"
+   },
+   {
+    "name": "fg-df3",
+    "rc": "0",
+    "seconds": "11",
+    "last_line": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+   },
+   {
+    "name": "fg-df3b",
+    "rc": "0",
+    "seconds": "2",
+    "last_line": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+   },
+   {
+    "name": "read-only-core",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "read-only-core-fixture: PASS  [rerun after golden-fixture update]",
+    "null": [
+     "OK",
+     "profile:fixture.example/default"
+    ]
+   },
+   {
+    "name": "l10n-static-C",
+    "rc": "0",
+    "seconds": "6",
+    "last_line": "localization-static-audit: PASS (327 bilingual keys; 407 legacy call-sites)"
+   },
+   {
+    "name": "l10n-static-UTF8",
+    "rc": "0",
+    "seconds": "7",
+    "last_line": "localization-static-audit: PASS (327 bilingual keys; 407 legacy call-sites)"
+   },
+   {
+    "name": "l10n-flow-C",
+    "rc": "0",
+    "seconds": "4",
+    "last_line": "localization-flow-fixture: PASS (locale=C)"
+   },
+   {
+    "name": "l10n-flow-UTF8",
+    "rc": "0",
+    "seconds": "4",
+    "last_line": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+   },
+   {
+    "name": "static-smoke",
+    "rc": "0",
+    "seconds": "1",
+    "last_line": "static-smoke: PASS"
+   },
+   {
+    "name": "certificate-smoke",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "certificate-smoke: PASS"
+   },
+   {
+    "name": "tui-presentation",
+    "rc": "0",
+    "seconds": "3",
+    "last_line": "tui-presentation-fixture: PASS"
+   },
+   {
+    "name": "stage-x-fixui",
+    "rc": "0",
+    "seconds": "18",
+    "last_line": "stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)  [rerun after golden-fixture update]",
+    "null": [
+     "OK",
+     "profile:fixture.example/default"
+    ]
+   },
+   {
+    "name": "stage4-hash",
+    "rc": "0",
+    "seconds": "0",
+    "last_line": "bf060d063c53bd220210036c227df0cb251d5ba749c860df411b6de5fbb3c223  stage4-protected-function-set"
+   }
+  ],
+  "sentinel_calls": 0
+ },
+ "stage4_hashes": {
+  "legacy": [
+   "2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0",
+   "bf060d063c53bd220210036c227df0cb251d5ba749c860df411b6de5fbb3c223"
+  ],
+  "full": [
+   "b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d",
+   "830f6cd889f2c821c2fc69fe6b623c2595be0180517bfb7d2197079687c6b859"
+  ],
+  "changed_via": "stage4_render_restore_helper (s4_restore_id) only"
+ },
+ "scope": {
+  "functions_unchanged": 400,
+  "modified": 20,
+  "added": 22,
+  "removed": 0
+ },
+ "not_executed": [
+  "owner-flag behaviour on Debian 12 / Ubuntu 22.04",
+  "real cold boot with the new unit graph",
+  "genuine Telegram clients",
+  "signed release",
+  "GitHub publication (no credentials)"
+ ],
+ "commands": [
+  {
+   "name": "red0-identity",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:43:28Z",
+   "end_utc": "2026-10-29T12:43:28Z",
+   "command": "bash -c sha256sum\\ /usr/local/sbin/twebproxy\\ /opt/twebproxy-manager/twebproxy-manager.sh\\ work/twebproxy-manager.sh\\ \\|\\ cut\\ -c1-16\\;\\ grep\\ -m1\\ \\^MANAGER_VERSION=\\ /usr/local/sbin/twebproxy\\;\\ uname\\ -r\\;\\ cat\\ /proc/sys/kernel/random/boot_id\\;\\ ls\\ /etc/twebproxy/instances\\ \\|\\ wc\\ -l ",
+   "last_line": "2"
+  },
+  {
+   "name": "red1-fw-transitions",
+   "class": "REAL_HOST",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T12:43:28Z",
+   "end_utc": "2026-10-29T12:43:51Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 300 bash work/tests/prerc/fw-transition-probe.sh evidence/red1-fw-transitions ",
+   "last_line": "TOTAL backend OPEN samples from the external peer: 18966 of 24501"
+  },
+  {
+   "name": "red1b-recover-repair",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:44:05Z",
+   "end_utc": "2026-10-29T12:44:22Z",
+   "command": "bash -c for\\ h\\ in\\ \\$\\(ls\\ /etc/twebproxy/instances\\)\\;\\ do\\ twebproxy\\ repair\\ \\\"\\$h\\\"\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"repair\\ rc=\\$\\?\\\"\\;\\ done\\;\\ systemctl\\ list-units\\ --no-legend\\ --plain\\ \\\"twebproxy@\\*\\\"\\ \\\"twebproxy-mtproxy@\\*\\\"\\ \\|\\ grep\\ -c\\ \\\"\\ active\\ running\\\" ",
+   "last_line": "4"
+  },
+  {
+   "name": "red2-restore-metadata",
+   "class": "REAL_HOST",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T12:44:58Z",
+   "end_utc": "2026-10-29T12:45:30Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 1200 python3 -I work/tests/prerc/restore-metadata-real.py evidence/red2-restore-metadata ",
+   "last_line": "VERDICT: FAIL (P1-G-01 reproducible)"
+  },
+  {
+   "name": "red3-proc-secret",
+   "class": "REAL_HOST",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T12:45:48Z",
+   "end_utc": "2026-10-29T12:45:48Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/proc-secret-real.sh ",
+   "last_line": "root still sees backends: 149 pids visible to root; secret exposures to unprivileged readers: 12"
+  },
+  {
+   "name": "red4-rollback-eof",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:45:48Z",
+   "end_utc": "2026-10-29T12:45:49Z",
+   "command": "bash -c twebproxy\\ manager-rollback\\ latest\\ \\</dev/null\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ sha256sum\\ /usr/local/sbin/twebproxy\\ \\|\\ cut\\ -c1-16 ",
+   "last_line": "faa54d9a202f4f2a"
+  },
+  {
+   "name": "red5-dpi-enospc",
+   "class": "REAL_HOST",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T12:46:18Z",
+   "end_utc": "2026-10-29T12:46:24Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/dpi-enospc-real.sh <host-1> ",
+   "last_line": "VERDICT: FAIL"
+  },
+  {
+   "name": "g0-upgrade-repair-1",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:55:01Z",
+   "end_utc": "2026-10-29T12:55:14Z",
+   "command": "timeout 900 bash work/twebproxy-manager.sh repair <host-1> ",
+   "last_line": "  Если не подключается: откройте https://<host-1>/ в браузере (сертификат должен быть действительным), затем выполните: twebproxy"
+  },
+  {
+   "name": "g0-upgrade-repair-2",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:55:14Z",
+   "end_utc": "2026-10-29T12:55:23Z",
+   "command": "timeout 900 bash work/twebproxy-manager.sh repair <host-2> ",
+   "last_line": "  Если не подключается: откройте https://<host-2>/ в браузере (сертификат должен быть действительным), затем выполните: twebproxy "
+  },
+  {
+   "name": "g0-reinstall-fixed",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:55:56Z",
+   "end_utc": "2026-10-29T12:56:04Z",
+   "command": "timeout 900 bash work/twebproxy-manager.sh repair <host-1> ",
+   "last_line": "  Если не подключается: откройте https://<host-1>/ в браузере (сертификат должен быть действительным), затем выполните: twebproxy"
+  },
+  {
+   "name": "green1-fw-transitions",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:56:04Z",
+   "end_utc": "2026-10-29T12:56:27Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 300 bash work/tests/prerc/fw-transition-probe.sh evidence/green1-fw-transitions ",
+   "last_line": "TOTAL backend OPEN samples from the external peer: 0 of 506"
+  },
+  {
+   "name": "g0-reinstall-fixed2",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:57:14Z",
+   "end_utc": "2026-10-29T12:57:32Z",
+   "command": "bash -c for\\ h\\ in\\ <host-1>\\ <host-2>\\;\\ do\\ timeout\\ 900\\ bash\\ work/twebproxy-manager.sh\\ repair\\ \\$h\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"repair\\ rc=\\$\\?\\\"\\;\\ done\\;\\ ls\\ /etc/systemd/system/twebproxy-firewall.service.wants/\\ \\|\\ sed\\ -E\\ \\\"s/\\(<domain-1>\\|<domain-2>\\)/\\<d\\>/g\\\"\\;\\ cmp\\ /usr/local/sbin/twebproxy\\ work/twebproxy-manager.sh\\ \\&\\&\\ echo\\ installed==source ",
+   "last_line": "installed==source"
+  },
+  {
+   "name": "green1-fw-transitions",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:57:32Z",
+   "end_utc": "2026-10-29T12:57:55Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 300 bash work/tests/prerc/fw-transition-probe.sh evidence/green1-fw-transitions ",
+   "last_line": "TOTAL backend OPEN samples from the external peer: 0 of 400"
+  },
+  {
+   "name": "green2-restore-metadata",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:58:13Z",
+   "end_utc": "2026-10-29T12:58:55Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 1500 python3 -I work/tests/prerc/restore-metadata-real.py evidence/green2-restore-metadata ",
+   "last_line": "VERDICT: PASS (partial restore reported non-zero, recovery consistent)"
+  },
+  {
+   "name": "green3-proc-secret",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:59:10Z",
+   "end_utc": "2026-10-29T12:59:10Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/proc-secret-real.sh ",
+   "last_line": "root still sees backends: 157 pids visible to root; secret exposures to unprivileged readers: 0"
+  },
+  {
+   "name": "green4-rollback-eof",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:59:10Z",
+   "end_utc": "2026-10-29T12:59:15Z",
+   "command": "bash -c twebproxy\\ manager-rollback\\ latest\\ \\</dev/null\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ printf\\ \\\"n\\\\n\\\"\\ \\|\\ twebproxy\\ manager-rollback\\ latest\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ sha256sum\\ /usr/local/sbin/twebproxy\\ \\|\\ cut\\ -c1-16 ",
+   "last_line": "2e9992b16c476f56"
+  },
+  {
+   "name": "green4-rollback-eof",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T12:59:44Z",
+   "end_utc": "2026-10-29T12:59:45Z",
+   "command": "bash -c M=<scratch> bash\\ \\$M\\ manager-rollback\\ latest\\ \\</dev/null\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ printf\\ \\\"n\\\\n\\\"\\ \\|\\ bash\\ \\$M\\ manager-rollback\\ latest\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ sha256sum\\ /usr/local/sbin/twebproxy\\ \\|\\ cut\\ -c1-16 ",
+   "last_line": "2e9992b16c476f56"
+  },
+  {
+   "name": "green5-dpi-enospc",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:00:01Z",
+   "end_utc": "2026-10-29T13:00:07Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/dpi-enospc-real.sh <host-1> ",
+   "last_line": "VERDICT: PASS"
+  },
+  {
+   "name": "g0-reinstall-fixed3",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:15:09Z",
+   "end_utc": "2026-10-29T13:15:27Z",
+   "command": "bash -c for\\ h\\ in\\ <host-1>\\ <host-2>\\;\\ do\\ timeout\\ 900\\ bash\\ work/twebproxy-manager.sh\\ repair\\ \\$h\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"repair\\ rc=\\$\\?\\\"\\;\\ done\\;\\ cmp\\ /usr/local/sbin/twebproxy\\ work/twebproxy-manager.sh\\ \\&\\&\\ echo\\ installed==source ",
+   "last_line": "installed==source"
+  },
+  {
+   "name": "green1-fw-transitions",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:15:27Z",
+   "end_utc": "2026-10-29T13:16:08Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/green1-fw-transitions ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "green1b-guard-continuity",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:16:27Z",
+   "end_utc": "2026-10-29T13:16:27Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/guard-continuity-real.sh ",
+   "last_line": "VERDICT: PASS"
+  },
+  {
+   "name": "green1b-guard-continuity",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:16:42Z",
+   "end_utc": "2026-10-29T13:16:42Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/guard-continuity-real.sh ",
+   "last_line": "VERDICT: PASS"
+  },
+  {
+   "name": "g6-delete-web",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:17:06Z",
+   "end_utc": "2026-10-29T13:17:09Z",
+   "command": "bash -c printf\\ \\\"y\\\\n\\\"\\ \\|\\ timeout\\ 300\\ twebproxy\\ delete\\ <host-2> ",
+   "last_line": "[+] <host-2> удалён."
+  },
+  {
+   "name": "g6-drop-caddy-cert",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:17:09Z",
+   "end_utc": "2026-10-29T13:17:11Z",
+   "command": "bash -c d=\\$\\(find\\ /var/lib/caddy\\ -type\\ d\\ -name\\ <host-2>\\ -path\\ \\\"\\*certificates\\*\\\"\\ 2\\>/dev/null\\)\\;\\ echo\\ \\\"stored:\\ \\$\\(echo\\ \\\"\\$d\\\"\\ \\|\\ sed\\ -E\\ \\\"s/\\(<domain-2>\\)/\\<d\\>/g\\\"\\)\\\"\\;\\ \\[\\[\\ -n\\ \\\"\\$d\\\"\\ \\]\\]\\ \\&\\&\\ rm\\ -rf\\ --\\ \\$d\\;\\ systemctl\\ restart\\ caddy\\;\\ sleep\\ 2\\;\\ echo\\ \\\"remaining\\ stored\\ certs\\ for\\ the\\ name:\\ \\$\\(find\\ /var/lib/caddy\\ -type\\ d\\ -name\\ <host-2>\\ -path\\ \\\"\\*certificates\\*\\\"\\ \\|\\ wc\\ -l\\)\\;\\ caddy=\\$\\(systemctl\\ is-active\\ caddy\\)\\\" ",
+   "last_line": "remaining stored certs for the name: 0; caddy=active"
+  },
+  {
+   "name": "green6-caddy-async-acme",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T13:17:11Z",
+   "end_utc": "2026-10-29T13:17:23Z",
+   "command": "timeout 900 python3 -I work/tests/prerc/quick-setup-pty.py evidence/green6-caddy <host-2> 1 ",
+   "last_line": "{\"host\": \"<host-2>\", \"tls_choice\": \"1\", \"exit_code\": 0, \"error\": null, \"created\": true, \"plan_quick\": true, \"plan_stock\": true, \"client_help\": true}"
+  },
+  {
+   "name": "u1-delete-all",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:54:52Z",
+   "end_utc": "2026-10-29T17:54:58Z",
+   "command": "bash -c for\\ h\\ in\\ \\$\\(ls\\ /etc/twebproxy/instances\\)\\;\\ do\\ printf\\ \\\"y\\\\n\\\"\\ \\|\\ timeout\\ 300\\ twebproxy\\ delete\\ \\\"\\$h\\\"\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"delete\\ rc=\\$\\?\\\"\\;\\ done ",
+   "last_line": "delete rc=0"
+  },
+  {
+   "name": "u2-core-uninstall",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:54:58Z",
+   "end_utc": "2026-10-29T17:55:00Z",
+   "command": "bash -c printf\\ \\\"y\\\\n\\\"\\ \\|\\ timeout\\ 600\\ twebproxy\\ core-uninstall ",
+   "last_line": "[+] Логи сохранены: /opt/twebproxy-manager/logs"
+  },
+  {
+   "name": "u3-postconditions",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:55:00Z",
+   "end_utc": "2026-10-29T17:55:00Z",
+   "command": "bash -c echo\\ \\\"loaded\\ twebproxy\\ units:\\ \\$\\(systemctl\\ list-units\\ --all\\ --no-legend\\ --plain\\ \\\"twebproxy\\*\\\"\\ \\|\\ wc\\ -l\\)\\\"\\;\\ echo\\ \\\"dangling\\ links:\\ \\$\\(find\\ /etc/systemd/system\\ -xtype\\ l\\ -name\\ \\\"twebproxy\\*\\\"\\ \\|\\ wc\\ -l\\)\\\"\\;\\ echo\\ \\\"unit\\ files:\\ \\$\\(ls\\ /etc/systemd/system\\ \\|\\ grep\\ -c\\ twebproxy\\)\\\"\\;\\ echo\\ \\\"nft\\ tables:\\ \\[\\$\\(nft\\ list\\ tables\\ \\|\\ tr\\ \\\"\\\\n\\\"\\ \\\"\\ \\\"\\)\\]\\\"\\;\\ echo\\ \\\"nftables\\ drop-in:\\ \\$\\(ls\\ /etc/systemd/system/nftables.service.d\\ 2\\>/dev/null\\ \\|\\ wc\\ -l\\)\\\"\\;\\ echo\\ \\\"guard\\ helper:\\ \\$\\(ls\\ /usr/local/libexec/twebproxy/\\ 2\\>/dev/null\\ \\|\\ tr\\ \\\"\\\\n\\\"\\ \\\"\\ \\\"\\)\\\"\\;\\ echo\\ \\\"nft\\ -i\\ sessions:\\ \\$\\(pgrep\\ -x\\ nft\\ \\|\\ wc\\ -l\\)\\\"\\;\\ echo\\ \\\"procfs:\\ \\$\\(findmnt\\ -no\\ OPTIONS\\ /proc\\)\\ fstab_mark=\\$\\(grep\\ -c\\ twebproxy-proc-hardening\\ /etc/fstab\\)\\\" ",
+   "last_line": "procfs: rw,nosuid,nodev,noexec,relatime,gid=985,hidepid=invisible fstab_mark=1"
+  },
+  {
+   "name": "g7-proc-policy-cycle",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:55:17Z",
+   "end_utc": "2026-10-29T17:55:18Z",
+   "command": "bash -c $'\\ns() { echo \"  procfs=[$(findmnt -no OPTIONS /proc)] fstab_mark=$(grep -c twebproxy-proc-hardening /etc/fstab) www-data_sees_pid1=$(setpriv --reuid=33 --regid=33 --clear-groups sh -c \"test -r /proc/1/cmdline && echo yes || echo no\")\"; }\\necho \"status:\"; twebproxy proc-hardening status >/dev/null 2>&1; echo \"  rc=$?\"; s\\necho \"disable:\"; twebproxy proc-hardening disable >/dev/null 2>&1; echo \"  rc=$?\"; s; twebproxy proc-hardening status >/dev/null 2>&1; echo \"  status rc=$? (0 = accepted risk recorded? / policy file removed with core)\"\\necho \"enable:\"; twebproxy proc-hardening enable >/dev/null 2>&1; echo \"  rc=$?\"; s\\necho \"boot path: reset /proc to defaults, then systemd-remount-fs.service applies /etc/fstab\"\\nmount -o remount,hidepid=default /proc; s\\nsystemctl restart systemd-remount-fs.service; echo \"  remount-fs rc=$?\"; s' ",
+   "last_line": "  procfs=[rw,nosuid,nodev,noexec,relatime,gid=985,hidepid=invisible] fstab_mark=1 www-data_sees_pid1=no"
+  },
+  {
+   "name": "g7-proc-boot-path",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:55:35Z",
+   "end_utc": "2026-10-29T17:55:35Z",
+   "command": "bash -c $'\\ns() { echo \"  procfs=[$(findmnt -no OPTIONS /proc)] www-data_sees_pid1=$(setpriv --reuid=33 --regid=33 --clear-groups sh -c \"test -r /proc/1/cmdline && echo yes || echo no\")\"; }\\necho \"reset /proc as a fresh boot mounts it (hidepid=0):\"; mount -o remount,hidepid=0 /proc; s\\necho \"systemd-remount-fs.service (the boot unit that applies /etc/fstab options to /proc):\"; systemctl restart systemd-remount-fs.service; echo \"  rc=$?\"; s' ",
+   "last_line": "  procfs=[rw,nosuid,nodev,noexec,relatime,gid=985,hidepid=invisible] www-data_sees_pid1=no"
+  },
+  {
+   "name": "l1-tg3-installed-lifecycle",
+   "class": "LAB_REAL",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:56:00Z",
+   "end_utc": "2026-10-29T17:56:01Z",
+   "command": "env TWEBPROXY_LAB_MODE=disposable-vm timeout 600 bash <work>/tests/fieldgate/tg3-installed-manager-lifecycle.sh ",
+   "last_line": "tg3: pass=19 fail=0 neel=1"
+  },
+  {
+   "name": "l2-suite-stage-b",
+   "class": "LAB_REAL",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T17:56:01Z",
+   "end_utc": "2026-10-29T17:56:14Z",
+   "command": "env TWEBPROXY_LAB_MODE=disposable-vm timeout 1800 bash <work>/tests/stageb/run-stage-b-suite.sh ",
+   "last_line": "stage-b-suite: FAIL"
+  },
+  {
+   "name": "l3-suite-stage-a",
+   "class": "LAB_REAL",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:56:14Z",
+   "end_utc": "2026-10-29T17:57:23Z",
+   "command": "env TWEBPROXY_LAB_MODE=disposable-vm timeout 1800 bash <work>/tests/stagea/run-stage-a-suite.sh ",
+   "last_line": "stage-a-suite: PASS (all mandatory checks executed)"
+  },
+  {
+   "name": "l4-tg1-real-nft",
+   "class": "LAB_REAL",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:57:23Z",
+   "end_utc": "2026-10-29T17:57:23Z",
+   "command": "env TWEBPROXY_LAB_MODE=disposable-vm timeout 300 bash <work>/tests/fieldgate/tg1-real-nft-six-mode-gate.sh ",
+   "last_line": "tg1: pass=21 fail=0 neel=0"
+  },
+  {
+   "name": "l2-suite-stage-b",
+   "class": "LAB_REAL",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T17:59:59Z",
+   "end_utc": "2026-10-29T18:00:16Z",
+   "command": "env TWEBPROXY_LAB_MODE=disposable-vm timeout 1800 bash work/tests/stageb/run-stage-b-suite.sh ",
+   "last_line": "stage-b-suite: PASS (all mandatory checks executed)"
+  },
+  {
+   "name": "r1-core-install",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:00:36Z",
+   "end_utc": "2026-10-29T18:01:06Z",
+   "command": "env TWEBPROXY_UI_LANGUAGE=en timeout 1500 bash work/twebproxy-manager.sh core-install ",
+   "last_line": "[+] TWebProxy core installed. Add a hostname with: twebproxy add"
+  },
+  {
+   "name": "r2-quick-setup-<host-1>",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:01:06Z",
+   "end_utc": "2026-10-29T18:01:14Z",
+   "command": "timeout 900 python3 -I work/tests/prerc/quick-setup-pty.py evidence/reinstall <host-1> 1 ",
+   "last_line": "{\"host\": \"<host-1>\", \"tls_choice\": \"1\", \"exit_code\": 0, \"error\": null, \"created\": true, \"plan_quick\": true, \"plan_stock\": true, \"client_help\": true}"
+  },
+  {
+   "name": "r2-quick-setup-<host-2>",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:01:14Z",
+   "end_utc": "2026-10-29T18:01:23Z",
+   "command": "timeout 900 python3 -I work/tests/prerc/quick-setup-pty.py evidence/reinstall <host-2> 1 ",
+   "last_line": "{\"host\": \"<host-2>\", \"tls_choice\": \"1\", \"exit_code\": 0, \"error\": null, \"created\": true, \"plan_quick\": true, \"plan_stock\": true, \"client_help\": true}"
+  },
+  {
+   "name": "final1-fw-transitions",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:01:40Z",
+   "end_utc": "2026-10-29T18:02:20Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       1 twebproxy-mtproxy@*.service=active       1 twebproxy-mtproxy@*.service=failed       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "final2-guard-continuity",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:02:20Z",
+   "end_utc": "2026-10-29T18:02:20Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/guard-continuity-real.sh ",
+   "last_line": "VERDICT: PASS"
+  },
+  {
+   "name": "final3-restore-metadata",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:02:20Z",
+   "end_utc": "2026-10-29T18:02:49Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 1500 python3 -I work/tests/prerc/restore-metadata-real.py evidence/final3-restore-metadata ",
+   "last_line": "VERDICT: PASS (partial restore reported non-zero, recovery consistent)"
+  },
+  {
+   "name": "final4-proc-secret",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:02:49Z",
+   "end_utc": "2026-10-29T18:02:49Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host bash work/tests/prerc/proc-secret-real.sh ",
+   "last_line": "root still sees backends: 155 pids visible to root; secret exposures to unprivileged readers: 0"
+  },
+  {
+   "name": "final5-rollback-eof",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:02:49Z",
+   "end_utc": "2026-10-29T18:02:50Z",
+   "command": "bash -c twebproxy\\ manager-rollback\\ latest\\ \\</dev/null\\;\\ echo\\ \\\"exit=\\$\\?\\\"\\;\\ printf\\ \\\"n\\\\n\\\"\\ \\|\\ twebproxy\\ manager-rollback\\ latest\\;\\ echo\\ \\\"exit=\\$\\?\\\" ",
+   "last_line": "exit=1"
+  },
+  {
+   "name": "final6-dpi-enospc",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:02:50Z",
+   "end_utc": "2026-10-29T18:02:56Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/dpi-enospc-real.sh <host-1> ",
+   "last_line": "VERDICT: PASS"
+  },
+  {
+   "name": "g8-deploy-startlimit-fix",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:04:01Z",
+   "end_utc": "2026-10-29T18:04:19Z",
+   "command": "bash -c for\\ h\\ in\\ <host-1>\\ <host-2>\\;\\ do\\ timeout\\ 900\\ bash\\ work/twebproxy-manager.sh\\ repair\\ \\$h\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"repair\\ rc=\\$\\?\\\"\\;\\ done\\;\\ cmp\\ /usr/local/sbin/twebproxy\\ work/twebproxy-manager.sh\\ \\&\\&\\ echo\\ installed==source\\;\\ grep\\ -c\\ reset-failed\\ /etc/systemd/system/twebproxy-firewall.service ",
+   "last_line": "1"
+  },
+  {
+   "name": "final1-fw-transitions-run1",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:04:19Z",
+   "end_utc": "2026-10-29T18:05:00Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions-run1 ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "final1-fw-transitions-run2",
+   "class": "REAL_HOST",
+   "exit_code": "1",
+   "start_utc": "2026-10-29T18:05:01Z",
+   "end_utc": "2026-10-29T18:05:38Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions-run2 ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "g9-deploy-no-firewall-startlimit",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:06:10Z",
+   "end_utc": "2026-10-29T18:06:29Z",
+   "command": "bash -c for\\ h\\ in\\ <host-1>\\ <host-2>\\;\\ do\\ timeout\\ 900\\ bash\\ work/twebproxy-manager.sh\\ repair\\ \\$h\\ \\>/dev/null\\ 2\\>\\&1\\;\\ echo\\ \\\"repair\\ rc=\\$\\?\\\"\\;\\ done\\;\\ systemctl\\ reset-failed\\ \\\"twebproxy\\*\\\"\\;\\ cmp\\ /usr/local/sbin/twebproxy\\ work/twebproxy-manager.sh\\ \\&\\&\\ echo\\ installed==source\\;\\ systemctl\\ show\\ -p\\ StartLimitIntervalUSec\\ --value\\ twebproxy-firewall ",
+   "last_line": "0"
+  },
+  {
+   "name": "final1-fw-transitions-x1",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:06:29Z",
+   "end_utc": "2026-10-29T18:07:10Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions-x1 ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "final1-fw-transitions-x2",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:07:10Z",
+   "end_utc": "2026-10-29T18:07:51Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions-x2 ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "final1-fw-transitions-x3",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:07:51Z",
+   "end_utc": "2026-10-29T18:08:33Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 600 bash work/tests/prerc/fw-transition-probe.sh evidence/final1-fw-transitions-x3 ",
+   "last_line": "units after the run:       1 twebproxy-firewall.service=active       2 twebproxy-mtproxy@*.service=active       2 twebproxy@*.service=active "
+  },
+  {
+   "name": "final-real-suite",
+   "class": "REAL_HOST",
+   "exit_code": "0",
+   "start_utc": "2026-10-29T18:31:14Z",
+   "end_utc": "2026-10-29T18:32:35Z",
+   "command": "env TWEBPROXY_PRERC_REAL=installed-test-host timeout 3000 bash work/tests/prerc/run-prerc-real-suite.sh <host-1> evidence/final-real-suite ",
+   "last_line": "prerc-real-suite: PASS"
+  }
+ ]
+}

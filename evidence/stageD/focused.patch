@@ -1,0 +1,1800 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b457ec1..b86f7a5 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,53 @@
+ # Changelog
+ 
++## 0.2.18-beta — 2026-10-27 — Stage D: надёжность frontend и TLS
++
++- Caddy:
++  - блок TWebProxy распознаётся только по точным парным маркерам
++    `# BEGIN/END TWEBPROXY <hostname>`; изменённый, повторный, непарный или
++    перекрещённый с другим блоком маркер — отказ без изменений (раньше
++    потерянный END удалял всё до конца Caddyfile, включая чужие блоки и
++    сайты пользователя);
++  - candidate собирается рядом с активным Caddyfile (относительные `import`
++    разрешаются так же), проверяется `caddy validate` и подменяет файл
++    атомарно (права и владелец сохраняются, symlink разрешается);
++  - при неудачном reload/start прежний файл возвращается без изменений,
++    Caddy продолжает работать с прежней конфигурацией, restart больше не
++    выполняется; предыдущая версия хранится как `Caddyfile.twebproxy-previous`
++    (вместо накапливающихся `*.before-twebproxy.*`).
++- Nginx:
++  - управляемый vhost (`sites-available/twebproxy-<hostname>.conf` и ссылка в
++    `sites-enabled`) записывается атомарно, проверяется `nginx -t` и
++    применяется reload (или start); при любой ошибке файл и ссылка
++    восстанавливаются в точности, работающий Nginx не меняется; неожиданное
++    состояние этих файлов — отказ без изменений;
++  - конфликт `server_name` ищется во всех файлах, кроме своих, и при любом
++    положении имени в списке; Nginx и certbot устанавливаются, только если их
++    нет;
++  - пользовательские certificate/key: пути без опасных символов, ключ должен
++    соответствовать сертификату; предупреждение об истёкшем сертификате и
++    ключе, доступном на чтение всем.
++- Let's Encrypt:
++  - временная HTTP-конфигурация для ACME используется только при первом
++    выпуске; `repair` и продление больше не снимают рабочий HTTPS-vhost;
++  - если certbot не смог продлить ещё действующий сертификат, он остаётся в
++    работе с предупреждением; неудачный первый выпуск убирает временную
++    конфигурацию;
++  - `cert-renew` берёт блокировку инстанса и точно сообщает о сбоях certbot,
++    `nginx -t` и reload; сертификаты не удаляются и не заменяются при сбое.
++- Жизненный цикл:
++  - `delete` сначала удаляет frontend; если это не удалось, ничего не
++    удаляется и инстанс продолжает работать;
++  - изменения общей конфигурации Caddy/Nginx сериализованы блокировкой
++    `frontend`: параллельные операции двух инстансов больше не теряют блок
++    другого;
++  - прерывание (INT/TERM/HUP) во время замены/проверки/reload откладывается
++    до согласованного состояния; существующие каталоги не меняют права.
++- Stage A/A.1, B/B.1, C1/C1.1/C1.2, C2, Stage 4, DPI и stock MTProxy не
++  изменены. Статус: D завершён по модельным тестам разработки; следующий
++  этап — E (операции и диагностика). Реальные проверки Caddy/Nginx/certbot/
++  ACME/systemd остаются обязательными перед RC.
++
+ ## 0.2.17-beta — 2026-10-27 — Stage C2: жизненный цикл relay
+ 
+ - `twebproxy update` (relay):
+diff --git a/VERSION b/VERSION
+index 0fcb3bb..51e8fdc 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.17
++0.2.18
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 79f53d2..10c99ec 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -24,9 +24,10 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | F03/F04/F05/F13 state and profile integrity; independent audit: C1-AUD-01/02 |
+ | v0.2.15 Stage C1.1 | Superseded by C1.2 | C1-AUD-01/02 fixed; independent audit: C11-AUD-03/04 |
+ | v0.2.16 Stage C1.2 | Development accepted (model gates) | C11-AUD-03/04 backend-id ownership fixed; real systemd/nft/race/ENOSPC gates remain mandatory before an RC |
+-| v0.2.17 Stage C2 | **Development accepted (model gates)** | Relay update with atomic install, bounded readiness, final verification, rollback and interruption handling; relay update/restart serialization; restart/delete failure propagation; real systemd/curl/Go/ENOSPC gates remain mandatory before an RC |
++| v0.2.17 Stage C2 | Development accepted (model gates) | Relay update with atomic install, bounded readiness, final verification, rollback and interruption handling; relay update/restart serialization; restart/delete failure propagation; real systemd/curl/Go/ENOSPC gates remain mandatory before an RC |
++| v0.2.18 Stage D | **Development complete (model gates)** | Transactional Caddy blocks and Nginx vhosts (validation, atomic swap, exact restore, no restart), non-interrupting Let's Encrypt issuance/renewal with certificate preservation, frontend-first delete, frontend lock; real Caddy/Nginx/certbot/ACME/systemd gates remain mandatory before an RC |
+ 
+-**Next development stage: D — frontend / TLS** (see "Core implementation stages").
++**Next development stage: E — operations / diagnostics** (see "Core implementation stages").
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+diff --git a/tests/staged/README.md b/tests/staged/README.md
+new file mode 100644
+index 0000000..064719e
+--- /dev/null
++++ b/tests/staged/README.md
+@@ -0,0 +1,29 @@
++# Stage D verification
++
++Frontend and TLS lifecycle: managed Caddy blocks (strict ownership markers,
++candidate validation next to the live Caddyfile, atomic swap, reload with
++restore, never a restart), managed Nginx vhosts (atomic write, nginx -t,
++reload/start with exact restore of file and link), Let's Encrypt issuance,
++renewal and certificate preservation, custom certificate/key checks, and the
++truthful handling of create, repair, delete and cert-renew. Model tests only:
++safe on any Linux test workstation with Bash, jq, coreutils, util-linux and
++openssl; no system state changes.
++
++```sh
++bash tests/staged/run-stage-d-suite.sh             # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/staged/frontend-tls-fixture.sh [<manager>]
++bash tests/staged/d-scope-invariants.sh <v0.2.17 source tree>
++bash tests/staged/rebind-baseline.sh <pre-D manager> <out>   # RED baseline copy
++```
++
++`frontend-harness.sh` extends the C2 relay harness. The frontend locations are
++rebound into the sandbox (`CADDY_DIR`, `CADDYFILE`, `NGINX_DIR`, `LE_DIR`,
++`ACME_WEBROOT`); a manager whose frontend functions still name the real paths
++is refused. `caddy`, `nginx`, `certbot` and the caddy/nginx units are models
++that keep what is *running* separately from what is *on disk*; certificates
++are real self-signed openssl pairs. A pre-D manager has literal paths, so its
++RED run uses `rebind-baseline.sh`, which replaces only those literals (and
++verifies that nothing else changed).
++
++None of this proves real Caddy, Nginx, certbot/ACME or systemd behaviour; those
++remain disposable-VM gates before an RC.
+diff --git a/tests/staged/d-scope-invariants.sh b/tests/staged/d-scope-invariants.sh
+new file mode 100644
+index 0000000..d323a05
+--- /dev/null
++++ b/tests/staged/d-scope-invariants.sh
+@@ -0,0 +1,97 @@
++#!/usr/bin/env bash
++# Stage D scope against the exact v0.2.17 (Stage C2, e841c4e) tree: only the
++# Caddy/Nginx frontend, certificate (Let's Encrypt / custom) and instance delete
++# (frontend removal) paths may change; ui_localize_legacy may only gain lines;
++# new top-level variables are limited to the frontend locations, the
++# interruption flag and the frontend lock; write_nginx_tls_conf is replaced by render_nginx_tls_conf;
++# every other file except release metadata and the ROADMAP status is
++# byte-identical (README, assets, other docs, C1/C2 code and tests included).
++# Usage: d-scope-invariants.sh <v0.2.17 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.17 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-d-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(configure_caddy_host remove_caddy_block nginx_common_install nginx_domain_conflict
++  install_nginx_certbot_deploy_hook configure_nginx_le configure_nginx_custom remove_reverse_proxy_for_instance
++  cert_renew_cmd delete_instance_cmd ui_localize_legacy)
++ADDED=(frontend_lock_acquire frontend_lock_release frontend_dirs frontend_file_replace frontend_signals_defer frontend_signals_end caddy_block_range render_caddy_block
++  caddy_publish caddy_remove_host nginx_managed_state_ok nginx_link_enable nginx_managed_save
++  nginx_managed_restore nginx_test nginx_managed_apply nginx_managed_remove nginx_apply_or_die
++  tls_pair_matches le_cert_usable render_nginx_acme_conf render_nginx_tls_conf)
++REMOVED=(write_nginx_tls_conf)
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS docs/ROADMAP.md)
++ADDED_FILES=(tests/staged/README.md tests/staged/frontend-harness.sh tests/staged/frontend-tls-fixture.sh
++  tests/staged/run-stage-d-suite.sh tests/staged/d-scope-invariants.sh tests/staged/rebind-baseline.sh)
++NEW_VARS=(CADDY_DIR CADDYFILE NGINX_DIR LE_DIR ACME_WEBROOT FRONTEND_INTERRUPTED FRONTEND_LOCK_FD FRONTEND_LOCK_DEPTH)
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  if [[ -z "$new" ]]; then
++    in_list "$fn" "${REMOVED[@]}" || { echo "FAIL removed function: $fn"; exit 1; }
++    echo "allowed removed: $fn"; continue
++  fi
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${NEW_VARS[*]}"))=" "$TMP/candidate.vars" > "$TMP/candidate.vars.old"
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars.old"
++echo "PASS top-level variables unchanged except release identity and ${#NEW_VARS[@]} frontend location/interruption/lock variables"
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageD/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (README, assets, docs, other tests and evidence included)"
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS d-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/staged/frontend-harness.sh b/tests/staged/frontend-harness.sh
+new file mode 100644
+index 0000000..8154c1c
+--- /dev/null
++++ b/tests/staged/frontend-harness.sh
+@@ -0,0 +1,332 @@
++#!/usr/bin/env bash
++# Behavioral sandbox for the Stage D frontend (Caddy / Nginx) and TLS lifecycle.
++#
++# Extends tests/stagec2/relay-harness.sh (same rules: unmodified manager code,
++# commands run through d_run/d_eval in a separate bash process with production
++# `set -Eeuo pipefail`, nothing outside $TMP is read or written). The frontend
++# locations are rebound into $TMP through CADDY_DIR/CADDYFILE/NGINX_DIR/LE_DIR/
++# ACME_WEBROOT; a manager whose frontend functions still name the real paths is
++# refused. Host-boundary models in $TMP/bin:
++#   caddy    validate (braces, duplicate site addresses, injected rejection), fmt
++#   nginx    -t over conf.d/*.conf and sites-enabled/* (dangling links, braces,
++#            certificate files, key/certificate match with real openssl)
++#   certbot  certonly/renew into an $LE_DIR lineage (real self-signed certs);
++#            HTTP-01 succeeds only if the RUNNING Nginx serves the challenge
++#   systemctl  caddy/nginx units: start/reload activate the on-disk config only
++#            if it is valid and keep a snapshot of what is running; a failed
++#            Caddy reload keeps the previous config, an Nginx reload of an
++#            invalid config is a no-op (as nginx -s reload); restarts are logged
++# This proves control flow and file/served-state postconditions, not real
++# Caddy, Nginx, certbot or systemd behaviour.
++#
++# Faults (files in $TMP): fail-caddy-validate, caddy-reject-<site>,
++# fail-nginx-t, nginx-reject-tls-<host>, fail-reload-<caddy|nginx>,
++# fail-start-<caddy|nginx>, fail-certbot-issue-<host>, fail-certbot-renew-<host>,
++# fail-frontend-write (the next write of file content into the frontend
++# directories stops half-way and fails).
++# Barriers (name.reached / name.go, manager pid in name.pid):
++#   D_AT_VALIDATE=<name>           first `caddy validate`
++#   D_AT_NGINX_T=<name>            first `nginx -t`
++#   D_AT_RELOAD=<name>:<unit>      first reload of caddy|nginx
++
++D_HARNESS="${BASH_SOURCE[0]}"
++# shellcheck source=/dev/null
++source "$(dirname "$D_HARNESS")/../stagec2/relay-harness.sh"
++
++D_FRONTEND_FUNCS=(configure_tls_for_instance remove_reverse_proxy_for_instance configure_caddy_host
++  remove_caddy_block nginx_common_install nginx_domain_conflict write_nginx_tls_conf render_nginx_tls_conf
++  configure_nginx_le configure_nginx_custom install_nginx_certbot_deploy_hook cert_renew_cmd
++  caddy_publish caddy_remove_host frontend_file_replace nginx_managed_apply nginx_managed_remove
++  nginx_managed_restore nginx_link_enable le_cert_usable render_nginx_acme_conf)
++
++d_harness() {
++  export D_HARNESS
++  c2_harness
++  export D_MANAGER_PID=$$ D_ROOT="$TMP"
++  CADDY_DIR="$TMP/caddy"; CADDYFILE="$CADDY_DIR/Caddyfile"; NGINX_DIR="$TMP/nginx"
++  LE_DIR="$TMP/letsencrypt"; ACME_WEBROOT="$TMP/acme"
++  export D_CADDYFILE="$CADDYFILE" D_NGINX_DIR="$NGINX_DIR" D_LE_DIR="$LE_DIR"
++  if [[ ! -e "$TMP/bin/.d-models" ]]; then
++    install -d -m 0755 "$CADDY_DIR" "$NGINX_DIR/conf.d" "$NGINX_DIR/sites-available" "$NGINX_DIR/sites-enabled" \
++      "$LE_DIR/live" "$LE_DIR/archive" "$TMP/run"
++    d_write_models
++    : > "$TMP/bin/.d-models"
++  fi
++  # Stage D exercises the real frontend code that the C1 stubs replace.
++  eval "$(TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c 'source "$1" >/dev/null 2>&1; trap - ERR
++    declare -f configure_tls_for_instance remove_reverse_proxy_for_instance check_frontend_compatibility' _ "$MGR")"
++  local leak
++  leak="$(declare -f "${D_FRONTEND_FUNCS[@]}" 2>/dev/null | grep -nE '/etc/(caddy|nginx|letsencrypt)|/var/lib/twebproxy/acme' || true)"
++  if [[ -n "$leak" ]]; then
++    printf 'REFUSED: frontend functions of %s name real frontend paths:\n%s\n' "$MGR" "$leak" >&2
++    exit 2
++  fi
++  check_dns_for_host() { return 0; }
++  cert_status_impl() { printf 'cert status %s\n' "$1"; }
++  fetch_public_leaf_cert() { return 1; }
++  configure_ufw() { :; }
++  d_answers
++  d_faults
++}
++
++d_run() { bash -c 'source "$D_HARNESS"; d_harness; set -Eeuo pipefail; "$@"' d-run "$@"; }
++d_eval() { bash -c 'source "$D_HARNESS"; d_harness; set -Eeuo pipefail; eval "$1"' d-eval "$1"; }
++
++# TLS prompts of add_instance_cmd: D_TLS (1 caddy, 2 nginx-le, 3 nginx-custom,
++# 4 manual), D_EMAIL, D_CERT, D_KEY. Everything else answers as in C1.
++d_answers() {
++  eval "d_c1_ask() $(declare -f ask | tail -n +2)"
++  eval "d_c1_choose() $(declare -f choose | tail -n +2)"
++  ask() {
++    case "$1" in
++      'Email для Let’s Encrypt') printf '%s' "${D_EMAIL:-admin@example.org}";;
++      'Путь к fullchain.pem') printf '%s' "${D_CERT:-}";;
++      'Путь к privkey.pem') printf '%s' "${D_KEY:-}";;
++      *) d_c1_ask "$@";;
++    esac
++  }
++  choose() { if [[ "$1" == 'SSL / reverse proxy:' ]]; then printf '%s' "${D_TLS:-4}"; else d_c1_choose "$@"; fi; }
++}
++
++# fail-frontend-write: the next `cat` whose output goes into a frontend
++# directory writes 40 bytes and fails (a write stopped half-way, e.g. ENOSPC).
++d_faults() {
++  cat() {
++    if [[ -e "$TMP/fail-frontend-write" ]]; then
++      local me=$BASHPID out
++      out="$(readlink -f "/proc/$me/fd/1" 2>/dev/null)"
++      case "$out" in
++        "$CADDY_DIR"/*|"$NGINX_DIR"/*|"$LE_DIR"/*)
++          rm -f "$TMP/fail-frontend-write"
++          command cat "$@" | head -c 40
++          printf 'model: write to %s interrupted\n' "$out" >&2
++          return 1;;
++      esac
++    fi
++    command cat "$@"
++  }
++}
++
++d_write_models() {
++  cat > "$TMP/bin/d-barrier" <<'SH'
++#!/bin/bash
++# $1=barrier name: park until <name>.go (once per name)
++[[ -n "$1" && ! -e "$D_ROOT/$1.reached" ]] || exit 0
++echo "$D_MANAGER_PID" > "$D_ROOT/$1.pid"; : > "$D_ROOT/$1.reached"
++for ((i = 0; i < 600; i++)); do [[ -e "$D_ROOT/$1.go" ]] && exit 0; sleep 0.05; done
++exit 0
++SH
++  cat > "$TMP/bin/caddy-check" <<'SH'
++#!/bin/bash
++f="$1"
++[[ -f "$f" ]] || { echo "model caddy: no such file $f" >&2; exit 1; }
++[[ ! -e "$D_ROOT/fail-caddy-validate" ]] || { echo 'model caddy: injected validation failure' >&2; exit 1; }
++! grep -q 'INVALID-USER-CONFIG' "$f" || { echo 'model caddy: unrecognized directive INVALID-USER-CONFIG' >&2; exit 1; }
++awk -v root="$D_ROOT" '
++  { line = $0; sub(/#.*/, "", line); o = gsub(/\{/, "{", line); c = gsub(/\}/, "}", line)
++    if (depth == 0 && o > 0) {
++      addr = line; sub(/\{.*/, "", addr); n = split(addr, a, /[ ,\t]+/)
++      for (i = 1; i <= n; i++) if (a[i] != "") {
++        s = a[i]; sub(/^https?:\/\//, "", s); sub(/:443$/, "", s)
++        if (seen[s]++) dup = dup " " s
++        sites[s] = 1
++      }
++    }
++    depth += o - c; if (depth < 0) neg = 1 }
++  END {
++    if (neg || depth != 0) { print "model caddy: unbalanced braces" > "/dev/stderr"; exit 1 }
++    if (dup != "") { print "model caddy: ambiguous site definition:" dup > "/dev/stderr"; exit 1 }
++    for (s in sites) if ((getline x < (root "/caddy-reject-" s)) >= 0) { print "model caddy: site " s " rejected" > "/dev/stderr"; exit 1 }
++  }' "$f"
++SH
++  cat > "$TMP/bin/caddy" <<'SH'
++#!/bin/bash
++printf 'caddy %s\n' "$*" >> "$D_ROOT/events"
++case "$1" in
++  validate) cfg=""; while (( $# )); do [[ "$1" == --config ]] && { cfg="$2"; shift; }; shift; done
++            "$D_ROOT/bin/d-barrier" "${D_AT_VALIDATE:-}"
++            exec "$D_ROOT/bin/caddy-check" "$cfg";;
++  version) echo 'v2.0.0 model';;
++esac
++exit 0
++SH
++  cat > "$TMP/bin/nginx-check" <<'SH'
++#!/bin/bash
++shopt -s nullglob
++rc=0
++for f in "$D_NGINX_DIR"/conf.d/*.conf "$D_NGINX_DIR"/sites-enabled/*; do
++  [[ -e "$f" ]] || { echo "nginx: [emerg] open() \"$f\" failed (2: No such file or directory)" >&2; rc=1; continue; }
++  ! grep -q 'INVALID-USER-CONFIG' "$f" || { echo "nginx: [emerg] unknown directive \"INVALID-USER-CONFIG\" in $f" >&2; rc=1; }
++  o=$(tr -cd '{' < "$f" | wc -c); c=$(tr -cd '}' < "$f" | wc -c)
++  last=$(tr -d ' \t\n\r' < "$f" | tail -c 1)
++  (( o == c )) && [[ -z "$last" || "$last" == '}' || "$last" == ';' ]] ||
++    { echo "nginx: [emerg] unexpected end of file in $f" >&2; rc=1; }
++  cert=$(sed -n 's/^[[:space:]]*ssl_certificate[[:space:]]\+\([^;]*\);.*/\1/p' "$f" | head -n 1)
++  key=$(sed -n 's/^[[:space:]]*ssl_certificate_key[[:space:]]\+\([^;]*\);.*/\1/p' "$f" | head -n 1)
++  [[ -n "$cert$key" ]] || continue
++  if [[ ! -r "$cert" || ! -r "$key" ]]; then
++    echo "nginx: [emerg] cannot load certificate \"$cert\"" >&2; rc=1
++  elif [[ "$(openssl x509 -in "$cert" -noout -pubkey 2>/dev/null | sha256sum)" != "$(openssl pkey -in "$key" -pubout 2>/dev/null | sha256sum)" ]]; then
++    echo "nginx: [emerg] SSL_CTX_use_PrivateKey(\"$key\") failed (key values mismatch)" >&2; rc=1
++  fi
++  for h in $(sed -n 's/^[[:space:]]*server_name[[:space:]]\+\([^;]*\);.*/\1/p' "$f"); do
++    [[ ! -e "$D_ROOT/nginx-reject-tls-$h" ]] || { echo "nginx: [emerg] model: TLS server $h rejected" >&2; rc=1; }
++  done
++done
++(( rc )) && echo 'nginx: configuration file test failed' >&2 || echo 'nginx: configuration file test is successful' >&2
++exit "$rc"
++SH
++  cat > "$TMP/bin/nginx" <<'SH'
++#!/bin/bash
++printf 'nginx %s\n' "$*" >> "$D_ROOT/events"
++[[ "${1:-}" == -t ]] || exit 0
++"$D_ROOT/bin/d-barrier" "${D_AT_NGINX_T:-}"
++[[ ! -e "$D_ROOT/fail-nginx-t" ]] || { echo 'nginx: [emerg] model: injected test failure' >&2; exit 1; }
++exec "$D_ROOT/bin/nginx-check"
++SH
++  cat > "$TMP/bin/d-le-issue" <<'SH'
++#!/bin/bash
++# $1=lineage name $2=validity days: new certificate in the lineage (real openssl)
++name="$1" days="${2:-90}" d="$D_LE_DIR/archive/$1" live="$D_LE_DIR/live/$1"
++install -d -m 0700 "$d"; install -d -m 0755 "$live"
++n=$(( $(find "$d" -name 'cert*.pem' | wc -l) + 1 ))
++openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days "$days" -subj "/CN=$name" \
++  -keyout "$d/privkey$n.pem" -out "$d/cert$n.pem" >/dev/null 2>&1 || exit 1
++cp "$d/cert$n.pem" "$d/fullchain$n.pem"; cp "$d/cert$n.pem" "$d/chain$n.pem"
++for k in cert chain fullchain privkey; do ln -sfn "../../archive/$name/$k$n.pem" "$live/$k.pem"; done
++install -d -m 0755 "$D_LE_DIR/renewal"; printf 'cert = %s\n' "$live/cert.pem" > "$D_LE_DIR/renewal/$name.conf"
++SH
++  cat > "$TMP/bin/certbot" <<'SH'
++#!/bin/bash
++printf 'certbot %s\n' "$*" >> "$D_ROOT/events"
++sub="$1"; shift; name="" dry=0 force=0 keep=0
++while (( $# )); do case "$1" in
++  --cert-name) name="$2"; shift;; -d) [[ -n "$name" ]] || name="$2"; shift;;
++  --dry-run) dry=1;; --force-renewal) force=1;; --keep-until-expiring) keep=1;; esac; shift; done
++live="$D_LE_DIR/live/$name"
++due() { local end; end="$(openssl x509 -in "$live/cert.pem" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')"
++  [[ -z "$end" ]] || (( $(date -d "$end" +%s) - $(date +%s) < 30 * 86400 )); }
++challenge_served() { # the RUNNING Nginx answers HTTP-01 for $name
++  awk -v h="$name" '/^### /{ if (n && a) ok = 1; n = 0; a = 0; next }
++    $0 ~ ("server_name[ \t]+" h ";") { n = 1 } /acme-challenge/ { a = 1 }
++    END { if (n && a) ok = 1; exit !ok }' "$D_ROOT/run/nginx" 2>/dev/null; }
++case "$sub" in
++  certonly)
++    [[ ! -e "$D_ROOT/fail-certbot-issue-$name" ]] || { echo "model certbot: issuance for $name failed" >&2; exit 1; }
++    if (( keep )) && [[ -e "$live/cert.pem" ]] && ! due; then echo 'Certificate not yet due for renewal; no action taken.'; exit 0; fi
++    challenge_served || { echo "model certbot: HTTP-01 challenge for $name not served" >&2; exit 1; }
++    "$D_ROOT/bin/d-le-issue" "$name" "${D_ISSUE_DAYS:-90}" || exit 1
++    echo 'Successfully received certificate.';;
++  renew)
++    [[ -e "$live/cert.pem" ]] || { echo "No certificate found with name $name" >&2; exit 1; }
++    [[ ! -e "$D_ROOT/fail-certbot-renew-$name" ]] || { echo "model certbot: renewal of $name failed" >&2; exit 1; }
++    (( dry )) && { echo 'The dry run was successful.'; exit 0; }
++    if (( ! force )) && ! due; then echo 'No renewals were attempted.'; exit 0; fi
++    challenge_served || { echo "model certbot: HTTP-01 challenge for $name not served" >&2; exit 1; }
++    "$D_ROOT/bin/d-le-issue" "$name" "${D_ISSUE_DAYS:-90}" || exit 1
++    for h in "$D_LE_DIR"/renewal-hooks/deploy/*; do [[ -x "$h" ]] && RENEWED_LINEAGE="$live" "$h"; done
++    echo 'Congratulations, all renewals succeeded.';;
++esac
++exit 0
++SH
++  cat > "$TMP/bin/apt-get" <<'SH'
++#!/bin/bash
++printf 'apt-get %s\n' "$*" >> "$D_ROOT/events"
++exit 0
++SH
++  cat > "$TMP/bin/ufw" <<'SH'
++#!/bin/bash
++exit 1
++SH
++  # ss: public listener queries (sport = :80/:443) answer from $TMP/ss-public.
++  mv "$TMP/bin/ss" "$TMP/bin/ss-c1"
++  cat > "$TMP/bin/ss" <<'SH'
++#!/bin/bash
++case "$*" in *'sport = :80'*|*'sport = :443'*) cat "$D_ROOT/ss-public" 2>/dev/null; exit 0;; esac
++exec "$(dirname "$0")/ss-c1" "$@"
++SH
++  # systemctl: caddy/nginx units here, everything else to the C2/C1 models.
++  mv "$TMP/bin/systemctl" "$TMP/bin/systemctl-c2"
++  cat > "$TMP/bin/systemctl" <<'SH'
++#!/bin/bash
++args=("$@"); unit="${args[-1]}"; u="${unit%.service}"
++case "$u" in caddy|nginx) ;; *) exec "$(dirname "$0")/systemctl-c2" "$@";; esac
++printf '%s\n' "$*" >> "$D_ROOT/systemctl.calls"
++printf 'systemctl %s\n' "$*" >> "$D_ROOT/events"
++quiet=0; [[ "${2:-}" == --quiet ]] && quiet=1
++run="$D_ROOT/run"
++valid() { if [[ "$u" == caddy ]]; then "$D_ROOT/bin/caddy-check" "$D_CADDYFILE" 2>> "$D_ROOT/frontend.log"
++          else "$D_ROOT/bin/nginx-check" 2>> "$D_ROOT/frontend.log"; fi; }
++snapshot() { # what the unit serves from now on
++  if [[ "$u" == caddy ]]; then cp "$D_CADDYFILE" "$run/caddy"; return; fi
++  local f c h
++  : > "$run/nginx.new"
++  for f in "$D_NGINX_DIR"/conf.d/*.conf "$D_NGINX_DIR"/sites-enabled/*; do
++    [[ -e "$f" ]] || continue
++    printf '### %s\n' "${f##*/}" >> "$run/nginx.new"; cat "$f" >> "$run/nginx.new"
++    c=$(sed -n 's/^[[:space:]]*ssl_certificate[[:space:]]\+\([^;]*\);.*/\1/p' "$f" | head -n 1)
++    [[ -n "$c" ]] || continue
++    for h in $(sed -n 's/^[[:space:]]*server_name[[:space:]]\+\([^;]*\);.*/\1/p' "$f" | tr ' ' '\n' | sort -u); do
++      printf 'SERVED %s %s\n' "$h" "$(sha256sum < "$c" | cut -c1-16)" >> "$run/nginx.new"
++    done
++  done
++  mv "$run/nginx.new" "$run/nginx"
++  { echo '=== activation'; grep '^SERVED ' "$run/nginx"; } >> "$run/nginx.history"
++}
++start() {
++  [[ ! -e "$D_ROOT/fail-start-$u" ]] || { echo "model: start of $u failed" >&2; exit 1; }
++  if valid; then snapshot; : > "$run/$u.active"; echo "ACTIVATED $u" >> "$D_ROOT/events"; exit 0; fi
++  rm -f "$run/$u.active" "$run/$u"; echo "model: $u failed to start (invalid configuration)" >&2; exit 1
++}
++case "$1" in
++  is-active) if [[ -e "$run/$u.active" ]]; then (( quiet )) || echo active; exit 0; fi; (( quiet )) || echo inactive; exit 3;;
++  enable) [[ "${2:-}" == --now ]] || exit 0; [[ -e "$run/$u.active" ]] && exit 0; start;;
++  start) [[ -e "$run/$u.active" ]] && exit 0; start;;
++  restart) echo "RESTART $u" >> "$D_ROOT/events"; rm -f "$run/$u.active" "$run/$u"; start;;
++  reload)
++    [[ -z "${D_AT_RELOAD:-}" || "${D_AT_RELOAD#*:}" != "$u" ]] || "$D_ROOT/bin/d-barrier" "${D_AT_RELOAD%%:*}"
++    [[ ! -e "$D_ROOT/fail-reload-$u" ]] || { echo "model: reload of $u failed" >&2; exit 1; }
++    [[ -e "$run/$u.active" ]] || { echo "model: $u.service is not active, cannot reload" >&2; exit 1; }
++    if valid; then snapshot; echo "ACTIVATED $u" >> "$D_ROOT/events"; exit 0; fi
++    [[ "$u" == nginx ]] && exit 0     # nginx -s reload: the master keeps its old configuration
++    echo 'model: caddy reload: configuration rejected' >&2; exit 1;;
++  stop|disable) rm -f "$run/$u.active" "$run/$u"; echo "STOP $u" >> "$D_ROOT/events"; exit 0;;
++  *) exit 0;;
++esac
++SH
++  chmod 0755 "$TMP"/bin/*
++}
++
++# ---- seeding and assertion helpers (fixture side) ----
++d_seed_instance() { # $1=host $2=relay $3=admin $4=tls mode [$5=email|cert] [$6=key]
++  local email="" cert="" key=""
++  case "$4" in nginx-le) email="${5:-admin@example.org}";; nginx-custom) cert="$5"; key="$6";; esac
++  install -d -m 0700 "$INSTANCES_DIR/$1" "$INSTANCES_DIR/$1/profiles.d"
++  {
++    printf 'HOSTNAME=%q\nRELAY_PORT=%q\nADMIN_PORT=%q\nTLS_MODE=%q\nSITE_MODE=%q\n' "$1" "$2" "$3" "$4" placeholder
++    printf 'SITE_UPSTREAM=%q\nSOURCE_SITE_DIR=%q\nACME_EMAIL=%q\nNGINX_CERT=%q\nNGINX_KEY=%q\n' '' '' "$email" "$cert" "$key"
++    printf 'CREATED_AT=%q\n' 2026-01-01T00:00:00+00:00
++  } > "$INSTANCES_DIR/$1/instance.env"
++  chmod 0600 "$INSTANCES_DIR/$1/instance.env"
++  printf '{"public_hostname":"%s"}\n' "$1" > "$INSTANCES_DIR/$1/config.json"
++}
++d_make_cert() { # $1=cert $2=key $3=CN [$4=days]: self-signed pair (real openssl)
++  install -d -m 0700 "$(dirname "$1")" "$(dirname "$2")"
++  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days "${4:-90}" -subj "/CN=$3" \
++    -keyout "$2" -out "$1" >/dev/null 2>&1 && chmod 0600 "$2"
++}
++d_tree_sum() { # content and link targets of a directory tree, for "unchanged" checks
++  (cd "$1" 2>/dev/null && find . \( -type f -o -type l \) -printf '%p %l\n' | LC_ALL=C sort | while read -r p l; do
++    if [[ -L "$p" ]]; then printf '%s -> %s\n' "$p" "$l"; else printf '%s %s\n' "$p" "$(sha256sum < "$p" | cut -c1-16)"; fi
++  done) | sha256sum | cut -c1-16
++}
++d_caddy_valid() { "$TMP/bin/caddy-check" "$CADDYFILE" 2>/dev/null; }
++d_nginx_valid() { "$TMP/bin/nginx-check" 2>/dev/null; }
++d_served_caddy() { grep -qE "^[[:space:]]*$(sed 's/\./\\./g' <<<"$1")[[:space:]]*\{" "$TMP/run/caddy" 2>/dev/null; }   # $1=site
++d_served_nginx() { grep -q "^SERVED $1 " "$TMP/run/nginx" 2>/dev/null; }                                          # $1=host (HTTPS)
++d_served_nginx_cert() { sed -n "s/^SERVED $1 //p" "$TMP/run/nginx" 2>/dev/null; }
++d_restarted() { grep -q "^RESTART $1" "$TMP/events"; }
++d_https_never_lost() { # $1=host: every Nginx activation since the last reset served it over HTTPS
++  awk -v h="$1" '/^=== activation/ { if (n++ && !s) bad = 1; s = 0; next } $1 == "SERVED" && $2 == h { s = 1 }
++    END { if (n && !s) bad = 1; exit bad }' "$TMP/run/nginx.history" 2>/dev/null
++}
+diff --git a/tests/staged/frontend-tls-fixture.sh b/tests/staged/frontend-tls-fixture.sh
+new file mode 100644
+index 0000000..2d2e5e4
+--- /dev/null
++++ b/tests/staged/frontend-tls-fixture.sh
+@@ -0,0 +1,353 @@
++#!/usr/bin/env bash
++# Stage D regression: frontend (Caddy / Nginx) and TLS lifecycle changes are
++# failure-safe. A failed, invalid, interrupted or partially written change never
++# leaves an invalid or truncated frontend configuration, never restarts the
++# frontend, never loses user-managed sites or another instance's block, never
++# replaces or removes a valid certificate and never interrupts HTTPS of a
++# working hostname; create, repair, delete and renew report frontend failures.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-d-frontend.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/staged/frontend-harness.sh"
++d_harness
++export TWEBPROXY_RELAY_READY_WAIT=3
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++not() { ! "$@"; }
++show() { grep -E '\[(x|!|\+)\]' "$TMP/out" | tail -n 3 | sed 's/\x1b\[[0-9;]*m//g; s/^/  | /'; }
++op() { d_run "$@" > "$TMP/out" 2>&1; rc=$?; }
++in_flock() { local c; for c in $(pgrep -P "$1"); do [[ "$(cat "/proc/$c/comm" 2>/dev/null)" == flock ]] && return 0; in_flock "$c" && return 0; done; return 1; }
++A=alpha.example B=beta.example C=gamma.example D=delta.example U=shop.example O=other.example
++
++# What the manager writes for a managed Caddy block / Nginx TLS vhost.
++tpl_caddy_block() { # $1=host $2=relay
++  printf '# BEGIN TWEBPROXY %s\n%s {\n    encode zstd gzip\n    reverse_proxy 127.0.0.1:%s {\n        transport http {\n            response_header_timeout 40s\n        }\n    }\n    log {\n        output discard\n    }\n}\n# END TWEBPROXY %s\n' "$1" "$1" "$2" "$1"
++}
++tpl_nginx_tls() { # $1=host $2=relay $3=cert $4=key
++  cat <<EOF
++server {
++    listen 80;
++    listen [::]:80;
++    server_name $1;
++    location /.well-known/acme-challenge/ { root $ACME_WEBROOT; }
++    location / { return 301 https://\$host\$request_uri; }
++    access_log off;
++}
++
++server {
++    listen 443 ssl http2;
++    listen [::]:443 ssl http2;
++    server_name $1;
++    ssl_certificate $3;
++    ssl_certificate_key $4;
++    ssl_protocols TLSv1.2 TLSv1.3;
++    access_log off;
++
++    location / {
++        proxy_pass http://127.0.0.1:$2;
++        proxy_http_version 1.1;
++        proxy_set_header Host \$http_host;
++        proxy_set_header X-Forwarded-For \$remote_addr;
++        proxy_set_header X-Forwarded-Proto https;
++        proxy_set_header Upgrade \$http_upgrade;
++        proxy_set_header Connection \$twebproxy_connection_upgrade;
++        proxy_read_timeout 90s;
++        proxy_send_timeout 90s;
++        proxy_buffering off;
++        client_max_body_size 2m;
++    }
++}
++EOF
++}
++
++reset() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$SITES_DIR" "$BASE_DIR/.locks" "$TMP"/units/* "$TMP"/fail-* \
++    "$TMP"/caddy-reject-* "$TMP"/nginx-reject-* "$TMP"/state-* "$TMP"/*.reached "$TMP"/*.go "$TMP"/*.pid \
++    "$CADDY_DIR" "$NGINX_DIR" "$LE_DIR" "$ACME_WEBROOT" "$TMP/run" "$TMP/custom" "$TMP/user-certs" "$TMP/firewall.applied"
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"
++  install -d -m 0755 "$SITES_DIR" "$CADDY_DIR" "$NGINX_DIR/conf.d" "$NGINX_DIR/sites-available" "$NGINX_DIR/sites-enabled" \
++    "$LE_DIR/live" "$LE_DIR/archive" "$TMP/run"
++  c2_relay_binary old > "$TPROXY_BIN"; chmod 0755 "$TPROXY_BIN"
++}
++seed_host() { # $1=host $2=index $3=tls [$4 $5]: instance with one running profile and a running relay
++  d_seed_instance "$1" $((18080 + 2 * $2)) $((18081 + 2 * $2)) "$3" "${4:-}" "${5:-}"
++  c1_seed_profile "$1" main "$(printf '%032d' $(($2 + 1)))" https $((23980 + $2)) $((28980 + $2))
++  c1_run rebuild_profiles_json "$1" >/dev/null 2>&1
++  "$TMP/bin/systemctl" start "twebproxy-mtproxy@$1--main.service"
++  "$TMP/bin/systemctl" start "twebproxy@$1.service"
++}
++settle() { c1_eval rebuild_firewall >/dev/null 2>&1; : > "$TMP/events"; : > "$TMP/run/nginx.history"; }
++no_frontend_debris() { [[ -z "$(find "$CADDY_DIR" "$NGINX_DIR" -name '.twebproxy-*' 2>/dev/null)" ]]; }
++instance_kept() { [[ -f "$INSTANCES_DIR/$1/instance.env" && -f "$BACKENDS_DIR/$1--main.env" ]] && c2_relay_up "$1" &&
++  [[ -e "$TMP/units/twebproxy-mtproxy@$1--main.service" ]]; }
++
++# ---------- Caddy world: user sites around the managed blocks of alpha and beta ----------
++USER_HEAD=$'{\n\temail admin@example.org\n}\n\nshop.example {\n\trespond "user shop"\n}\n'
++USER_TAIL=$'\nblog.example {\n\trespond "user blog"\n}\n'
++caddy_world() { # [$1=edit before Caddy starts] [$2=edit after it started (on disk only)]
++  reset; seed_host "$A" 0 caddy; seed_host "$B" 1 caddy; seed_host "$C" 2 caddy; chmod 0750 "$CADDY_DIR"
++  { printf '%s\n' "$USER_HEAD"; tpl_caddy_block "$A" 18080; printf '\n'; tpl_caddy_block "$B" 18082; printf '%s' "$USER_TAIL"; } > "$CADDYFILE"
++  [[ -z "${1:-}" ]] || "$1"
++  chmod 0644 "$CADDYFILE"
++  "$TMP/bin/systemctl" start caddy >/dev/null 2>&1
++  [[ -z "${2:-}" ]] || "$2"
++  CF0="$(sha256sum < "$CADDYFILE")"; RUN0="$(sha256sum < "$TMP/run/caddy")"
++  settle
++}
++edit_dangling_begin() { awk -v m="# BEGIN TWEBPROXY $C" '/^blog\.example \{/ {print m} {print}' "$CADDYFILE" > "$TMP/cf.edit" && mv "$TMP/cf.edit" "$CADDYFILE"; }
++edit_altered_end() { sed -i "s/^# END TWEBPROXY $A\$/& /" "$CADDYFILE"; }
++edit_duplicate_pair() { printf '\n# BEGIN TWEBPROXY %s\n# END TWEBPROXY %s\n' "$A" "$A" >> "$CADDYFILE"; }
++edit_user_gamma() { printf '\nhttps://%s {\n\trespond "user gamma"\n}\n' "$C" >> "$CADDYFILE"; }
++edit_invalid_rest() { printf '\nINVALID-USER-CONFIG\n' >> "$CADDYFILE"; }
++caddy_same() { [[ "$(sha256sum < "$CADDYFILE")" == "$CF0" ]]; }
++caddy_running_same() { [[ "$(sha256sum < "$TMP/run/caddy")" == "$RUN0" ]]; }
++block_of() { awk -v h="$1" '$0 == "# BEGIN TWEBPROXY " h {p = 1} p {print} $0 == "# END TWEBPROXY " h {p = 0}' "$CADDYFILE"; }
++blocks() { grep -cx "# BEGIN TWEBPROXY $1" "$CADDYFILE"; }
++b_intact() { [[ "$(block_of "$B")" == "$(tpl_caddy_block "$B" 18082)" ]]; }
++user_caddy_intact() { grep -qx 'shop.example {' "$CADDYFILE" && grep -qx 'blog.example {' "$CADDYFILE" &&
++  grep -qx $'\temail admin@example.org' "$CADDYFILE" && grep -qx $'\trespond "user blog"' "$CADDYFILE"; }
++no_caddy_reload() { ! grep -q '^systemctl reload caddy' "$TMP/events"; }
++
++# 1. Add gamma: block appended once, everything else intact, reload only.
++caddy_world; op configure_tls_for_instance "$C"; show
++check caddy_add_ok test "$rc" -eq 0
++check caddy_add_block_once test "$(blocks "$C")" -eq 1
++check caddy_add_served d_served_caddy "$C"
++check caddy_add_others_intact eval 'user_caddy_intact && b_intact && [[ "$(blocks "$A")" == 1 ]]'
++check caddy_add_valid_no_restart eval 'd_caddy_valid && ! d_restarted caddy'
++check caddy_add_dir_mode_kept test "$(stat -c %a "$CADDY_DIR")" = 750
++# 2. Invalid candidate.
++caddy_world; : > "$TMP/caddy-reject-$C"; op configure_tls_for_instance "$C"; show
++check caddy_invalid_refused test "$rc" -ne 0
++check caddy_invalid_file_unchanged caddy_same
++check caddy_invalid_running_unchanged caddy_running_same
++check caddy_invalid_no_reload no_caddy_reload
++# 3. Failed reload: previous file back, Caddy still serving the previous config, no restart.
++caddy_world; : > "$TMP/fail-reload-caddy"; op configure_tls_for_instance "$C"; show
++check caddy_reload_fail_reported test "$rc" -ne 0
++check caddy_reload_fail_file_restored caddy_same
++check caddy_reload_fail_running_unchanged caddy_running_same
++check caddy_reload_fail_no_restart not d_restarted caddy
++check caddy_reload_fail_still_active "$TMP/bin/systemctl" is-active --quiet caddy
++check caddy_reload_fail_no_debris no_frontend_debris
++# 4. Write stopped half-way.
++caddy_world; : > "$TMP/fail-frontend-write"; op configure_tls_for_instance "$C"; show
++check caddy_partial_write_reported test "$rc" -ne 0
++check caddy_partial_write_file_unchanged caddy_same
++check caddy_partial_write_live_valid d_caddy_valid
++check caddy_partial_write_no_debris no_frontend_debris
++# 5. Ambiguous ownership is refused with the Caddyfile unchanged.
++caddy_world edit_dangling_begin
++op configure_tls_for_instance "$C"; show
++check caddy_dangling_begin_refused test "$rc" -ne 0
++check caddy_dangling_begin_file_unchanged caddy_same
++check caddy_dangling_begin_user_site_kept grep -qx 'blog.example {' "$CADDYFILE"
++caddy_world edit_altered_end
++op configure_tls_for_instance "$A"; show
++check caddy_altered_marker_refused test "$rc" -ne 0
++check caddy_altered_marker_file_unchanged caddy_same
++check caddy_altered_marker_other_block_and_user_kept eval 'b_intact && user_caddy_intact'
++caddy_world edit_duplicate_pair
++op configure_tls_for_instance "$A"
++check caddy_duplicate_block_refused test "$rc" -ne 0
++check caddy_duplicate_block_file_unchanged caddy_same
++caddy_world edit_user_gamma
++op configure_tls_for_instance "$C"
++check caddy_user_defined_host_refused test "$rc" -ne 0
++check caddy_user_defined_host_file_unchanged caddy_same
++# 6. Re-apply alpha (the repair path): beta's block and the user sites stay byte-for-byte.
++caddy_world; op configure_tls_for_instance "$A"
++check caddy_reapply_ok test "$rc" -eq 0
++check caddy_reapply_others_intact eval 'b_intact && user_caddy_intact && [[ "$(blocks "$A")" == 1 ]]'
++check caddy_reapply_no_restart not d_restarted caddy
++# 6b. Two instances published at the same time: neither block may be lost.
++caddy_world; seed_host "$D" 3 caddy; settle
++D_AT_VALIDATE=cv d_run configure_tls_for_instance "$C" > "$TMP/out1" 2>&1 & p1=$!
++c1_wait_reached cv
++d_run configure_tls_for_instance "$D" > "$TMP/out2" 2>&1 & p2=$!
++for ((i = 0; i < 100; i++)); do kill -0 "$p2" 2>/dev/null || break; in_flock "$p2" && break; sleep 0.1; done
++: > "$TMP/cv.go"; wait "$p1"; rc1=$?; wait "$p2"; rc2=$?
++check caddy_concurrent_both_ok test "$rc1" -eq 0 -a "$rc2" -eq 0
++check caddy_concurrent_no_block_lost eval '[[ "$(blocks "$C")" == 1 && "$(blocks "$D")" == 1 ]] && b_intact && user_caddy_intact'
++check caddy_concurrent_valid_and_served eval 'd_caddy_valid && d_served_caddy "$C" && d_served_caddy "$D"'
++# 7. Repair with a failed Caddy reload: reported, Caddyfile unchanged, no restart.
++caddy_world; : > "$TMP/fail-reload-caddy"; op repair_instance_cmd "$A"; show
++check caddy_repair_fail_reported test "$rc" -ne 0
++check caddy_repair_fail_file_unchanged caddy_same
++check caddy_repair_fail_running_unchanged caddy_running_same
++check caddy_repair_fail_no_restart not d_restarted caddy
++# 8. Interrupted (SIGTERM) while Caddy reloads a candidate it then rejects.
++caddy_world; : > "$TMP/fail-reload-caddy"
++D_AT_RELOAD="ci:caddy" d_run configure_tls_for_instance "$C" > "$TMP/out" 2>&1 & p=$!
++c1_wait_reached ci; kill -TERM "$(cat "$TMP/ci.pid")" 2>/dev/null; : > "$TMP/ci.go"; wait "$p"; rc=$?; show
++check caddy_interrupted_reported test "$rc" -ne 0
++check caddy_interrupted_file_restored caddy_same
++check caddy_interrupted_valid_no_restart eval 'd_caddy_valid && ! d_restarted caddy'
++# 9. Delete with a failed reload: nothing deleted, the instance keeps serving.
++caddy_world; : > "$TMP/fail-reload-caddy"; op delete_instance_cmd "$A"; show
++check caddy_delete_fail_reported test "$rc" -ne 0
++check caddy_delete_fail_instance_kept instance_kept "$A"
++check caddy_delete_fail_file_unchanged caddy_same
++check caddy_delete_fail_no_success not grep -q "$A was deleted" "$TMP/out"
++caddy_world '' edit_invalid_rest
++op delete_instance_cmd "$A"; show
++check caddy_delete_invalid_rest_refused test "$rc" -ne 0
++check caddy_delete_invalid_rest_instance_kept instance_kept "$A"
++check caddy_delete_invalid_rest_file_unchanged caddy_same
++# 10. Delete succeeds: only alpha's block goes.
++caddy_world; op delete_instance_cmd "$A"; show
++check caddy_delete_ok test "$rc" -eq 0 -a ! -e "$INSTANCES_DIR/$A"
++check caddy_delete_block_removed test "$(blocks "$A")" -eq 0
++check caddy_delete_others_intact eval 'b_intact && user_caddy_intact'
++check caddy_delete_served eval '! d_served_caddy "$A" && d_served_caddy "$B" && d_served_caddy "$U"'
++check caddy_delete_no_restart not d_restarted caddy
++
++# ---------- Nginx world: user vhost + LE alpha + custom beta + an unrelated LE lineage ----------
++nginx_world() { # [$1=days left on alpha's certificate]
++  reset
++  seed_host "$A" 0 nginx-le admin@example.org
++  d_make_cert "$TMP/custom/$B/fullchain.pem" "$TMP/custom/$B/privkey.pem" "$B"
++  seed_host "$B" 1 nginx-custom "$TMP/custom/$B/fullchain.pem" "$TMP/custom/$B/privkey.pem"
++  "$TMP/bin/d-le-issue" "$A" "${1:-60}"; "$TMP/bin/d-le-issue" "$O" 60
++  d_make_cert "$TMP/user-certs/shop.pem" "$TMP/user-certs/shop.key" "$U"
++  printf 'map $http_upgrade $twebproxy_connection_upgrade {\n    default upgrade;\n    %s      close;\n}\n' "''" > "$NGINX_DIR/conf.d/twebproxy-map.conf"
++  tpl_nginx_tls "$A" 18080 "$LE_DIR/live/$A/fullchain.pem" "$LE_DIR/live/$A/privkey.pem" > "$NGINX_DIR/sites-available/twebproxy-$A.conf"
++  tpl_nginx_tls "$B" 18082 "$TMP/custom/$B/fullchain.pem" "$TMP/custom/$B/privkey.pem" > "$NGINX_DIR/sites-available/twebproxy-$B.conf"
++  printf 'server {\n    listen 443 ssl;\n    server_name %s;\n    ssl_certificate %s;\n    ssl_certificate_key %s;\n    root /srv/shop;\n}\n' \
++    "$U" "$TMP/user-certs/shop.pem" "$TMP/user-certs/shop.key" > "$NGINX_DIR/sites-available/shop.conf"
++  for f in "twebproxy-$A.conf" "twebproxy-$B.conf" shop.conf; do ln -s "$NGINX_DIR/sites-available/$f" "$NGINX_DIR/sites-enabled/$f"; done
++  chmod 0750 "$NGINX_DIR/conf.d"
++  "$TMP/bin/systemctl" start nginx >/dev/null 2>&1
++  NG0="$(d_tree_sum "$NGINX_DIR")"; LE0="$(d_tree_sum "$LE_DIR/live")$(d_tree_sum "$LE_DIR/archive")"
++  LO0="$(d_tree_sum "$LE_DIR/live/$O")$(d_tree_sum "$LE_DIR/archive/$O")"
++  SA0="$(d_served_nginx_cert "$A")"; SB0="$(d_served_nginx_cert "$B")"; SU0="$(d_served_nginx_cert "$U")"
++  settle
++}
++nginx_same() { [[ "$(d_tree_sum "$NGINX_DIR")" == "$NG0" ]]; }
++le_same() { [[ "$(d_tree_sum "$LE_DIR/live")$(d_tree_sum "$LE_DIR/archive")" == "$LE0" ]]; }
++others_served() { [[ "$(d_served_nginx_cert "$B")" == "$SB0" && "$(d_served_nginx_cert "$U")" == "$SU0" ]]; }
++no_managed() { [[ ! -e "$NGINX_DIR/sites-available/twebproxy-$1.conf" && ! -L "$NGINX_DIR/sites-enabled/twebproxy-$1.conf" ]]; }
++custom_gamma() { # $1=mismatched key? : gamma with a custom certificate, not yet configured
++  d_make_cert "$TMP/custom/$C/fullchain.pem" "$TMP/custom/$C/privkey.pem" "$C"
++  [[ -z "${1:-}" ]] || d_make_cert "$TMP/custom/$C/other.pem" "$TMP/custom/$C/privkey.pem" "$C"
++  seed_host "$C" 2 nginx-custom "$TMP/custom/$C/fullchain.pem" "$TMP/custom/$C/privkey.pem"; settle
++  NG0="$(d_tree_sum "$NGINX_DIR")"; RN0="$(sha256sum < "$TMP/run/nginx")"
++}
++nginx_running_same() { [[ "$(sha256sum < "$TMP/run/nginx")" == "$RN0" ]]; }
++
++# 11. Custom-certificate hostname added next to the others.
++nginx_world; custom_gamma; op configure_tls_for_instance "$C"; show
++check nginx_custom_add_ok test "$rc" -eq 0
++check nginx_custom_add_served d_served_nginx "$C"
++check nginx_custom_add_others_unchanged eval 'others_served && [[ "$(d_served_nginx_cert "$A")" == "$SA0" ]]'
++check nginx_custom_add_dir_mode_kept test "$(stat -c %a "$NGINX_DIR/conf.d")" = 750
++# 12. Candidate rejected by nginx -t.
++nginx_world; custom_gamma; : > "$TMP/nginx-reject-tls-$C"; op configure_tls_for_instance "$C"; show
++check nginx_invalid_refused test "$rc" -ne 0
++check nginx_invalid_nothing_left no_managed "$C"
++check nginx_invalid_disk_valid d_nginx_valid
++check nginx_invalid_running_unchanged nginx_running_same
++# 13. Key that does not belong to the certificate.
++nginx_world; custom_gamma mismatch; op configure_tls_for_instance "$C"; show
++check nginx_key_mismatch_refused test "$rc" -ne 0
++check nginx_key_mismatch_nothing_left no_managed "$C"
++check nginx_key_mismatch_disk_valid d_nginx_valid
++# 14. Failed reload: the new vhost is taken back.
++nginx_world; custom_gamma; : > "$TMP/fail-reload-nginx"; op configure_tls_for_instance "$C"; show
++check nginx_reload_fail_reported test "$rc" -ne 0
++check nginx_reload_fail_restored no_managed "$C"
++check nginx_reload_fail_disk_valid d_nginx_valid
++check nginx_reload_fail_running_unchanged nginx_running_same
++# 15. Write stopped half-way while re-applying beta.
++nginx_world; : > "$TMP/fail-frontend-write"; op configure_tls_for_instance "$B"; show
++check nginx_partial_write_reported test "$rc" -ne 0
++check nginx_partial_write_files_unchanged nginx_same
++check nginx_partial_write_disk_valid d_nginx_valid
++check nginx_partial_write_no_debris no_frontend_debris
++# 16. Repair of a working LE hostname: HTTPS is never taken away.
++nginx_world; op configure_tls_for_instance "$A"; show
++check nginx_le_reapply_ok test "$rc" -eq 0
++check nginx_le_reapply_https_never_lost d_https_never_lost "$A"
++check nginx_le_reapply_same_cert test "$(d_served_nginx_cert "$A")" = "$SA0"
++check nginx_le_reapply_certs_unchanged le_same
++# 17. Renewal due, certbot fails: the still valid certificate stays in service.
++nginx_world 10; : > "$TMP/fail-certbot-issue-$A"; op configure_tls_for_instance "$A"; show
++check nginx_le_certbot_fail_https_never_lost d_https_never_lost "$A"
++check nginx_le_certbot_fail_same_cert test "$(d_served_nginx_cert "$A")" = "$SA0"
++check nginx_le_certbot_fail_certs_unchanged le_same
++check nginx_le_certbot_fail_warned grep -q 'Certbot' "$TMP/out"
++# 18. First issuance fails: nothing is left behind.
++nginx_world; seed_host "$C" 2 nginx-le admin@example.org; settle; NG0="$(d_tree_sum "$NGINX_DIR")"
++: > "$TMP/fail-certbot-issue-$C"; op configure_tls_for_instance "$C"; show
++check nginx_le_issue_fail_reported test "$rc" -ne 0
++check nginx_le_issue_fail_nothing_left no_managed "$C"
++check nginx_le_issue_fail_disk_valid d_nginx_valid
++check nginx_le_issue_fail_certs_unchanged le_same
++check nginx_le_issue_fail_others_served eval 'others_served && [[ "$(d_served_nginx_cert "$A")" == "$SA0" ]]'
++# 19. First issuance succeeds.
++nginx_world; seed_host "$C" 2 nginx-le admin@example.org; settle; op configure_tls_for_instance "$C"; show
++check nginx_le_issue_ok test "$rc" -eq 0
++check nginx_le_issue_served d_served_nginx "$C"
++check nginx_le_issue_hook_installed test -x "$LE_DIR/renewal-hooks/deploy/twebproxy-nginx-reload"
++check nginx_le_issue_other_lineage_unchanged eval '[[ "$(d_tree_sum "$LE_DIR/live/$O")$(d_tree_sum "$LE_DIR/archive/$O")" == "$LO0" ]]'
++# 20-22. cert-renew.
++nginx_world 10; : > "$TMP/fail-certbot-renew-$A"; op cert_renew_cmd "$A"; show
++check renew_fail_reported test "$rc" -ne 0
++check renew_fail_certs_unchanged le_same
++check renew_fail_still_served test "$(d_served_nginx_cert "$A")" = "$SA0"
++check renew_fail_says_kept grep -qiE 'previous certificate|kept' "$TMP/out"
++nginx_world 10; op cert_renew_cmd "$A"; show
++check renew_ok test "$rc" -eq 0
++check renew_ok_new_cert_served eval '[[ "$(d_served_nginx_cert "$A")" == "$(sha256sum < "$LE_DIR/live/$A/fullchain.pem" | cut -c1-16)" && "$(d_served_nginx_cert "$A")" != "$SA0" ]]'
++nginx_world 10; : > "$TMP/fail-nginx-t"; op cert_renew_cmd "$A"; show
++check renew_nginx_test_fail_reported test "$rc" -ne 0
++check renew_nginx_test_fail_old_cert_served test "$(d_served_nginx_cert "$A")" = "$SA0"
++check renew_nginx_test_fail_explained grep -qiE 'previous certificate' "$TMP/out"
++# 23. Delete while Nginx without the vhost fails nginx -t: nothing deleted, still serving.
++nginx_world; printf 'INVALID-USER-CONFIG;\n' >> "$NGINX_DIR/sites-available/shop.conf"; NG0="$(d_tree_sum "$NGINX_DIR")"
++op delete_instance_cmd "$A"; show
++check nginx_delete_fail_reported test "$rc" -ne 0
++check nginx_delete_fail_instance_kept instance_kept "$A"
++check nginx_delete_fail_files_restored nginx_same
++check nginx_delete_fail_still_served test "$(d_served_nginx_cert "$A")" = "$SA0"
++check nginx_delete_fail_no_success not grep -q "$A was deleted" "$TMP/out"
++# 24. Delete succeeds: only alpha's vhost goes; certificates stay.
++nginx_world; op delete_instance_cmd "$A"; show
++check nginx_delete_ok test "$rc" -eq 0 -a ! -e "$INSTANCES_DIR/$A"
++check nginx_delete_vhost_removed no_managed "$A"
++check nginx_delete_not_served not d_served_nginx "$A"
++check nginx_delete_others_served others_served
++check nginx_delete_certs_kept le_same
++# 25. Interrupted (SIGTERM) during nginx -t of a candidate it rejects.
++nginx_world; custom_gamma; : > "$TMP/nginx-reject-tls-$C"
++D_AT_NGINX_T=ni d_run configure_tls_for_instance "$C" > "$TMP/out" 2>&1 & p=$!
++c1_wait_reached ni; kill -TERM "$(cat "$TMP/ni.pid")" 2>/dev/null; : > "$TMP/ni.go"; wait "$p"; rc=$?; show
++check nginx_interrupted_reported test "$rc" -ne 0
++check nginx_interrupted_nothing_left no_managed "$C"
++check nginx_interrupted_disk_valid d_nginx_valid
++# 26. A certificate path that would inject configuration is refused.
++nginx_world; d_make_cert "$TMP/custom/evil;x.pem" "$TMP/custom/evil.key" "$C"
++seed_host "$C" 2 nginx-custom "$TMP/custom/evil;x.pem" "$TMP/custom/evil.key"; settle
++op configure_tls_for_instance "$C"; show
++check nginx_unsafe_path_refused test "$rc" -ne 0
++check nginx_unsafe_path_nothing_written no_managed "$C"
++
++# ---------- Instance creation through add (D3) ----------
++caddy_world; D_TLS=1 C1_HOST="$D" C1_NAME=main op add_instance_cmd; show
++check add_caddy_ok test "$rc" -eq 0
++check add_caddy_served d_served_caddy "$D"
++check add_caddy_others_intact eval 'b_intact && user_caddy_intact'
++nginx_world; d_make_cert "$TMP/custom/$D/fullchain.pem" "$TMP/custom/$D/privkey.pem" "$D"
++d_make_cert "$TMP/custom/$D/other.pem" "$TMP/custom/$D/privkey.pem" "$D"; NG0="$(d_tree_sum "$NGINX_DIR")"
++D_TLS=3 D_CERT="$TMP/custom/$D/fullchain.pem" D_KEY="$TMP/custom/$D/privkey.pem" C1_HOST="$D" C1_NAME=main op add_instance_cmd; show
++check add_nginx_bad_key_reported test "$rc" -ne 0
++check add_nginx_bad_key_nothing_left no_managed "$D"
++check add_nginx_bad_key_disk_valid d_nginx_valid
++check add_nginx_bad_key_others_served others_served
++
++printf 'd-frontend-tls: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/staged/rebind-baseline.sh b/tests/staged/rebind-baseline.sh
+new file mode 100644
+index 0000000..c055116
+--- /dev/null
++++ b/tests/staged/rebind-baseline.sh
+@@ -0,0 +1,22 @@
++#!/usr/bin/env bash
++# Writes a copy of a pre-Stage-D manager whose literal frontend paths
++# (/etc/caddy, /etc/nginx, /etc/letsencrypt, /var/lib/twebproxy/acme) are
++# replaced by the Stage D variables CADDYFILE/CADDY_DIR/NGINX_DIR/LE_DIR/
++# ACME_WEBROOT, so its frontend code runs inside the frontend harness sandbox.
++# Only those literals change (the diff is printed); it is used to reproduce the
++# RED baseline and is never installed.
++# Usage: rebind-baseline.sh <manager> <output>
++set -Eeuo pipefail
++in="${1:?manager}" out="${2:?output}"
++sed -e 's#/etc/caddy/Caddyfile#${CADDYFILE}#g' -e 's#/etc/caddy#${CADDY_DIR}#g' -e 's#/etc/nginx#${NGINX_DIR}#g' \
++    -e 's#/etc/letsencrypt#${LE_DIR}#g' -e 's#/var/lib/twebproxy/acme#${ACME_WEBROOT}#g' "$in" > "$out"
++bash -n "$out"
++diff "$in" "$out" | grep -E '^[<>]' | sed -E 's#\$\{(CADDYFILE|CADDY_DIR|NGINX_DIR|LE_DIR|ACME_WEBROOT)\}#<\1>#g' |
++  awk '{print}' > "$out.diff" || true
++changed="$(diff "$in" "$out" | grep -c '^<' || true)"
++# Every changed line differs only in the substituted literals.
++paste -d '\n' <(diff "$in" "$out" | grep '^<' | cut -c3-) <(diff "$in" "$out" | grep '^>' | cut -c3- |
++  sed -e 's#${CADDYFILE}#/etc/caddy/Caddyfile#g' -e 's#${CADDY_DIR}#/etc/caddy#g' -e 's#${NGINX_DIR}#/etc/nginx#g' \
++      -e 's#${LE_DIR}#/etc/letsencrypt#g' -e 's#${ACME_WEBROOT}#/var/lib/twebproxy/acme#g') |
++  awk 'NR % 2 { a = $0; next } a != $0 { bad = 1 } END { exit bad }'
++printf 'rebind-baseline: %s lines changed, only frontend path literals; written %s\n' "$changed" "$out"
+diff --git a/tests/staged/run-stage-d-suite.sh b/tests/staged/run-stage-d-suite.sh
+new file mode 100644
+index 0000000..523bea9
+--- /dev/null
++++ b/tests/staged/run-stage-d-suite.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage D cases are model tests (tests/staged/frontend-harness.sh): they change
++# no system state and need no lab host. Scope: d-scope-invariants.sh <v0.2.17 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "D frontend (Caddy/Nginx) and TLS lifecycle (MODEL)" "$ROOT/tests/staged/frontend-tls-fixture.sh" 900 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-d-suite: PASS (all mandatory model checks executed)';;
++  77) echo 'stage-d-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-d-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index bc06506..8f3672c 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.17-beta
++# TWebProxy Manager v0.2.18-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.17"
+-MANAGER_RELEASE_VERSION="0.2.17-beta"
++MANAGER_VERSION="0.2.18"
++MANAGER_RELEASE_VERSION="0.2.18-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -42,6 +42,13 @@ SYSTEMD_DIR="/etc/systemd/system"
+ GLOBAL_ENV="$BASE_DIR/global.env"
+ FIREWALL_FILE="$BASE_DIR/firewall.nft"
+ LANGUAGE_FILE="${TWEBPROXY_LANGUAGE_FILE:-$BASE_DIR/ui-language}"
++# Frontend / TLS locations: Caddy, Nginx, Let's Encrypt and the ACME HTTP-01 webroot.
++CADDY_DIR="/etc/caddy"
++CADDYFILE="$CADDY_DIR/Caddyfile"
++NGINX_DIR="/etc/nginx"
++LE_DIR="/etc/letsencrypt"
++ACME_WEBROOT="/var/lib/twebproxy/acme"
++FRONTEND_INTERRUPTED=0
+ 
+ # Stage X-DPI remains opt-in. STOCK creates no DPI state, service, binary or
+ # nftables table. Enabled state is keyed by the resolved public IPv4 address
+@@ -513,6 +520,50 @@ ui_localize_legacy() {
+     'Обновление relay прервано; восстанавливаю прежний relay binary.') printf 'The relay update was interrupted; restoring the previous relay binary.'; return;;
+     'Откат relay неполный: прежний binary восстановлен, но не ready: '*) value="${text#*но не ready: }"; printf "Relay rollback incomplete: the previous binary was restored, but these relays are not ready: %s. Check them and run 'twebproxy restart <hostname>'." "${value%%. Проверь*}"; return;;
+     'Откат relay не удался: прежний binary не восстановлен, его копия: '*) value="${text#*его копия: }"; value2="${text#*новым binary: }"; printf 'Relay rollback failed: the previous binary was not restored; its copy: %s. Relays restarted with the new binary: %s.' "${value%%. Relays*}" "${value2%.}"; return;;
++    # Stage D frontend / TLS messages.
++    'Конфигурацию frontend сейчас меняет другая операция; повтори позже.') printf 'Another operation is changing the frontend configuration (frontend lock busy); retry later.'; return;;
++    'Не удалось записать конфигурацию Nginx для '*) value="${text#Не удалось записать конфигурацию Nginx для }"; printf 'Could not write the Nginx configuration for %s; its previous configuration was restored.' "${value%%;*}"; return;;
++    'Прервано: изменение frontend уже применено и проверено.') printf 'Interrupted: the frontend change had already been applied and verified.'; return;;
++    'Прервано: изменение frontend не применено, и прежнюю конфигурацию восстановить не удалось.') printf 'Interrupted: the frontend change was not applied, and the previous configuration could not be restored.'; return;;
++    'Прервано: изменение frontend не применено, прежняя конфигурация восстановлена.') printf 'Interrupted: the frontend change was not applied; the previous configuration was restored.'; return;;
++    'Не удалось подготовить candidate Caddyfile в '*) value="${text#Не удалось подготовить candidate Caddyfile в }"; printf 'Could not prepare a candidate Caddyfile in %s.' "${value%.}"; return;;
++    'Маркеры блока TWebProxy для '*' в Caddyfile неоднозначны; '*) value="${text#Маркеры блока TWebProxy для }"; printf 'The TWebProxy block markers for %s in the Caddyfile are ambiguous; the Caddyfile was not changed. Fix them manually.' "${value%% в Caddyfile*}"; return;;
++    'Активный Caddyfile уже не проходит caddy validate; блок '*) value="${text#*; блок }"; printf 'The active Caddyfile already fails caddy validate; the block for %s was not added and the Caddyfile was not changed.' "${value%% не добавлен*}"; return;;
++    'Caddy не применил новую конфигурацию '*', и прежний Caddyfile восстановить не удалось: '*) value="${text#Caddy не применил новую конфигурацию }"; printf 'Caddy did not apply the new configuration for %s, and the previous Caddyfile could not be restored: check %s (the previous version is next to it, *.twebproxy-previous).' "${value%%, и прежний*}" "$CADDYFILE"; return;;
++    'Caddy не применил новую конфигурацию '*'; прежний Caddyfile восстановлен'*) value="${text#Caddy не применил новую конфигурацию }"; printf 'Caddy did not apply the new configuration for %s; the previous Caddyfile was restored and Caddy keeps its previous configuration.' "${value%%; прежний*}"; return;;
++    'Блок TWebProxy для '*' не удалён из Caddyfile: '*) value="${text#Блок TWebProxy для }"; printf 'The TWebProxy block for %s was not removed from the Caddyfile: its markers are ambiguous or the Caddyfile without it is invalid; the Caddyfile was not changed.' "${value%% не удалён*}"; return;;
++    'Caddy не применил Caddyfile без '*', и прежний Caddyfile восстановить не удалось: '*) value="${text#Caddy не применил Caddyfile без }"; printf 'Caddy did not apply the Caddyfile without %s, and the previous Caddyfile could not be restored: check %s (the previous version is next to it, *.twebproxy-previous).' "${value%%, и прежний*}" "$CADDYFILE"; return;;
++    'Caddy не применил Caddyfile без '*'; прежний Caddyfile восстановлен.') value="${text#Caddy не применил Caddyfile без }"; printf 'Caddy did not apply the Caddyfile without %s; the previous Caddyfile was restored.' "${value%%; прежний*}"; return;;
++    'Не удалось установить Nginx.') printf 'Could not install Nginx.'; return;;
++    'Не удалось установить certbot.') printf 'Could not install certbot.'; return;;
++    'Не удалось создать временный файл.') printf 'Could not create a temporary file.'; return;;
++    'Не удалось подготовить '*'.') value="${text#Не удалось подготовить }"; printf 'Could not prepare %s.' "${value%.}"; return;;
++    'Не удалось записать '*'.') value="${text#Не удалось записать }"; printf 'Could not write %s.' "${value%.}"; return;;
++    'Nginx уже содержит server_name '*' вне TWebProxy: '*) value="${text#Nginx уже содержит server_name }"; printf 'Nginx already contains server_name %s outside TWebProxy: %s' "${value%% вне TWebProxy:*}" "${text##*вне TWebProxy: }"; return;;
++    'Nginx отклонил конфигурацию '*) value="${text#Nginx отклонил конфигурацию }"; printf 'Nginx rejected the configuration for %s (nginx -t); its previous configuration was restored and the running Nginx was not changed.' "${value%% (nginx -t)*}"; return;;
++    'Nginx не применил конфигурацию '*) value="${text#Nginx не применил конфигурацию }"; printf 'Nginx did not apply the configuration for %s (reload/start failed); its previous configuration was restored.' "${value%% (reload*}"; return;;
++    'Не удалось восстановить прежнюю конфигурацию Nginx для '*) value="${text#Не удалось восстановить прежнюю конфигурацию Nginx для }"; value2="${value#*проверь }"; printf 'Could not restore the previous Nginx configuration for %s: check %s and nginx -t.' "${value%%:*}" "${value2%% и nginx -t*}"; return;;
++    'Не удалось восстановить конфигурацию Nginx для '*) value="${text#Не удалось восстановить конфигурацию Nginx для }"; value2="${value#*проверь }"; printf 'Could not restore the Nginx configuration for %s: check %s and nginx -t.' "${value%%:*}" "${value2%% и nginx -t*}"; return;;
++    'Файлы Nginx для '*' в неожиданном состоянии '*) value="${text#Файлы Nginx для }"; value="${value%% в неожиданном*}"; printf 'The Nginx files for %s are in an unexpected state (sites-enabled/twebproxy-%s.conf is not a link to its own file); nothing was changed.' "$value" "$value"; return;;
++    'Nginx без конфигурации '*' не проходит nginx -t; '*) value="${text#Nginx без конфигурации }"; printf 'Nginx fails nginx -t without the configuration for %s; its files were restored and Nginx was not changed.' "${value%% не проходит*}"; return;;
++    'Nginx не перезагрузился без конфигурации '*) value="${text#Nginx не перезагрузился без конфигурации }"; printf 'Nginx did not reload without the configuration for %s; its files were restored.' "${value%%; её*}"; return;;
++    'Certbot не смог получить или продлить сертификат '*) value="${text#Certbot не смог получить или продлить сертификат }"; value2="${text##*до истечения: }"; printf 'Certbot could not obtain or renew the certificate for %s; the current certificate stays in service (days until it expires: %s).' "${value%%;*}" "${value2%).}"; return;;
++    'Certbot не смог получить сертификат для '*) value="${text#Certbot не смог получить сертификат для }"; printf 'Certbot could not obtain a certificate for %s; existing certificates were not changed.' "${value%%;*}"; return;;
++    'Временная HTTP-конфигурация '*' для ACME не убрана; '*) value="${text#Временная HTTP-конфигурация }"; printf 'The temporary ACME HTTP configuration for %s was not removed; check %s' "${value%% для ACME*}" "${text##*проверь }"; return;;
++    'Для '*' оставлена временная HTTP-конфигурация ACME: '*) value="${text#Для }"; printf 'The temporary ACME HTTP configuration for %s was kept: the previous one referred to a missing certificate.' "${value%% оставлена*}"; return;;
++    'После certbot нет пригодной пары сертификат/ключ для '*) value="${text#После certbot нет пригодной пары сертификат/ключ для }"; printf 'After certbot there is no usable certificate/key pair for %s in %s' "${value%% в *}" "${value#* в }"; return;;
++    'Пути к сертификату и ключу должны быть абсолютными, без пробелов и спецсимволов: '*) printf 'The certificate and key paths must be absolute, without spaces or special characters: %s' "${text#*спецсимволов: }"; return;;
++    'Ключ '*' не соответствует сертификату '*) value="${text#Ключ }"; value2="${text#* не соответствует сертификату }"; printf 'Key %s does not match certificate %s.' "${value%% не соответствует*}" "${value2%.}"; return;;
++    'Сертификат '*' уже истёк.') value="${text#Сертификат }"; printf 'Certificate %s has already expired.' "${value% уже истёк.}"; return;;
++    'Ключ '*' доступен для чтения всем пользователям; '*) value="${text#Ключ }"; printf 'Key %s is readable by all users; restrict its permissions (chmod 600).' "${value%% доступен*}"; return;;
++    'Frontend для '*' не удалён; ничего не удалено, инстанс продолжает работать.') value="${text#Frontend для }"; printf 'The frontend for %s was not removed; nothing was deleted and the instance keeps serving.' "${value%% не удалён*}"; return;;
++    'Frontend '*' уже отключён; '*) value="${text#Frontend }"; value="${value%% уже отключён*}"; printf "The frontend for %s is already removed; 'twebproxy repair %s' restores it." "$value" "$value"; return;;
++    'Нет пригодного сертификата Let'"'"'s Encrypt для '*) value="${text#*Encrypt для }"; printf "No usable Let's Encrypt certificate for %s; run 'twebproxy repair %s'." "${value%%;*}" "${value%%;*}"; return;;
++    'Certbot dry-run для '*' не прошёл; '*) value="${text#Certbot dry-run для }"; printf 'The Certbot dry run for %s failed; the active certificate was not changed.' "${value%% не прошёл*}"; return;;
++    'Certbot не продлил сертификат '*) value="${text#Certbot не продлил сертификат }"; printf 'Certbot did not renew the certificate for %s; the previous certificate is kept and still used.' "${value%%;*}"; return;;
++    'Сертификат '*' продлён на диске, но nginx -t не проходит; '*) value="${text#Сертификат }"; printf 'The certificate for %s was renewed on disk, but nginx -t fails; Nginx was not reloaded and still serves the previous certificate.' "${value%% продлён*}"; return;;
++    'Сертификат '*' продлён на диске, но reload Nginx не удался; '*) value="${text#Сертификат }"; printf 'The certificate for %s was renewed on disk, but the Nginx reload failed; Nginx still serves the previous certificate.' "${value%% продлён*}"; return;;
++    'Nginx не запущен; сертификат '*) value="${text#Nginx не запущен; сертификат }"; printf 'Nginx is not running; the certificate for %s was renewed on disk but is not in use.' "${value%% продлён*}"; return;;
+     'Запусти от root:'*) printf 'Run as root:%s' "${text#*:}"; return;;
+     'Нужен systemd.') printf 'systemd is required.'; return;;
+     'jq нужен для --json output.') printf 'jq is required for --json output.'; return;;
+@@ -1340,15 +1391,17 @@ profile_state_restore() { # $1=host $2=profile $3=previous record ("" = remove)
+ # Narrow flock locks under $BASE_DIR/.locks: instance-<host> serializes the
+ # mutations of one instance; ports serializes port choice until persistence;
+ # relay serializes relay binary replacement with relay restarts/stops;
+-# relay-update serializes whole relay updates (upstream checkout and build).
++# relay-update serializes whole relay updates (upstream checkout and build);
++# frontend serializes changes of the shared Caddy/Nginx configuration.
+ # Order: instance -> ports -> (DPI lock, backend firewall helper); the port
+ # lock is a leaf. instance -> relay and relay-update -> relay; ports and relay
+-# are never held together. Closing the descriptor or process exit (die)
+-# releases them.
++# are never held together. instance -> frontend; frontend is a leaf. Closing
++# the descriptor or process exit (die) releases them.
+ STATE_LOCK_WAIT_SECONDS="${TWEBPROXY_STATE_LOCK_WAIT:-120}"
+ INSTANCE_LOCK_FD=""; INSTANCE_LOCK_HOST=""; INSTANCE_LOCK_DEPTH=0
+ PORT_LOCK_FD=""; PORT_LOCK_DEPTH=0
+ RELAY_LOCK_FD=""; RELAY_LOCK_DEPTH=0
++FRONTEND_LOCK_FD=""; FRONTEND_LOCK_DEPTH=0
+ # Bounded relay readiness wait (seconds, one /readyz probe per second).
+ RELAY_READY_WAIT_SECONDS="${TWEBPROXY_RELAY_READY_WAIT:-25}"
+ RELAY_UPDATE_INTERRUPTED=0
+@@ -1415,6 +1468,22 @@ relay_lock_release() {
+   (( RELAY_LOCK_DEPTH > 0 )) || exec {RELAY_LOCK_FD}>&-
+ }
+ 
++frontend_lock_acquire() {
++  if (( FRONTEND_LOCK_DEPTH > 0 )); then FRONTEND_LOCK_DEPTH=$((FRONTEND_LOCK_DEPTH + 1)); return 0; fi
++  state_lock_path frontend || return 1
++  exec {FRONTEND_LOCK_FD}>>"$STATE_LOCK_PATH" || return 1
++  if ! flock -w "$STATE_LOCK_WAIT_SECONDS" "$FRONTEND_LOCK_FD"; then
++    exec {FRONTEND_LOCK_FD}>&-; return 1
++  fi
++  FRONTEND_LOCK_DEPTH=1
++}
++
++frontend_lock_release() {
++  (( FRONTEND_LOCK_DEPTH > 0 )) || return 0
++  FRONTEND_LOCK_DEPTH=$((FRONTEND_LOCK_DEPTH - 1))
++  (( FRONTEND_LOCK_DEPTH > 0 )) || exec {FRONTEND_LOCK_FD}>&-
++}
++
+ # ---- Stage X-DPI: optional, IPv4-address-scoped compatibility subsystem ----
+ 
+ dpi_mode_valid() {
+@@ -4807,41 +4876,93 @@ install_caddy() {
+   systemctl unmask caddy 2>/dev/null || true
+ }
+ 
+-remove_caddy_block() {
+-  local host="$1" cf="${2:-/etc/caddy/Caddyfile}" tmp
+-  [[ -f "$cf" ]] || return 0
+-  tmp="$(mktemp)"
+-  awk -v b="# BEGIN TWEBPROXY $host" -v e="# END TWEBPROXY $host" '
+-    $0==b {skip=1; next}
+-    $0==e {skip=0; next}
+-    !skip {print}
+-  ' "$cf" > "$tmp"
+-  cat "$tmp" > "$cf"; rm -f "$tmp"
++# Replaces $2 by renaming a complete copy of $1 written in the same directory
++# (symlinks resolved; mode and owner of an existing file kept, else mode $3),
++# so a failed or interrupted write never leaves a partial file in place.
++frontend_file_replace() { # $1=content file $2=target [$3=mode of a new file]
++  local target tmp
++  target="$(readlink -f -- "$2")" || return 1
++  tmp="$(mktemp "${target%/*}/.twebproxy-tmp.XXXXXX")" || return 1
++  if cat -- "$1" > "$tmp" &&
++     if [[ -e "$target" ]]; then chmod --reference="$target" -- "$tmp" && chown --reference="$target" -- "$tmp"
++     else chmod "${3:-0644}" -- "$tmp"; fi &&
++     mv -f -T -- "$tmp" "$target"; then
++    return 0
++  fi
++  rm -f -- "$tmp"; return 1
+ }
+ 
+-configure_caddy_host() {
+-  local host="$1" relay="$2" cf=/etc/caddy/Caddyfile family candidate block backup
+-  family="$(managed_frontend_family)"
+-  [[ -z "$family" || "$family" == caddy ]] || die "Другой TWebProxy-инстанс уже использует Nginx на 80/443. Нельзя параллельно запустить managed Caddy."
+-  check_public_listener_owner caddy
+-  install_caddy
+-  [[ -f "$cf" ]] || touch "$cf"
++# Creates missing frontend directories (0755); existing ones keep their mode.
++frontend_dirs() {
++  local d
++  for d; do [[ -d "$d" ]] || install -d -m 0755 -- "$d" || return 1; done
++}
+ 
+-  candidate="$(mktemp /tmp/twebproxy-Caddyfile.XXXXXX)"
+-  block="$(mktemp /tmp/twebproxy-caddy-block.XXXXXX)"
+-  cp -a "$cf" "$candidate"
+-  remove_caddy_block "$host" "$candidate"
++# A frontend change (swap, test, reload, rollback) always runs to its end: an
++# INT/TERM/HUP meanwhile is only recorded and acted on once the files are
++# consistent again. Callers run the change in an || context, so every step in
++# it is checked explicitly.
++frontend_signals_defer() { FRONTEND_INTERRUPTED=0; trap 'FRONTEND_INTERRUPTED=1' INT TERM HUP; }
++frontend_signals_end() { # $1=outcome of the change (0 applied, 3 previous state not restored)
++  trap - INT TERM HUP
++  (( FRONTEND_INTERRUPTED )) || return 0
++  case "$1" in
++    0) die "Прервано: изменение frontend уже применено и проверено.";;
++    3) die "Прервано: изменение frontend не применено, и прежнюю конфигурацию восстановить не удалось.";;
++    *) die "Прервано: изменение frontend не применено, прежняя конфигурация восстановлена.";;
++  esac
++}
+ 
+-  if grep -Eq "^[[:space:]]*${host//./\\.}([[:space:]{,]|$)" "$candidate"; then
+-    rm -f "$candidate" "$block"
+-    die "В Caddyfile уже есть $host вне управляемого блока TWebProxy."
++# Line range "first last" of the TWebProxy block of $1 in Caddyfile $2 (nothing
++# when there is none). Fails, with the reason on stderr, when the markers that
++# concern $1 are ambiguous: altered, duplicated, unpaired or interleaved with
++# another block. Ownership is never guessed from such a file.
++caddy_block_range() { # $1=host $2=file
++  awk -v h="$1" '
++    function fail(why) { print "line " NR ": " why > "/dev/stderr"; bad = 1; exit 1 }
++    {
++      line = $0; sub(/\r$/, "", line)
++      if (line !~ /^[ \t]*#[ \t]*(BEGIN|END)[ \t]+TWEBPROXY([ \t]|$)/) next
++      m = line; sub(/^[ \t]*#[ \t]*/, "", m); split(m, w, /[ \t]+/); k = w[1]; x = w[3]
++      if (x == h && $0 != "# " k " TWEBPROXY " h) fail("altered marker of " h)
++      if (k == "BEGIN") {
++        if (cur != "" && (cur == h || x == h)) fail("BEGIN marker of " x " inside the block of " cur)
++        if (cur == "") cur = x
++        if (x == h) { if (pairs) fail("second block of " h); open = NR }
++      } else {
++        if (x == h) { if (cur != h) fail("END marker of " h " without BEGIN"); first = open; last = NR; pairs++ }
++        else if (cur == h) fail("END marker of " x " inside the block of " h)
++        if (x == cur) cur = ""
++      }
++    }
++    END {
++      if (bad) exit 1
++      if (cur == h) { print "line " open ": BEGIN marker of " h " without END" > "/dev/stderr"; exit 1 }
++      if (pairs) print first, last
++    }' "$2"
++}
++
++# Removes the TWebProxy block of $1 (and the blank line written before it) from
++# the private Caddyfile copy $2; fails, leaving $2 unchanged, if its markers are
++# ambiguous.
++remove_caddy_block() { # $1=host $2=file
++  local range first last
++  range="$(caddy_block_range "$1" "$2")" || return 1
++  [[ -n "$range" ]] || return 0
++  read -r first last <<<"$range"
++  if awk -v a="$first" -v b="$last" 'NR < a - 1 || (NR == a - 1 && $0 != "") || NR > b' "$2" > "$2.cut" &&
++     mv -f -T -- "$2.cut" "$2"; then
++    return 0
+   fi
++  rm -f -- "$2.cut"; return 1
++}
+ 
+-  cat > "$block" <<EOF
+-# BEGIN TWEBPROXY $host
+-$host {
++render_caddy_block() { # $1=host $2=relay port
++  cat <<EOF
++# BEGIN TWEBPROXY $1
++$1 {
+     encode zstd gzip
+-    reverse_proxy 127.0.0.1:$relay {
++    reverse_proxy 127.0.0.1:$2 {
+         transport http {
+             response_header_timeout 40s
+         }
+@@ -4850,64 +4971,291 @@ $host {
+         output discard
+     }
+ }
+-# END TWEBPROXY $host
++# END TWEBPROXY $1
+ EOF
+-  # Format only the generated block. Never rewrite unrelated user-managed sites.
+-  caddy fmt --overwrite "$block" >/dev/null 2>&1 || true
+-  printf '\n' >> "$candidate"
+-  cat "$block" >> "$candidate"
+-  rm -f "$block"
++}
+ 
+-  if ! caddy validate --config "$candidate" --adapter caddyfile; then
+-    rm -f "$candidate"
+-    die "Candidate Caddyfile не прошёл validate; активный Caddyfile не изменён."
++# Publishes candidate $1, a complete Caddyfile written next to the live one $2
++# (so relative imports resolve alike): caddy validate, atomic swap, reload (or
++# start). A failed activation puts the previous file back unchanged; Caddy keeps
++# serving its previous configuration after a failed reload, so it is never
++# restarted. The replaced file is kept as $2.twebproxy-previous.
++# 0 published; 1 invalid (nothing changed); 2 not activated, previous file
++# restored; 3 not activated and the previous file not restored.
++caddy_publish() { # $1=candidate $2=live Caddyfile (symlinks resolved)
++  local cand="$1" live="$2" prev="" out rc=0 swapped=0
++  if ! out="$(caddy validate --config "$cand" --adapter caddyfile 2>&1)"; then
++    printf '%s\n' "$out" | tail -n 8 >&2
++    rm -f -- "$cand"; return 1
++  fi
++  if [[ -e "$live" ]]; then
++    if ! prev="$(mktemp "${live%/*}/.twebproxy-previous.XXXXXX")" || ! cp -p -- "$live" "$prev" ||
++       ! chmod --reference="$live" -- "$cand" || ! chown --reference="$live" -- "$cand"; then
++      rm -f -- "$cand" "$prev"; return 2
++    fi
++  else
++    chmod 0644 -- "$cand" || { rm -f -- "$cand"; return 2; }
++  fi
++  frontend_signals_defer
++  if mv -f -T -- "$cand" "$live"; then
++    swapped=1
++    if systemctl is-active --quiet caddy; then
++      systemctl reload caddy || rc=2
++    else
++      systemctl enable --now caddy || rc=2
++    fi
++  else
++    rc=2
+   fi
++  if (( rc && swapped )); then
++    if [[ -n "$prev" ]]; then mv -f -T -- "$prev" "$live" || rc=3; else rm -f -- "$live" || rc=3; fi
++  fi
++  if [[ -n "$prev" && -e "$prev" ]]; then mv -f -T -- "$prev" "$live.twebproxy-previous" || rm -f -- "$prev"; fi
++  rm -f -- "$cand"
++  frontend_signals_end "$rc"
++  return "$rc"
++}
+ 
+-  backup="$cf.before-twebproxy.$(date +%Y%m%d%H%M%S)"
+-  cp -a "$cf" "$backup"
+-  cat "$candidate" > "$cf"
+-  rm -f "$candidate"
++# Removes the TWebProxy block of $1 from the live Caddyfile. 0 removed or none
++# there; 1 ambiguous markers or the rest of the Caddyfile is invalid (nothing
++# changed); 2 reload failed, previous file restored; 3 previous file not
++# restored; 5 frontend lock busy (nothing changed).
++caddy_remove_host() { # $1=host
++  local live cand rc=0
++  [[ -e "$CADDYFILE" ]] || return 0
++  frontend_lock_acquire || return 5
++  if ! live="$(readlink -f -- "$CADDYFILE")" || ! cand="$(mktemp "${live%/*}/.twebproxy-candidate.XXXXXX")"; then
++    frontend_lock_release; return 1
++  fi
++  if ! cp -- "$live" "$cand" || ! remove_caddy_block "$1" "$cand"; then
++    rc=1
++  elif cmp -s -- "$live" "$cand"; then
++    :
++  else
++    caddy_publish "$cand" "$live" || rc=$?
++  fi
++  rm -f -- "$cand"; frontend_lock_release
++  return "$rc"
++}
+ 
+-  systemctl enable --now caddy
+-  if ! systemctl reload caddy; then
+-    warn "Caddy reload не прошёл; возвращаю предыдущий Caddyfile."
+-    cat "$backup" > "$cf"
+-    caddy validate --config "$cf" --adapter caddyfile >/dev/null 2>&1 || true
+-    systemctl reload caddy || systemctl restart caddy || true
+-    die "Caddy frontend rollback выполнен после неуспешного reload."
++configure_caddy_host() {
++  local host="$1" relay="$2" family live cand block rc=0
++  family="$(managed_frontend_family)"
++  [[ -z "$family" || "$family" == caddy ]] || die "Другой TWebProxy-инстанс уже использует Nginx на 80/443. Нельзя параллельно запустить managed Caddy."
++  check_public_listener_owner caddy
++  install_caddy
++  frontend_dirs "$CADDY_DIR" || die "Не удалось подготовить candidate Caddyfile в $CADDY_DIR."
++  # The Caddyfile is shared by all instances: read, change and publish it under one lock.
++  frontend_lock_acquire || die "Конфигурацию frontend сейчас меняет другая операция; повтори позже."
++  live="$(readlink -f -- "$CADDYFILE")" && cand="$(mktemp "${live%/*}/.twebproxy-candidate.XXXXXX")" ||
++    die "Не удалось подготовить candidate Caddyfile в $CADDY_DIR."
++  if [[ -e "$live" ]] && ! cp -- "$live" "$cand"; then
++    rm -f -- "$cand"; die "Не удалось подготовить candidate Caddyfile в $CADDY_DIR."
++  fi
++  if ! remove_caddy_block "$host" "$cand"; then
++    rm -f -- "$cand"
++    die "Маркеры блока TWebProxy для $host в Caddyfile неоднозначны; Caddyfile не изменён. Исправь их вручную."
++  fi
++  if grep -Eq "^[[:space:]]*${host//./\\.}([[:space:]{,]|$)" "$cand"; then
++    rm -f -- "$cand"
++    die "В Caddyfile уже есть $host вне управляемого блока TWebProxy."
++  fi
++  block="$(mktemp)" || { rm -f -- "$cand"; die "Не удалось подготовить candidate Caddyfile в $CADDY_DIR."; }
++  render_caddy_block "$host" "$relay" > "$block"
++  # Format only the generated block. Never rewrite unrelated user-managed sites.
++  caddy fmt --overwrite "$block" >/dev/null 2>&1 || true
++  if ! { printf '\n'; cat -- "$block"; } >> "$cand"; then
++    rm -f -- "$cand" "$block"; die "Не удалось подготовить candidate Caddyfile в $CADDY_DIR."
+   fi
++  rm -f -- "$block"
++  caddy_publish "$cand" "$live" || rc=$?
++  frontend_lock_release
++  case "$rc" in
++    0) ;;
++    1) if [[ -e "$live" ]] && ! caddy validate --config "$live" --adapter caddyfile >/dev/null 2>&1; then
++         die "Активный Caddyfile уже не проходит caddy validate; блок $host не добавлен, Caddyfile не изменён."
++       fi
++       die "Candidate Caddyfile не прошёл validate; активный Caddyfile не изменён.";;
++    2) die "Caddy не применил новую конфигурацию $host; прежний Caddyfile восстановлен, Caddy работает с прежней конфигурацией.";;
++    *) die "Caddy не применил новую конфигурацию $host, и прежний Caddyfile восстановить не удалось: проверь $CADDYFILE (прежняя версия рядом, *.twebproxy-previous).";;
++  esac
+ }
+ 
+ nginx_common_install() {
+-  local family; family="$(managed_frontend_family)"
++  local family tmp map="$NGINX_DIR/conf.d/twebproxy-map.conf"
++  family="$(managed_frontend_family)"
+   [[ -z "$family" || "$family" == nginx ]] || die "Другой TWebProxy-инстанс уже использует Caddy на 80/443. Нельзя параллельно запустить managed Nginx."
+   check_public_listener_owner nginx
+-  export DEBIAN_FRONTEND=noninteractive
+-  apt-get install -y nginx
+-  install -d -m 0755 /etc/nginx/sites-available /etc/nginx/sites-enabled
+-  cat > /etc/nginx/conf.d/twebproxy-map.conf <<'EOF'
++  if ! command -v nginx >/dev/null 2>&1; then
++    export DEBIAN_FRONTEND=noninteractive
++    apt-get install -y nginx || die "Не удалось установить Nginx."
++  fi
++  frontend_dirs "$NGINX_DIR/sites-available" "$NGINX_DIR/sites-enabled" "$NGINX_DIR/conf.d" &&
++    tmp="$(mktemp)" || die "Не удалось записать $map."
++  cat > "$tmp" <<'EOF'
+ map $http_upgrade $twebproxy_connection_upgrade {
+     default upgrade;
+     ''      close;
+ }
+ EOF
++  if ! cmp -s -- "$tmp" "$map" && ! frontend_file_replace "$tmp" "$map" 0644; then
++    rm -f -- "$tmp"; die "Не удалось записать $map."
++  fi
++  rm -f -- "$tmp"
+ }
+ 
+ nginx_domain_conflict() {
+-  local host="$1" own="/etc/nginx/sites-available/twebproxy-$host.conf"
+-  if grep -RqsE "server_name[[:space:]]+${host//./\\.}([[:space:];]|$)" /etc/nginx 2>/dev/null; then
+-    [[ -f "$own" ]] || die "Nginx уже содержит server_name $host вне TWebProxy."
++  local host="$1" f
++  while IFS= read -r f; do
++    [[ "$f" == "$NGINX_DIR/sites-available/twebproxy-$host.conf" || "$f" == "$NGINX_DIR/sites-enabled/twebproxy-$host.conf" ]] && continue
++    die "Nginx уже содержит server_name $host вне TWebProxy: $f"
++  done < <(grep -RlsE "^[^#]*server_name[^;#]*[[:space:]]${host//./\\.}([[:space:];]|$)" "$NGINX_DIR" 2>/dev/null || true)
++}
++
++# The managed vhost of $1 may be changed only while it looks as the manager left
++# it: the sites-available file absent or a regular file, the sites-enabled entry
++# absent or a link to that file. Anything else is reported, never overwritten.
++nginx_managed_state_ok() { # $1=host
++  local f="$NGINX_DIR/sites-available/twebproxy-$1.conf" l="$NGINX_DIR/sites-enabled/twebproxy-$1.conf"
++  { [[ ! -e "$f" && ! -L "$f" ]] || [[ -f "$f" && ! -L "$f" ]]; } &&
++    { [[ ! -e "$l" && ! -L "$l" ]] || [[ -L "$l" && "$(readlink -f -- "$l")" == "$(readlink -f -- "$f")" ]]; }
++}
++
++nginx_link_enable() { # $1=host: sites-enabled link to the managed file, replaced atomically
++  local f="$NGINX_DIR/sites-available/twebproxy-$1.conf" l="$NGINX_DIR/sites-enabled/twebproxy-$1.conf"
++  local tmp="$NGINX_DIR/sites-enabled/.twebproxy-link.$$"
++  if ln -sfn -- "$f" "$tmp" && mv -f -T -- "$tmp" "$l"; then return 0; fi
++  rm -f -- "$tmp"; return 1
++}
++
++nginx_managed_save() { # $1=host $2=private dir: remembers the managed file and link
++  local f="$NGINX_DIR/sites-available/twebproxy-$1.conf" l="$NGINX_DIR/sites-enabled/twebproxy-$1.conf"
++  if [[ -f "$f" ]] && ! cp -p -- "$f" "$2/conf"; then return 1; fi
++  if [[ -L "$l" ]] && ! : > "$2/link"; then return 1; fi
++  return 0
++}
++
++nginx_managed_restore() { # $1=host $2=private dir: puts the remembered file and link back exactly
++  local f="$NGINX_DIR/sites-available/twebproxy-$1.conf" l="$NGINX_DIR/sites-enabled/twebproxy-$1.conf" rc=0
++  if [[ -f "$2/conf" ]]; then frontend_file_replace "$2/conf" "$f" || rc=1; else rm -f -- "$f" || rc=1; fi
++  if [[ -e "$2/link" ]]; then nginx_link_enable "$1" || rc=1; else rm -f -- "$l" || rc=1; fi
++  return "$rc"
++}
++
++nginx_test() { # nginx -t; on failure the tail of its output goes to stderr
++  local out
++  out="$(nginx -t 2>&1)" && return 0
++  printf '%s\n' "$out" | tail -n 6 >&2
++  return 1
++}
++
++# Puts candidate $2 (removed afterwards) in place as the managed vhost of $1
++# (file plus sites-enabled link), tests the complete configuration (nginx -t)
++# and reloads, or starts, Nginx. On any failure the previous file and link (or
++# their absence) are put back exactly; a running Nginx keeps serving its
++# previous configuration.
++# 0 applied; 1 rejected by nginx -t; 2 not activated; 3 previous state not
++# restored; 4 managed files in an unexpected state (nothing changed); 5 not
++# written (previous state restored); 6 frontend lock busy (nothing changed).
++nginx_managed_apply() { # $1=host $2=candidate
++  local host="$1" save rc=0
++  frontend_lock_acquire || { rm -f -- "$2"; return 6; }
++  nginx_managed_state_ok "$host" || { rm -f -- "$2"; frontend_lock_release; return 4; }
++  save="$(mktemp -d)" || { rm -f -- "$2"; frontend_lock_release; return 2; }
++  nginx_managed_save "$host" "$save" || { rm -rf -- "$save" "$2"; frontend_lock_release; return 2; }
++  frontend_signals_defer
++  if ! frontend_file_replace "$2" "$NGINX_DIR/sites-available/twebproxy-$host.conf" 0644 || ! nginx_link_enable "$host"; then
++    rc=5
++  elif ! nginx_test; then
++    rc=1
++  elif systemctl is-active --quiet nginx; then
++    systemctl reload nginx || rc=2
++  else
++    systemctl enable --now nginx || rc=2
++  fi
++  (( rc == 0 )) || nginx_managed_restore "$host" "$save" || rc=3
++  rm -rf -- "$save" "$2"
++  frontend_lock_release
++  frontend_signals_end "$rc"
++  return "$rc"
++}
++
++# Removes the managed vhost of $1, tests the remaining configuration and reloads
++# a running Nginx; on failure the file and link are put back exactly.
++# 0 removed or nothing to remove; 1 nginx -t fails without it; 2 reload failed;
++# 3 previous state not restored; 4 managed files in an unexpected state;
++# 6 frontend lock busy (nothing changed).
++nginx_managed_remove() { # $1=host
++  local host="$1" f="$NGINX_DIR/sites-available/twebproxy-$1.conf" l="$NGINX_DIR/sites-enabled/twebproxy-$1.conf" save rc=0
++  [[ -e "$f" || -L "$f" || -e "$l" || -L "$l" ]] || return 0
++  frontend_lock_acquire || return 6
++  nginx_managed_state_ok "$host" || { frontend_lock_release; return 4; }
++  save="$(mktemp -d)" || { frontend_lock_release; return 2; }
++  nginx_managed_save "$host" "$save" || { rm -rf -- "$save"; frontend_lock_release; return 2; }
++  frontend_signals_defer
++  if ! rm -f -- "$l" "$f"; then
++    rc=2
++  elif ! nginx_test; then
++    rc=1
++  elif systemctl is-active --quiet nginx; then
++    systemctl reload nginx || rc=2
+   fi
++  (( rc == 0 )) || nginx_managed_restore "$host" "$save" || rc=3
++  rm -rf -- "$save"
++  frontend_lock_release
++  frontend_signals_end "$rc"
++  return "$rc"
++}
++
++nginx_apply_or_die() { # $1=host $2=candidate (removed): nginx_managed_apply with its outcome reported
++  local rc=0
++  nginx_managed_apply "$1" "$2" || rc=$?
++  rm -f -- "$2"
++  case "$rc" in
++    0) return 0;;
++    1) die "Nginx отклонил конфигурацию $1 (nginx -t); прежняя конфигурация $1 восстановлена, работающий Nginx не менялся.";;
++    2) die "Nginx не применил конфигурацию $1 (reload/start не удался); прежняя конфигурация $1 восстановлена.";;
++    3) die "Не удалось восстановить прежнюю конфигурацию Nginx для $1: проверь $NGINX_DIR/sites-available/twebproxy-$1.conf и nginx -t.";;
++    5) die "Не удалось записать конфигурацию Nginx для $1; прежняя конфигурация $1 восстановлена.";;
++    6) die "Конфигурацию frontend сейчас меняет другая операция; повтори позже.";;
++    *) die "Файлы Nginx для $1 в неожиданном состоянии (sites-enabled/twebproxy-$1.conf не ссылка на свой файл); ничего не изменено.";;
++  esac
++}
++
++# Certificate $1 and key $2 are readable, parse and belong together.
++tls_pair_matches() {
++  local a b
++  [[ -r "$1" && -r "$2" ]] || return 1
++  a="$(openssl x509 -in "$1" -noout -pubkey 2>/dev/null | openssl pkey -pubin -outform DER 2>/dev/null | sha256sum)" || return 1
++  b="$(openssl pkey -in "$2" -pubout -outform DER 2>/dev/null | sha256sum)" || return 1
++  [[ "$a" == "$b" ]]
+ }
+ 
+-write_nginx_tls_conf() {
+-  local host="$1" relay="$2" cert="$3" key="$4" f="/etc/nginx/sites-available/twebproxy-$host.conf"
+-  cat > "$f" <<EOF
++le_cert_usable() { # $1=host: its Let's Encrypt lineage has a matching certificate and key
++  tls_pair_matches "$LE_DIR/live/$1/fullchain.pem" "$LE_DIR/live/$1/privkey.pem"
++}
++
++render_nginx_acme_conf() { # $1=host: HTTP-only vhost for the first ACME HTTP-01 challenge
++  cat <<EOF
++server {
++    listen 80;
++    listen [::]:80;
++    server_name $1;
++    location /.well-known/acme-challenge/ { root $ACME_WEBROOT; }
++    location / { return 200 "ok\n"; add_header Content-Type text/plain; }
++    access_log off;
++}
++EOF
++}
++
++render_nginx_tls_conf() { # $1=host $2=relay port $3=certificate $4=key -> vhost on stdout
++  local host="$1" relay="$2" cert="$3" key="$4"
++  cat <<EOF
+ server {
+     listen 80;
+     listen [::]:80;
+     server_name $host;
+-    location /.well-known/acme-challenge/ { root /var/lib/twebproxy/acme; }
++    location /.well-known/acme-challenge/ { root $ACME_WEBROOT; }
+     location / { return 301 https://\$host\$request_uri; }
+     access_log off;
+ }
+@@ -4936,12 +5284,12 @@ server {
+     }
+ }
+ EOF
+-  ln -sfn "$f" "/etc/nginx/sites-enabled/twebproxy-$host.conf"
+ }
+ 
+ install_nginx_certbot_deploy_hook() {
+-  install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+-  cat > /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload <<'EOF'
++  local tmp hook="$LE_DIR/renewal-hooks/deploy/twebproxy-nginx-reload"
++  frontend_dirs "$LE_DIR/renewal-hooks/deploy" && tmp="$(mktemp)" || die "Не удалось записать $hook."
++  cat > "$tmp" <<'EOF'
+ #!/usr/bin/env bash
+ set -Eeuo pipefail
+ if systemctl is-active --quiet nginx.service; then
+@@ -4949,7 +5297,8 @@ if systemctl is-active --quiet nginx.service; then
+   systemctl reload nginx.service
+ fi
+ EOF
+-  chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/twebproxy-nginx-reload
++  if ! frontend_file_replace "$tmp" "$hook" 0755 || ! chmod 0755 "$hook"; then rm -f -- "$tmp"; die "Не удалось записать $hook."; fi
++  rm -f -- "$tmp"
+ }
+ 
+ write_certbot_fallback_timer() {
+@@ -5016,39 +5365,61 @@ ensure_nginx_le_auto_renew() {
+ }
+ 
+ configure_nginx_le() {
+-  local host="$1" relay="$2" email="$3"
++  local host="$1" relay="$2" email="$3" live="$LE_DIR/live/$1" cand had_cert=0 had_conf=0 days="" rc=0
+   nginx_common_install; nginx_domain_conflict "$host"
+-  export DEBIAN_FRONTEND=noninteractive; apt-get install -y certbot
+-  install -d -m 0755 /var/lib/twebproxy/acme
+-  local f="/etc/nginx/sites-available/twebproxy-$host.conf"
+-  cat > "$f" <<EOF
+-server {
+-    listen 80;
+-    listen [::]:80;
+-    server_name $host;
+-    location /.well-known/acme-challenge/ { root /var/lib/twebproxy/acme; }
+-    location / { return 200 "ok\n"; add_header Content-Type text/plain; }
+-    access_log off;
+-}
+-EOF
+-  ln -sfn "$f" "/etc/nginx/sites-enabled/twebproxy-$host.conf"
+-  nginx -t; systemctl enable --now nginx; systemctl reload nginx
+-  certbot certonly --webroot -w /var/lib/twebproxy/acme --cert-name "$host" -d "$host" --non-interactive --agree-tos --email "$email" --keep-until-expiring
++  if ! command -v certbot >/dev/null 2>&1; then
++    export DEBIAN_FRONTEND=noninteractive
++    apt-get install -y certbot || die "Не удалось установить certbot."
++  fi
++  install -d -m 0755 "$ACME_WEBROOT" || die "Не удалось подготовить $ACME_WEBROOT."
++  [[ -e "$NGINX_DIR/sites-available/twebproxy-$host.conf" ]] && had_conf=1
++  if le_cert_usable "$host"; then
++    # The managed TLS vhost already answers HTTP-01 on port 80: renewal and
++    # re-issue never replace it with the HTTP-only bootstrap.
++    had_cert=1
++  else
++    # First issuance: the hostname must answer HTTP-01 on port 80 before any
++    # certificate exists. Nothing serves HTTPS for it yet.
++    cand="$(mktemp)" || die "Не удалось создать временный файл."
++    render_nginx_acme_conf "$host" > "$cand"
++    nginx_apply_or_die "$host" "$cand"
++  fi
++  if ! certbot certonly --webroot -w "$ACME_WEBROOT" --cert-name "$host" -d "$host" --non-interactive --agree-tos --email "$email" --keep-until-expiring; then
++    if (( had_cert )) && days="$(cert_days_remaining_file "$live/fullchain.pem")" && (( days > 0 )); then
++      warn "Certbot не смог получить или продлить сертификат $host; остаётся действующий сертификат (дней до истечения: $days)."
++    else
++      if (( ! had_cert && ! had_conf )); then
++        nginx_managed_remove "$host" || rc=$?
++        (( rc == 0 )) || warn "Временная HTTP-конфигурация $host для ACME не убрана; проверь $NGINX_DIR/sites-available/twebproxy-$host.conf."
++      elif (( ! had_cert )); then
++        warn "Для $host оставлена временная HTTP-конфигурация ACME: прежняя ссылалась на отсутствующий сертификат."
++      fi
++      die "Certbot не смог получить сертификат для $host; существующие сертификаты не изменены."
++    fi
++  fi
++  le_cert_usable "$host" || die "После certbot нет пригодной пары сертификат/ключ для $host в $live."
+   install_nginx_certbot_deploy_hook
+   ensure_nginx_le_auto_renew
+-  write_nginx_tls_conf "$host" "$relay" "/etc/letsencrypt/live/$host/fullchain.pem" "/etc/letsencrypt/live/$host/privkey.pem"
+-  nginx -t; systemctl reload nginx
++  cand="$(mktemp)" || die "Не удалось создать временный файл."
++  render_nginx_tls_conf "$host" "$relay" "$live/fullchain.pem" "$live/privkey.pem" > "$cand"
++  nginx_apply_or_die "$host" "$cand"
+ }
+ 
+ configure_nginx_custom() {
+-  local host="$1" relay="$2" cert="$3" key="$4"
++  local host="$1" relay="$2" cert="$3" key="$4" cand days="" path_re='^/[A-Za-z0-9._/@+:,=~%-]+$'
+   nginx_common_install; nginx_domain_conflict "$host"
++  [[ "$cert" =~ $path_re && "$key" =~ $path_re ]] ||
++    die "Пути к сертификату и ключу должны быть абсолютными, без пробелов и спецсимволов: $cert $key"
+   [[ -r "$cert" ]] || die "Сертификат не читается: $cert"
+   [[ -r "$key" ]] || die "Ключ не читается: $key"
+   openssl x509 -in "$cert" -noout >/dev/null 2>&1 || die "Некорректный PEM certificate."
+   openssl pkey -in "$key" -noout >/dev/null 2>&1 || die "Некорректный PEM key."
+-  write_nginx_tls_conf "$host" "$relay" "$cert" "$key"
+-  nginx -t; systemctl enable --now nginx; systemctl reload nginx
++  tls_pair_matches "$cert" "$key" || die "Ключ $key не соответствует сертификату $cert."
++  if days="$(cert_days_remaining_file "$cert")" && (( days < 0 )); then warn "Сертификат $cert уже истёк."; fi
++  if [[ "$(stat -L -c '%a' -- "$key")" =~ [4567]$ ]]; then warn "Ключ $key доступен для чтения всем пользователям; ограничь права (chmod 600)."; fi
++  cand="$(mktemp)" || die "Не удалось создать временный файл."
++  render_nginx_tls_conf "$host" "$relay" "$cert" "$key" > "$cand"
++  nginx_apply_or_die "$host" "$cand"
+ }
+ 
+ configure_tls_for_instance() {
+@@ -5062,34 +5433,34 @@ configure_tls_for_instance() {
+   esac
+ }
+ 
++# Removes the managed frontend of $1. Fails, with the reason reported, when that
++# is not proven; the previous frontend configuration then stays in place.
+ remove_reverse_proxy_for_instance() {
+-  local host="$1"; load_instance "$host"
++  local host="$1" rc=0; load_instance "$host"
+   case "$TLS_MODE" in
+     caddy)
+-      [[ -f /etc/caddy/Caddyfile ]] || return 0
+-      local backup candidate
+-      backup="/etc/caddy/Caddyfile.before-twebproxy-remove.$(date +%Y%m%d%H%M%S)"
+-      candidate="$(mktemp /tmp/twebproxy-Caddyfile-remove.XXXXXX)"
+-      cp -a /etc/caddy/Caddyfile "$backup"
+-      cp -a /etc/caddy/Caddyfile "$candidate"
+-      remove_caddy_block "$host" "$candidate"
+-      if caddy validate --config "$candidate" --adapter caddyfile >/dev/null 2>&1; then
+-        cat "$candidate" > /etc/caddy/Caddyfile
+-        if ! systemctl reload caddy; then
+-          warn "Caddy reload после удаления блока не прошёл; восстанавливаю backup."
+-          cat "$backup" > /etc/caddy/Caddyfile
+-          systemctl reload caddy || systemctl restart caddy || true
+-        fi
+-      else
+-        warn "Caddy candidate после удаления блока невалиден; активный Caddyfile оставлен без изменений."
+-      fi
+-      rm -f "$candidate"
++      caddy_remove_host "$host" || rc=$?
++      case "$rc" in
++        0) ;;
++        1) warn "Блок TWebProxy для $host не удалён из Caddyfile: маркеры неоднозначны или Caddyfile без него невалиден; Caddyfile не изменён.";;
++        2) warn "Caddy не применил Caddyfile без $host; прежний Caddyfile восстановлен.";;
++        5) warn "Конфигурацию frontend сейчас меняет другая операция; повтори позже.";;
++        *) warn "Caddy не применил Caddyfile без $host, и прежний Caddyfile восстановить не удалось: проверь $CADDYFILE (прежняя версия рядом, *.twebproxy-previous).";;
++      esac
+       ;;
+     nginx-*)
+-      rm -f "/etc/nginx/sites-enabled/twebproxy-$host.conf" "/etc/nginx/sites-available/twebproxy-$host.conf"
+-      nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
++      nginx_managed_remove "$host" || rc=$?
++      case "$rc" in
++        0) ;;
++        1) warn "Nginx без конфигурации $host не проходит nginx -t; её файлы восстановлены, Nginx не менялся.";;
++        2) warn "Nginx не перезагрузился без конфигурации $host; её файлы восстановлены.";;
++        3) warn "Не удалось восстановить конфигурацию Nginx для $host: проверь $NGINX_DIR/sites-available/twebproxy-$host.conf и nginx -t.";;
++        6) warn "Конфигурацию frontend сейчас меняет другая операция; повтори позже.";;
++        *) warn "Файлы Nginx для $host в неожиданном состоянии (sites-enabled/twebproxy-$host.conf не ссылка на свой файл); ничего не изменено.";;
++      esac
+       ;;
+   esac
++  return "$rc"
+ }
+ 
+ configure_ufw() {
+@@ -5880,6 +6251,7 @@ cert_status_cmd() {
+ cert_renew_cmd() {
+   need_root; need_systemd; banner
+   local host="${1:-}" force="${2:-}"
++  [[ -z "$force" || "$force" == --dry-run || "$force" == --force ]] || die "Использование: twebproxy cert-renew [hostname] [--dry-run|--force]"
+   [[ -n "$host" ]] || host="$(select_instance)"
+   instance_exists "$host" || die "Нет $host"
+   load_instance "$host"
+@@ -5887,24 +6259,34 @@ cert_renew_cmd() {
+   case "$TLS_MODE" in
+     nginx-le)
+       command -v certbot >/dev/null 2>&1 || die "certbot не установлен. Запусти repair."
++      instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++      le_cert_usable "$host" || die "Нет пригодного сертификата Let's Encrypt для $host; запусти 'twebproxy repair $host'."
+       install_nginx_certbot_deploy_hook
+       ensure_nginx_le_auto_renew
+       log "Проверяю необходимость продления Let's Encrypt для $host..."
++      # Certbot keeps the current lineage when a renewal fails; its deploy hook
++      # reloads Nginx only after a renewal that succeeded and passed nginx -t.
+       if [[ "$force" == "--dry-run" ]]; then
+-        certbot renew --cert-name "$host" --dry-run
++        certbot renew --cert-name "$host" --dry-run || die "Certbot dry-run для $host не прошёл; рабочий сертификат не менялся."
+         ok "Certbot renewal dry-run PASS; рабочий сертификат не заменялся."
++        instance_lock_release
+         cert_status_impl "$host"
+         return 0
+       elif [[ "$force" == "--force" ]]; then
+         warn "Force renewal может приблизить rate limit Let's Encrypt."
+-        certbot renew --cert-name "$host" --force-renewal
+-      elif [[ -n "$force" ]]; then
+-        die "Использование: twebproxy cert-renew [hostname] [--dry-run|--force]"
++        certbot renew --cert-name "$host" --force-renewal ||
++          die "Certbot не продлил сертификат $host; прежний сертификат сохранён и продолжает использоваться."
+       else
+-        certbot renew --cert-name "$host"
++        certbot renew --cert-name "$host" ||
++          die "Certbot не продлил сертификат $host; прежний сертификат сохранён и продолжает использоваться."
+       fi
+-      nginx -t
+-      systemctl reload nginx
++      nginx_test || die "Сертификат $host продлён на диске, но nginx -t не проходит; Nginx не перезагружен и отдаёт прежний сертификат."
++      if systemctl is-active --quiet nginx; then
++        systemctl reload nginx || die "Сертификат $host продлён на диске, но reload Nginx не удался; Nginx отдаёт прежний сертификат."
++      else
++        die "Nginx не запущен; сертификат $host продлён на диске, но не применён."
++      fi
++      instance_lock_release
+       if curl -fsS --max-time 10 --proto '=https' --tlsv1.2 -o /dev/null "https://$host/" >/dev/null 2>&1; then
+         ok "Certificate renewal check завершён; strict HTTPS PASS."
+       else
+@@ -6482,7 +6864,7 @@ diagnose_cmd() {
+ 
+ delete_instance_cmd() {
+   need_root; banner
+-  local host="${1:-}" p id kind old_ip="" ambiguous=0; local -a ids=()
++  local host="${1:-}" p id kind old_ip="" ambiguous=0 frontend_note=""; local -a ids=()
+   [[ -n "$host" ]] || host="$(select_instance)"; require_instance "$host"
+   warn "Будет удалён hostname $host, все его secrets/backends и управляемый reverse-proxy block."
+   yesno "Удалить $host?" n || exit 0
+@@ -6499,21 +6881,28 @@ delete_instance_cmd() {
+     ambiguous=1
+   done < <(orphan_backend_ids "$host")
+   (( ambiguous == 0 )) || die "Для $host есть backend env, который нельзя однозначно отнести к этому инстансу; ничего не удалено."
++  # Outermost layer first: if the frontend cannot be removed, nothing else is
++  # touched and the instance keeps serving.
++  remove_reverse_proxy_for_instance "$host" ||
++    die "Frontend для $host не удалён; ничего не удалено, инстанс продолжает работать."
++  [[ "$TLS_MODE" == manual ]] || frontend_note="Frontend $host уже отключён; 'twebproxy repair $host' вернёт его."
+   # Held until the instance files are gone: a concurrent relay update must not
+   # restart this relay in between.
+-  relay_lock_acquire || die "Другая операция обновляет или перезапускает relay; повтори позже."
+-  stop_relay_unit "$host" ||
++  relay_lock_acquire || { [[ -z "$frontend_note" ]] || warn "$frontend_note"; die "Другая операция обновляет или перезапускает relay; повтори позже."; }
++  stop_relay_unit "$host" || {
++    [[ -z "$frontend_note" ]] || warn "$frontend_note"
+     die "Relay twebproxy@$host.service не остановлен или его состояние неизвестно; ничего не удалено. Проверь его (systemctl status twebproxy@$host.service) и повтори."
++  }
+   # Every backend of the instance (profiles and orphans) must be proven down
+   # before any record or env file is removed; otherwise nothing is deleted and
+   # the firewall keeps protecting their ports.
+   for id in "${ids[@]}"; do
+     stop_backend_unit "$id" && continue
++    [[ -z "$frontend_note" ]] || warn "$frontend_note"
+     warn "Часть сервисов $host могла быть остановлена; 'twebproxy repair $host' снова запустит их."
+     die "Backend twebproxy-mtproxy@$id.service не остановлен или его состояние неизвестно; ничего не удалено, защита firewall сохранена. Проверь его (systemctl status twebproxy-mtproxy@$id.service) и повтори."
+   done
+   for id in "${ids[@]}"; do rm -f -- "$BACKENDS_DIR/$id.env"; done
+-  remove_reverse_proxy_for_instance "$host"
+   rm -rf "$(instance_dir "$host")" "$(site_dir "$host")"
+   relay_lock_release
+   rebuild_firewall

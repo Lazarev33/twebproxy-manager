@@ -1,0 +1,20 @@
+1
+0
+Select language / Выберите язык
+
+[1] English
+[2] Русский
+
+Выбор: 
+
+Before you start
+  - A hostname with a DNS A record pointing to this server's public IPv4.
+  - TCP 443 free for HTTPS; TCP 80 as well for automatic certificates.
+  - Debian 12+ or Ubuntu 22.04+, x86_64, systemd, root.
+  - Recommended: Caddy with automatic HTTPS and the STOCK network mode (traffic unchanged).
+
+Action:
+  [1] Quick setup: install the core and add the first hostname (recommended)
+  [2] Install the core only
+  [0] Exit
+> 

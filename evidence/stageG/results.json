@@ -1,0 +1,775 @@
+{
+ "stage": "G",
+ "version": "0.2.21-beta",
+ "verdict": "STAGE G DEVELOPMENT_COMPLETE / NEXT: H (UX), pending independent review and the separate pre-RC lab gates",
+ "baseline": {
+  "commit": "24e2fb8244fc5308815f8ad54543be07205a42e6",
+  "tree": "65dbb9783ee74d1a0582925dc41580f936f998d7",
+  "manager_sha256": "92fb202539bb407c57af5c9e9e87b2a4ed717566c2a5381b85fc5b922aa56570",
+  "input_zip_sha256": "56a0b8cf548238846e958d38a68ef85204015d2445278281dddafb4a07e0be82"
+ },
+ "github_publication": {
+  "status": "NOT_EXECUTED (blocked)",
+  "detail": "repository reachable read-only (main 2cab1b3); no GitHub write credentials; push dry-run of stage-d/v0.2.18 stage-e/v0.2.19 stage-f/v0.2.20 failed with 'could not read Username' (rc 128); nothing pushed; remote SHA/tree not verifiable; README/ROADMAP taken from main 2cab1b3"
+ },
+ "result_protocol": "0=PASS 1=FAIL 77=NOT_EXECUTED; NOT_EXECUTED is never counted as PASS",
+ "environment": "development host with live TWebProxy services (treated as production): sandboxed tests only, sentinel stubs first in PATH, 0 sentinel calls, host canary unchanged; real-process oracle with real CLI/curl/TLS/flock/signals in /tmp sandboxes, loopback-only TLS server",
+ "evidence_classes": {
+  "MODEL": "real updater code, processes, pipes and flock with fake candidates/curl/systemctl/nginx/certbot",
+  "REAL_PROCESS_SANDBOX": "real manager CLI, candidate built from the real manager, real curl/TLS, real flock/signals/proc; sandboxed path constants and release URLs",
+  "REAL_PERMISSION": "kernel permission decision via setpriv as www-data"
+ },
+ "p1_fixes": {
+  "G-P1-A": {
+   "title": "health probe held open by a stdout-holding descendant",
+   "red_real": {
+    "title": "candidate --help leaves a child holding stdout (real manager candidate)",
+    "command": "twebproxy manager-update --sha256 9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+    "observed_at_25s": {
+     "running": true,
+     "child_alive": true,
+     "lock_free": false,
+     "copies": {
+      "bin": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+      "copy": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4"
+     },
+     "seconds": 25.02
+    },
+    "final": {
+     "exit_code": 0,
+     "seconds": 41.51,
+     "child_alive": false,
+     "lock_free": true,
+     "copies": {
+      "bin": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+      "copy": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4"
+     },
+     "candidate_sha256": "9de3027249bdeaff6a629f2c81a73dbca3d75a74f7a29f627090dda4b71cbee4",
+     "old_sha256": "51d6df37af478558319411c00477d090860d1f14bdd8be9abd7a50e808cc5218",
+     "result_line": "UPDATE_SUCCESS backup_id=update-20261028T133642Z-7c66cf9c56ce"
+    },
+    "checks": [
+     {
+      "check": "child-spawned",
+      "result": "PASS",
+      "detail": "child pid 142388"
+     },
+     {
+      "check": "bounded",
+      "result": "FAIL",
+      "detail": "update still running at 25.02s"
+     },
+     {
+      "check": "success",
+      "result": "PASS",
+      "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T133642Z-7c66cf9c56ce"
+     },
+     {
+      "check": "installed",
+      "result": "PASS",
+      "detail": "both copies == candidate"
+     },
+     {
+      "check": "no-orphan-at-25s",
+      "result": "FAIL",
+      "detail": "stdout-holding child gone by 25s"
+     },
+     {
+      "check": "lock-free-at-25s",
+      "result": "FAIL",
+      "detail": "lock free by 25s"
+     }
+    ]
+   },
+   "green_real": {
+    "title": "candidate --help leaves a child holding stdout (real manager candidate)",
+    "command": "twebproxy manager-update --sha256 ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff",
+    "observed_at_25s": {
+     "running": false,
+     "child_alive": false,
+     "lock_free": true,
+     "copies": {
+      "bin": "ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff",
+      "copy": "ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff"
+     },
+     "seconds": 1.48
+    },
+    "final": {
+     "exit_code": 0,
+     "seconds": 1.48,
+     "child_alive": false,
+     "lock_free": true,
+     "copies": {
+      "bin": "ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff",
+      "copy": "ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff"
+     },
+     "candidate_sha256": "ca35233e658b74b408a3840e32af7424087b24f8c378c18f20e6829c5f9640ff",
+     "old_sha256": "3eb53ba3f1c9a629af09b8817934b1b10b7380a2ae382315c51cb03a87ff3246",
+     "result_line": "UPDATE_SUCCESS backup_id=update-20261028T180043Z-5bd295ad1006"
+    },
+    "checks": [
+     {
+      "check": "child-spawned",
+      "result": "PASS",
+      "detail": "child pid 447574"
+     },
+     {
+      "check": "bounded",
+      "result": "PASS",
+      "detail": "finished in 1.48s"
+     },
+     {
+      "check": "success",
+      "result": "PASS",
+      "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T180043Z-5bd295ad1006"
+     },
+     {
+      "check": "installed",
+      "result": "PASS",
+      "detail": "both copies == candidate"
+     },
+     {
+      "check": "no-orphan-at-25s",
+      "result": "PASS",
+      "detail": "stdout-holding child gone by 25s"
+     },
+     {
+      "check": "lock-free-at-25s",
+      "result": "PASS",
+      "detail": "lock free by 25s"
+     }
+    ]
+   }
+  },
+  "G-P1-B": {
+   "title": "update lock inherited by curl/helper children; parent-only SIGKILL",
+   "red_real": {
+    "title": "parent-only SIGKILL while real curl waits for the artifact",
+    "command": "twebproxy manager-update --sha256 be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca",
+    "observed": {
+     "artifact_request_arrived": true,
+     "lock_holders_during_download": [
+      "142669:bash",
+      "142906:bash",
+      "142907:curl"
+     ],
+     "second_update_exit_code": 1,
+     "second_update_result": "\u001b[31m[x]\u001b[0m A Manager update is already running or the lock is unsafe: /tmp/twebproxy-g-oracle-B.15xu3cry/root/run/lock/twebproxy-manager-update.lock",
+     "parent_exit_code": -9,
+     "lock_free_0.3s_after_kill": false,
+     "lock_free_2s_after_kill": false,
+     "lock_holders_after_kill": [
+      "142906:bash",
+      "142907:curl"
+     ],
+     "lock_free_after_server_release": true,
+     "stale_staging_before_next_update": true,
+     "copies_after_kill": {
+      "bin": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664",
+      "copy": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664"
+     },
+     "old_sha256": "75620a3e3741b6e4b02dbdc003a47681b9bb778e7eaf93f89fa41aa9aed3e664",
+     "next_update_exit_code": 0,
+     "next_update_result": "UPDATE_SUCCESS backup_id=update-20261028T133731Z-2f53325538e6",
+     "staging_after_next_update": false,
+     "copies_after_next_update": {
+      "bin": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca",
+      "copy": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca"
+     },
+     "candidate_sha256": "be1824db24d38a1445c82bcc82644b7cbf3ab2eb27dc296ec8aefc133618f3ca"
+    },
+    "checks": [
+     {
+      "check": "download-blocked",
+      "result": "PASS",
+      "detail": "real curl request reached the test server"
+     },
+     {
+      "check": "only-owner-holds-lock",
+      "result": "FAIL",
+      "detail": "holders ['142669:bash', '142906:bash', '142907:curl'], updater pid 142669"
+     },
+     {
+      "check": "concurrent-refused",
+      "result": "PASS",
+      "detail": "second update exit 1"
+     },
+     {
+      "check": "lock-free-0.3s-after-parent-kill",
+      "result": "FAIL",
+      "detail": ""
+     },
+     {
+      "check": "lock-free-2s-after-parent-kill",
+      "result": "FAIL",
+      "detail": ""
+     },
+     {
+      "check": "copies-unchanged",
+      "result": "PASS",
+      "detail": ""
+     },
+     {
+      "check": "next-update-recovers",
+      "result": "PASS",
+      "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T133731Z-2f53325538e6"
+     }
+    ]
+   },
+   "green_real": {
+    "title": "parent-only SIGKILL while real curl waits for the artifact",
+    "command": "twebproxy manager-update --sha256 23b63d775d878f9eddb527a2c674bbd583cb7bb244c75330c14e0fa8b104751a",
+    "observed": {
+     "artifact_request_arrived": true,
+     "lock_holders_during_download": [
+      "447840:bash"
+     ],
+     "second_update_exit_code": 1,
+     "second_update_result": "\u001b[31m[x]\u001b[0m A Manager update is already running or the lock is unsafe: /tmp/twebproxy-g-oracle-B.oksmtu68/root/run/lock/twebproxy-manager-update.lock",
+     "parent_exit_code": -9,
+     "lock_free_0.3s_after_kill": true,
+     "lock_free_2s_after_kill": true,
+     "lock_holders_after_kill": [],
+     "lock_free_after_server_release": true,
+     "stale_staging_before_next_update": true,
+     "copies_after_kill": {
+      "bin": "da5697aa4f6ea0fef0c68e19ecde05a2ba60882d8ad1bdc8c8585a5301edf3b0",
+      "copy": "da5697aa4f6ea0fef0c68e19ecde05a2ba60882d8ad1bdc8c8585a5301edf3b0"
+     },
+     "old_sha256": "da5697aa4f6ea0fef0c68e19ecde05a2ba60882d8ad1bdc8c8585a5301edf3b0",
+     "next_update_exit_code": 0,
+     "next_update_result": "UPDATE_SUCCESS backup_id=update-20261028T180052Z-d99cc917ff14",
+     "staging_after_next_update": false,
+     "copies_after_next_update": {
+      "bin": "23b63d775d878f9eddb527a2c674bbd583cb7bb244c75330c14e0fa8b104751a",
+      "copy": "23b63d775d878f9eddb527a2c674bbd583cb7bb244c75330c14e0fa8b104751a"
+     },
+     "candidate_sha256": "23b63d775d878f9eddb527a2c674bbd583cb7bb244c75330c14e0fa8b104751a"
+    },
+    "checks": [
+     {
+      "check": "download-blocked",
+      "result": "PASS",
+      "detail": "real curl request reached the test server"
+     },
+     {
+      "check": "only-owner-holds-lock",
+      "result": "PASS",
+      "detail": "holders ['447840:bash'], updater pid 447840"
+     },
+     {
+      "check": "concurrent-refused",
+      "result": "PASS",
+      "detail": "second update exit 1"
+     },
+     {
+      "check": "lock-free-0.3s-after-parent-kill",
+      "result": "PASS",
+      "detail": ""
+     },
+     {
+      "check": "lock-free-2s-after-parent-kill",
+      "result": "PASS",
+      "detail": ""
+     },
+     {
+      "check": "copies-unchanged",
+      "result": "PASS",
+      "detail": ""
+     },
+     {
+      "check": "next-update-recovers",
+      "result": "PASS",
+      "detail": "exit 0, UPDATE_SUCCESS backup_id=update-20261028T180052Z-d99cc917ff14"
+     }
+    ]
+   }
+  },
+  "truthful_failure": {
+   "title": "hanging probe with stdout-holding child -> rollback",
+   "red_real": {
+    "title": "candidate --help hangs ignoring SIGTERM, with a stdout-holding child: failed health -> rollback",
+    "command": "twebproxy manager-update --sha256 c9768236111c9895e6b281aa75a24dbbb11640db3d636e3eebf44aecad88cb40",
+    "observed": {
+     "exit_code": 1,
+     "seconds": 22.03,
+     "child_alive": false,
+     "lock_free": true,
+     "copies": {
+      "bin": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62",
+      "copy": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62"
+     },
+     "old_sha256": "12dda13cb4e3c2b294ca10abcceeaac5141e39fe4f52e0a53532994d6d8eee62",
+     "candidate_sha256": "c9768236111c9895e6b281aa75a24dbbb11640db3d636e3eebf44aecad88cb40",
+     "result_line": "UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T133733Z-3967cde89ede"
+    },
+    "checks": [
+     {
+      "check": "bounded",
+      "result": "PASS",
+      "detail": "22.03s (probe 15 s + 5 s kill grace, then rollback)"
+     },
+     {
+      "check": "truthful-failure",
+      "result": "PASS",
+      "detail": "exit 1, UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T133733Z-3967cde89ede"
+     },
+     {
+      "check": "restored",
+      "result": "PASS",
+      "detail": "both copies == previous manager"
+     },
+     {
+      "check": "no-orphan",
+      "result": "PASS",
+      "detail": "child pid 143997"
+     },
+     {
+      "check": "lock-free",
+      "result": "PASS",
+      "detail": ""
+     }
+    ]
+   },
+   "green_real": {
+    "title": "candidate --help hangs ignoring SIGTERM, with a stdout-holding child: failed health -> rollback",
+    "command": "twebproxy manager-update --sha256 e71de09a9e9113c82d63c692fac423123687c54e2ed7a653ec61349780974874",
+    "observed": {
+     "exit_code": 1,
+     "seconds": 22.29,
+     "child_alive": false,
+     "lock_free": true,
+     "copies": {
+      "bin": "99c853212d0419945ef7aac9c51127ef73c3f83edd284dfbd8f44fab3e4a959a",
+      "copy": "99c853212d0419945ef7aac9c51127ef73c3f83edd284dfbd8f44fab3e4a959a"
+     },
+     "old_sha256": "99c853212d0419945ef7aac9c51127ef73c3f83edd284dfbd8f44fab3e4a959a",
+     "candidate_sha256": "e71de09a9e9113c82d63c692fac423123687c54e2ed7a653ec61349780974874",
+     "result_line": "UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T180054Z-109baf48918c"
+    },
+    "checks": [
+     {
+      "check": "bounded",
+      "result": "PASS",
+      "detail": "22.29s (probe 15 s + 5 s kill grace, then rollback)"
+     },
+     {
+      "check": "truthful-failure",
+      "result": "PASS",
+      "detail": "exit 1, UPDATE_FAILED_ROLLBACK_SUCCESS backup_id=update-20261028T180054Z-109baf48918c"
+     },
+     {
+      "check": "restored",
+      "result": "PASS",
+      "detail": "both copies == previous manager"
+     },
+     {
+      "check": "no-orphan",
+      "result": "PASS",
+      "detail": "child pid 449167"
+     },
+     {
+      "check": "lock-free",
+      "result": "PASS",
+      "detail": ""
+     }
+    ]
+   }
+  }
+ },
+ "stage4_protected_hashes": {
+  "legacy_tool": "tests/fieldgate/stage4-function-set-hash.sh",
+  "legacy_before": "c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b",
+  "legacy_after": "2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0",
+  "full_body_tool": "tests/stagef/updater-function-hashes.sh",
+  "full_body_before": "29479800bfd4afec9edc48d9154e61f198d7f275ebf9acfdab6f1a0ed3b5933f",
+  "full_body_after": "b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d",
+  "per_function": "updater-function-hashes-v0.2.20.txt / -v0.2.21.txt, other-function-hashes-v0.2.20.txt / -v0.2.21.txt"
+ },
+ "scope": {
+  "unchanged_functions": 397,
+  "modified_functions": 17,
+  "added_functions": 1,
+  "byte_identical_files": 514
+ },
+ "summary": {
+  "PASS": 37,
+  "FAIL": 0,
+  "NOT_EXECUTED": 2
+ },
+ "red": {
+  "process-fixture-on-v0.2.20": {
+   "exit_status": 1,
+   "seconds": 373,
+   "last_line": "process-fixture: 37 pass, 10 fail"
+  },
+  "real-process-oracle-on-v0.2.20": {
+   "exit_status": 1,
+   "seconds": 74,
+   "last_line": "real-process-oracle: 12 pass, 6 fail"
+  },
+  "acme-webroot-on-v0.2.20": {
+   "exit_status": 1,
+   "seconds": 3,
+   "last_line": "acme-webroot-fixture: pass=9 fail=3"
+  },
+  "input-validation-on-v0.2.20": {
+   "exit_status": 1,
+   "seconds": 8,
+   "last_line": "input-validation-fixture: pass=20 fail=21"
+  },
+  "mutant-probe-through-pipe-process": {
+   "exit_status": 1,
+   "seconds": 81,
+   "last_line": "process-fixture: 4 pass, 1 fail"
+  },
+  "mutant-probe-through-pipe-oracle": {
+   "exit_status": 1,
+   "seconds": 44,
+   "last_line": "real-process-oracle: 3 pass, 3 fail"
+  },
+  "mutant-no-probe-group-kill": {
+   "exit_status": 1,
+   "seconds": 37,
+   "last_line": "process-fixture: 18 pass, 3 fail"
+  },
+  "mutant-curl-inherits-lock-process": {
+   "exit_status": 1,
+   "seconds": 6,
+   "last_line": "process-fixture: 5 pass, 2 fail"
+  },
+  "mutant-curl-inherits-lock-oracle": {
+   "exit_status": 1,
+   "seconds": 9,
+   "last_line": "real-process-oracle: 4 pass, 3 fail"
+  },
+  "mutant-release-query-holds-lock": {
+   "exit_status": 1,
+   "seconds": 5,
+   "last_line": "process-fixture: 0 pass, 2 fail"
+  },
+  "mutant-health-helper-holds-lock": {
+   "exit_status": 1,
+   "seconds": 8,
+   "last_line": "process-fixture: 2 pass, 1 fail"
+  },
+  "mutant-no-metadata-sync": {
+   "exit_status": 1,
+   "seconds": 3,
+   "last_line": "process-fixture: 8 pass, 1 fail"
+  },
+  "mutant-acme-no-traversal": {
+   "exit_status": 1,
+   "seconds": 4,
+   "last_line": "acme-webroot-fixture: pass=9 fail=3"
+  },
+  "mutant-no-hostname-validation": {
+   "exit_status": 1,
+   "seconds": 8,
+   "last_line": "input-validation-fixture: pass=20 fail=21"
+  }
+ },
+ "red_notes": [
+  "All four Stage G test files fail on unchanged v0.2.20: process fixture 10 FAIL, real-process oracle 6 FAIL (A and B; C is a guard that passes on both), ACME webroot 3 FAIL, hostname validation 21 FAIL.",
+  "Oracle A on v0.2.20: at 25.02 s the real update was still running, the stdout-holding child alive and the lock held; it finished at 41.5 s. Oracle B on v0.2.20: holders bash(updater), bash(subshell), curl; lock still held 0.3 s and 2 s after a parent-only SIGKILL.",
+  "Each of 8 mutants of the final manager (one Stage G protection removed) is caught by the targeted fixture subset (see red/SUMMARY.tsv)."
+ ],
+ "mutants": {
+  "probe-through-pipe": "probe output read through a pipe again",
+  "no-probe-group-kill": "probe process group not killed after the probe",
+  "curl-inherits-lock": "download curl keeps fd 9",
+  "release-query-holds-lock": "release-query subshell and curl keep fd 9",
+  "health-helper-holds-lock": "health helper invocation keeps fd 9",
+  "no-metadata-sync": "offline restore leaves global.env",
+  "acme-no-traversal": "no search permission added to a 0700 parent",
+  "no-hostname-validation": "five commands back to an existence test only"
+ },
+ "green": [
+  {
+   "name": "git-diff-check",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "git diff --check 24e2fb8 (excluding captured evidence): clean"
+  },
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "seconds": 1,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "e-operations",
+   "exit_status": 0,
+   "seconds": 92,
+   "result": "PASS",
+   "summary": "e-operations: pass=48 fail=0"
+  },
+  {
+   "name": "suite-stage-e",
+   "exit_status": 0,
+   "seconds": 92,
+   "result": "PASS",
+   "summary": "stage-e-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "f-updater",
+   "exit_status": 0,
+   "seconds": 64,
+   "result": "PASS",
+   "summary": "updater-fixture: 278 pass, 0 fail"
+  },
+  {
+   "name": "suite-stage-f",
+   "exit_status": 0,
+   "seconds": 86,
+   "result": "PASS",
+   "summary": "stage-f-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-g",
+   "exit_status": 0,
+   "seconds": 92,
+   "result": "PASS",
+   "summary": "stage-g-suite: PASS (all mandatory checks executed)"
+  },
+  {
+   "name": "g-scope-vs-v0220",
+   "exit_status": 0,
+   "seconds": 8,
+   "result": "PASS",
+   "summary": "PASS g-scope unchanged=397 modified=17 added=1"
+  },
+  {
+   "name": "python-compile",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "python syntax OK"
+  },
+  {
+   "name": "stage4-mandatory-suite",
+   "exit_status": 0,
+   "seconds": 31,
+   "result": "PASS",
+   "summary": "stage4-mandatory-suite: PASS (A-V all executed)"
+  },
+  {
+   "name": "stage-x-dpi-installed-asset",
+   "exit_status": 0,
+   "seconds": 3,
+   "result": "PASS",
+   "summary": "stage-x-dpi-installed-asset-fixture: PASS"
+  },
+  {
+   "name": "updater-function-hashes",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "b1933776707d4b909eb85ba4da28aaf5007cb81b212112c75ddfaf287be69f0d  stage4-protected-function-set-full"
+  },
+  {
+   "name": "d-frontend-tls",
+   "exit_status": 0,
+   "seconds": 38,
+   "result": "PASS",
+   "summary": "d-frontend-tls: pass=122 fail=0"
+  },
+  {
+   "name": "suite-stage-d",
+   "exit_status": 0,
+   "seconds": 38,
+   "result": "PASS",
+   "summary": "stage-d-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c2",
+   "exit_status": 0,
+   "seconds": 30,
+   "result": "PASS",
+   "summary": "stage-c2-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "seconds": 41,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "audit-c11-cross-instance-orphan",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "PASS"
+  },
+  {
+   "name": "audit-c11-backend-id-collision",
+   "exit_status": 0,
+   "seconds": 1,
+   "result": "PASS",
+   "summary": "PASS: existing B/x backend env preserved"
+  },
+  {
+   "name": "audit-c1-failed-backend-stop",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "FW collection ports=[23980,23981,28980,28981]"
+  },
+  {
+   "name": "audit-c1-orphan-backend",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "API profiles=[alpha]"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "seconds": 13,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "seconds": 72,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "seconds": 1,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "seconds": 12,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "seconds": 2,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "seconds": 7,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "seconds": 6,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "seconds": 8,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "seconds": 2,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "seconds": 3,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "seconds": 1,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "tui-presentation",
+   "exit_status": 0,
+   "seconds": 3,
+   "result": "PASS",
+   "summary": "tui-presentation-fixture: PASS"
+  },
+  {
+   "name": "stage-x-fixui",
+   "exit_status": 0,
+   "seconds": 69,
+   "result": "PASS",
+   "summary": "stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "seconds": 0,
+   "result": "PASS",
+   "summary": "2cb42277ad8f010cace933b9adc8760ff1099606f92cf5ee441ac8e669de1ce0  stage4-protected-function-set"
+  }
+ ],
+ "contracts": [
+  "Stage F trust model unchanged (signed manifest with pinned key, or operator --sha256; fail closed; no key invented)",
+  "backup format v1, manager-update/-rollback/-backup-list CLI, UPDATE_* result lines, --json/--raw schemas, RU/EN unchanged",
+  "C1-E behaviour, firewall, DPI/nfqws, relay, frontend (except ACME webroot traversal) unchanged; scope 397 functions identical"
+ ],
+ "not_executed_gates": [
+  "real ENOSPC and immutable files against the changed probe/lock code (disposable VM)",
+  "live systemd units and installed paths, full CLI on a real installation",
+  "Nginx/certbot against a real CA through the repaired webroot",
+  "SSH loss and power loss during an update",
+  "real GitHub release with a signed manifest",
+  "tg3 installed-manager lifecycle (lab gate); Stage A/B lab-only cases (suites exit 77)"
+ ]
+}

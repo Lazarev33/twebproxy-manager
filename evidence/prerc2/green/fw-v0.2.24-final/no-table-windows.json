@@ -1,0 +1,10 @@
+{
+ "windows_without_any_twebproxy_table_while_backends_alive": 7,
+ "total_window_ms": 31315.2,
+ "backend_samples_inside": 9938,
+ "status_inside": {
+  "ERR111": 8472,
+  "TIMEOUT": 1466
+ },
+ "open_inside": 0
+}

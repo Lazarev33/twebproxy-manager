@@ -1,0 +1,7 @@
+name	rc	last_line
+rebind-baseline-v0.2.17	0	rebind-baseline: 33 lines changed, only frontend path literals; written <scratch>/manager-v0.2.17-rebound.sh
+frontend-tls-on-v0.2.17	1	d-frontend-tls: pass=80 fail=42
+frontend-tls-on-mutant-no-signal-deferral	1	d-frontend-tls: pass=119 fail=3
+frontend-tls-on-mutant-always-bootstrap	1	d-frontend-tls: pass=119 fail=3
+frontend-tls-on-mutant-lenient-markers	1	d-frontend-tls: pass=120 fail=2
+frontend-tls-on-mutant-no-frontend-lock	1	d-frontend-tls: pass=120 fail=2

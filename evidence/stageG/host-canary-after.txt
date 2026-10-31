@@ -1,0 +1,22 @@
+/usr/local/libexec/twebproxy directory 755 0:0 mtime=1792468474
+/usr/local/libexec/twebproxy/restore-update-backup regular file 755 0:0 mtime=1792467783
+/etc/twebproxy directory 700 0:0 mtime=1792468474
+/etc/systemd/system directory 755 0:0 mtime=1792468474
+/usr/local/sbin directory 755 0:0 mtime=1792468045
+/usr/local/bin directory 755 0:0 mtime=1792494953
+/usr/local/bin/tproxy-server regular file 755 0:0 mtime=1792467893
+/opt/twebproxy-manager directory 700 0:0 mtime=1792494154
+/opt/twebproxy-manager/logs directory 700 0:0 mtime=1792467758
+/srv/twebproxy directory 755 0:0 mtime=1792469080
+/etc/caddy absent
+/etc/nginx directory 755 0:0 mtime=1793076001
+/etc/nginx/sites-enabled directory 755 0:0 mtime=1792469096
+/etc/nginx/sites-available directory 755 0:0 mtime=1793076001
+/etc/nginx/conf.d directory 755 0:0 mtime=1792468024
+/etc/letsencrypt directory 755 0:0 mtime=1793150081
+/etc/letsencrypt/live directory 700 0:0 mtime=1792469095
+/etc/letsencrypt/renewal-hooks/deploy directory 755 0:0 mtime=1792468043
+/var/lib/twebproxy directory 755 0:0 mtime=1792468032
+/run/lock/twebproxy-manager-update.lock absent
+e827f571adb2cf23c6b4cd0291b7f7a3c38e042497c77cd345ff20eae578da88  frontend-dir-listing-hash
+f7ab41c8a44baa6cef8d9336f5312d8f7b1ca3d28b590e9230cc128db90c6b3e  mount-table-hash

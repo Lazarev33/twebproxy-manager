@@ -1,0 +1,136 @@
+{
+ "installed_version": "0.2.22",
+ "candidate_version": "0.2.72",
+ "installed_sha256": "faa54d9a202f4f2a",
+ "start": {
+  "bin": "faa54d9a202f4f2a",
+  "copy": "faa54d9a202f4f2a",
+  "global_env_version": "0.2.22"
+ },
+ "helper": {
+  "exit_code": 0,
+  "outcome": [
+   "RESTORE_SUCCESS backup_id=update-20261029T124501Z-680e76ca4583 manager_version=0.2.22"
+  ],
+  "executables_restored": true,
+  "metadata": "0.2.72",
+  "false_success": true
+ },
+ "cli": {
+  "update2_exit": 0,
+  "exit_code": 0,
+  "outcome": [
+   "RESTORE_SUCCESS backup_id=update-20261029T124506Z-3f7d9df95f31 manager_version=0.2.22"
+  ],
+  "executables_restored": true,
+  "metadata": "0.2.72",
+  "false_success": true
+ },
+ "repair_while_immutable": {
+  "exit_code": 1,
+  "metadata": "0.2.72",
+  "stderr_tail": []
+ },
+ "recovery": {
+  "exit_code": 0,
+  "metadata": "0.2.22",
+  "consistent": true
+ },
+ "end": {
+  "bin": "faa54d9a202f4f2a",
+  "copy": "faa54d9a202f4f2a",
+  "global_env_version": "0.2.22"
+ },
+ "end_matches_start": true,
+ "runs": [
+  {
+   "step": "update",
+   "command": "bash <corr>/evidence/red2-restore-metadata/wrapper.sh --sha256 5c0ebb14c263a434c7db9bf0c9cdbbdbed10f2e9528c21af10e7bf908ac4b03c",
+   "exit_code": 0,
+   "seconds": 4.04,
+   "outcome_lines": [
+    "UPDATE_SUCCESS backup_id=update-20261029T124501Z-680e76ca4583"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "5c0ebb14c263a434",
+    "copy": "5c0ebb14c263a434",
+    "global_env_version": "0.2.72"
+   }
+  },
+  {
+   "step": "helper-restore-latest-immutable",
+   "command": "/usr/local/libexec/twebproxy/restore-update-backup restore-latest",
+   "exit_code": 0,
+   "seconds": 1.81,
+   "outcome_lines": [
+    "RESTORE_SUCCESS backup_id=update-20261029T124501Z-680e76ca4583 manager_version=0.2.22"
+   ],
+   "stderr_tail": [
+    "mv: cannot move '/etc/twebproxy/.global.env.X71i8x' to '/etc/twebproxy/global.env': Operation not permitted",
+    "restore-update-backup: MANAGER_VERSION in global.env not updated to 0.2.22; 'twebproxy repair' rewrites it"
+   ],
+   "state": {
+    "bin": "faa54d9a202f4f2a",
+    "copy": "faa54d9a202f4f2a",
+    "global_env_version": "0.2.72"
+   }
+  },
+  {
+   "step": "update-2",
+   "command": "bash <corr>/evidence/red2-restore-metadata/wrapper.sh --sha256 5c0ebb14c263a434c7db9bf0c9cdbbdbed10f2e9528c21af10e7bf908ac4b03c --force",
+   "exit_code": 0,
+   "seconds": 3.77,
+   "outcome_lines": [
+    "UPDATE_SUCCESS backup_id=update-20261029T124506Z-3f7d9df95f31"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "5c0ebb14c263a434",
+    "copy": "5c0ebb14c263a434",
+    "global_env_version": "0.2.72"
+   }
+  },
+  {
+   "step": "cli-rollback-immutable",
+   "command": "twebproxy manager-rollback latest",
+   "exit_code": 0,
+   "seconds": 2.13,
+   "outcome_lines": [
+    "RESTORE_SUCCESS backup_id=update-20261029T124506Z-3f7d9df95f31 manager_version=0.2.22"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "faa54d9a202f4f2a",
+    "copy": "faa54d9a202f4f2a",
+    "global_env_version": "0.2.72"
+   }
+  },
+  {
+   "step": "repair-while-immutable",
+   "command": "twebproxy repair <host-2>",
+   "exit_code": 1,
+   "seconds": 11.29,
+   "outcome_lines": [],
+   "stderr_tail": [],
+   "state": {
+    "bin": "faa54d9a202f4f2a",
+    "copy": "faa54d9a202f4f2a",
+    "global_env_version": "0.2.72"
+   }
+  },
+  {
+   "step": "repair-after-clearing",
+   "command": "twebproxy repair <host-2>",
+   "exit_code": 0,
+   "seconds": 8.32,
+   "outcome_lines": [],
+   "stderr_tail": [],
+   "state": {
+    "bin": "faa54d9a202f4f2a",
+    "copy": "faa54d9a202f4f2a",
+    "global_env_version": "0.2.22"
+   }
+  }
+ ]
+}

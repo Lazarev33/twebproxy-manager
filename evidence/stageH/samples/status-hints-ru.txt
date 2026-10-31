@@ -1,0 +1,18 @@
+Статус TWebProxy · gamma.example
+--------------------------------------------------------------------------------
+Итог               [ОШИБКА]
+Проверки       норма 2; предупреждения 0; 
+ошибки 3; отключено 1; неизвестно 1
+Режим             STOCK@unresolved
+
+Требуется внимание
+[НЕИЗВЕСТНО] tls.certificate.summary — TLS certificate: 
+mode=caddy | remaining=?d | renewal=Caddy auto
+  -> HTTPS или сертификат не подтверждены: DNS-запись A должна указывать сюда, порты 80/443 — быть доступны; twebproxy cert-status gamma.example
+[ОШИБКА] relay.service.active — inactive
+  -> Relay не запущен или не готов: twebproxy repair gamma.example (подробности: twebproxy diagnose gamma.example)
+[ОШИБКА] relay.healthz — unavailable
+[ОШИБКА] relay.readyz — unavailable
+
+Подробные данные доступны в разделе 
+«Диагностика».

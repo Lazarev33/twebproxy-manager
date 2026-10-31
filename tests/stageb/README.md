@@ -30,3 +30,9 @@ kernel atomicity or real systemd behaviour.
 but run only on a disposable lab host; see `tests/LAB.md`. Elsewhere they
 report `NOT_EXECUTED` and the suite is `INCOMPLETE`. Exit 77 /
 `NOT_EXECUTED_ENVIRONMENT_LIMITATION` must never be counted as PASS.
+
+v0.2.23: the firewall unit contract changed (P1-EXPOSURE-01 / P1-STOP-01):
+`Type=exec` owned-guard session (`firewall-guard hold`, verified by
+`firewall-guard wait` and `reload $MAINPID`), no `PartOf=nftables.service`,
+backends `BindsTo=` and `WantedBy=` the firewall unit. `firewall-unit-fixture.sh`,
+the systemctl/nft models and `real-systemd-validation.sh` follow it.

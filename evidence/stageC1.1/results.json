@@ -1,0 +1,218 @@
+{
+ "stage": "C1.1",
+ "version": "0.2.15-beta",
+ "input": "v0.2.14-beta commit 810beac25988f1ca5104fb014a33cc7affa1fb80 tree 2c060be4d42f41c71fa81006fd52d5d4cf494505",
+ "environment": "production host: model tests only; sentinel stubs first in PATH; 0 sentinel calls; host metadata canary unchanged",
+ "independent_reproduction": {
+  "source": "own model fixture tests/stagec1/backend-stop-fixture.sh (the audit handoff archive with its reproducers was not available on the host)",
+  "red": {
+   "backend-stop-on-v0.2.13.log": {
+    "exit_status": 1,
+    "fail_count": 38,
+    "last_line": "c11-backend-stop: pass=29 fail=38"
+   },
+   "backend-stop-on-v0.2.14.log": {
+    "exit_status": 1,
+    "fail_count": 35,
+    "last_line": "c11-backend-stop: pass=32 fail=35"
+   }
+  },
+  "aud01_confirmed_on": [
+   "v0.2.13 (B.1)",
+   "v0.2.14 (C1)"
+  ],
+  "aud01_observation": "unit still running, profile/env removed, its ports absent from the applied firewall set, exit status 0"
+ },
+ "safe_tests": [
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "c11-backend-stop",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c11-backend-stop: pass=67 fail=0"
+  },
+  {
+   "name": "c1-identity",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c1-profile-identity: pass=32 fail=0"
+  },
+  {
+   "name": "c1-persistence",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c1-state-persistence: pass=54 fail=0"
+  },
+  {
+   "name": "c1-concurrency",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c1-concurrency: pass=33 fail=0"
+  },
+  {
+   "name": "c1-ports",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c1-port-allocation: pass=26 fail=0"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "c11-scope-vs-v0214",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS c11-scope unchanged=346 modified=8 added=3"
+  },
+  {
+   "name": "c1-scope-vs-v0213",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS c1-scope unchanged=310 modified=22 added=25"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "INCOMPLETE_LAB_CASES_NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "INCOMPLETE_LAB_CASES_NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 314 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 314 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb  stage4-protected-function-set"
+  }
+ ],
+ "findings": {
+  "C1-AUD-01": {
+   "class": "CONFIRMED (model)",
+   "fix": "stop_backend_unit proves inactive/failed after a successful disable --now; profile deletion stops first and fails closed; post-stop commit/validation failure restores record and restarts backend; instance deletion proves all backends stopped before removing anything"
+  },
+  "C1-AUD-02": {
+   "class": "CONFIRMED (model)",
+   "fix": "orphan_backend_ids (exact id, live profiles of all instances excluded, no symlinks/foreign names); reconcile_orphan_backends in repair and add_instance: remove env only after proven stop, else fail closed; profile_add refuses to overwrite an orphan env"
+  }
+ },
+ "guards_not_red_on_input": [
+  "stop success ordering",
+  "post-stop validation failure (input never reached its stop)",
+  "unrelated objects untouched",
+  "instance deletion success"
+ ],
+ "not_executed": [
+  {
+   "name": "real systemd exit codes/states for disable --now and is-active",
+   "result": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+   "why": "production host"
+  },
+  {
+   "name": "Stage A/B lab-only cases (real nft, real systemd, SA3 ENOSPC)",
+   "result": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+   "why": "lab gate refuses on production"
+  }
+ ],
+ "not_run_on_this_host": [
+  {
+   "name": "tui-presentation, stage-x-fixui, fd1-field-report, Stage 4 / X-DPI suites",
+   "why": "not isolated from host paths or not reviewed; code unchanged (scope tests)"
+  }
+ ]
+}

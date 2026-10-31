@@ -29,9 +29,27 @@ lab_gate_or_exit tg3-installed-manager
 
 # Re-exec inside a private mount namespace so the real installed paths are
 # writable tmpfs and nothing escapes to the host. TG3_INNER alone is no bypass.
+# The namespace isolates mounts only: directories, files and accounts the run
+# creates outside its tmpfs mounts land on the shared filesystem and would make
+# the lab gate refuse every later run. The outer process therefore records what
+# existed before and removes exactly what this run added (v0.2.23).
 if [[ "${TG3_INNER:-0}" != 1 ]]; then
   export TG3_PARENT_MNT_NS="$(readlink /proc/self/ns/mnt)"
-  exec env TG3_INNER=1 unshare --mount --propagation private bash "$0" "$MGR"
+  tg3_paths=(/run/lock/twebproxy-manager-update.lock /usr/local/libexec/twebproxy /opt/twebproxy-manager /usr/local/libexec)
+  tg3_pre=(); for p in "${tg3_paths[@]}"; do [[ -e "$p" || -L "$p" ]] && tg3_pre+=("$p"); done
+  tg3_users_pre="$(getent passwd tproxy mtproxy | cut -d: -f1)"
+  env TG3_INNER=1 unshare --mount --propagation private bash "$0" "$MGR"; tg3_rc=$?
+  for p in "${tg3_paths[@]}"; do
+    [[ " ${tg3_pre[*]} " == *" $p "* ]] && continue
+    case "$p" in
+      /usr/local/libexec|/opt/twebproxy-manager) rmdir -- "$p" 2>/dev/null || true;;
+      *) rm -rf -- "$p";;
+    esac
+  done
+  for u in tproxy mtproxy; do
+    grep -qx "$u" <<<"$tg3_users_pre" || ! getent passwd "$u" >/dev/null || userdel "$u" 2>/dev/null || true
+  done
+  exit "$tg3_rc"
 fi
 [[ -n "${TG3_PARENT_MNT_NS:-}" && "$(readlink /proc/self/ns/mnt)" != "$TG3_PARENT_MNT_NS" ]] ||
   { echo 'FAIL tg3: refusing to mount outside a private mount namespace'; exit 1; }

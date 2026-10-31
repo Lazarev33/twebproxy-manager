@@ -1,0 +1,10 @@
+{
+ "host": "<host-2>",
+ "tls_choice": "1",
+ "exit_code": 0,
+ "error": null,
+ "created": true,
+ "plan_quick": true,
+ "plan_stock": true,
+ "client_help": true
+}

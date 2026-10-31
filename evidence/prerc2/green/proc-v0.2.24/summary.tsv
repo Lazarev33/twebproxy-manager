@@ -1,0 +1,5 @@
+S1-repair-mount-fail	GREEN	rc=1 readable=0
+S2-restart-mount-fail	GREEN	rc=1 readable=0
+S3-repair-stacked	GREEN	rc=0 readable=0
+S4-systemd-start-unprotected	GREEN	unit_restart_rc=1 b1=activating/pid0 fw_restart_rc=0 readers_after_fw=0/0 active_after_fw=0 audit_procfs_error=1 untouched_backend_readers_before=12/12
+S5-explicit-opt-out	GREEN	disable_rc=0 start=active journal_warning=1 audit_warning=1 policy=off enable_rc=0

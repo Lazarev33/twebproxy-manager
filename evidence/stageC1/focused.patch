@@ -1,0 +1,1775 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 6451f63..ab8cab8 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,35 @@
+ # Changelog
+ 
++## 0.2.14-beta — 2026-10-21 — Stage C1: целостность профилей и состояния
++
++- F03: создание профиля больше не запускает, не показывает и не подтверждает
++  чужой профиль. `rebuild_profiles_json` и загрузка записей не меняют
++  глобальные переменные вызывающего; команды работают с локальными host/profile;
++  имена из командной строки проверяются до построения путей; запись, чей
++  `PROFILE_NAME` не совпадает с именем файла, отвергается.
++- F04: `instance.env`, записи профилей, backend env, `profiles.json` и
++  `config.json` заменяются атомарно (временный файл в том же каталоге, root,
++  rename); symlink-цели отвергаются. Авторитетны `instance.env` и
++  `profiles.d/*.env`; backend env и `profiles.json` выводятся из них заново при
++  каждой мутации инстанса и при `repair`. Ошибка записи или проверки до старта
++  runtime восстанавливает прежнюю запись профиля и возвращает отказ. Записи
++  читаются в подоболочке: отсутствующие ключи не наследуются, лишние переменные
++  не импортируются; дата создания профиля сохраняется при ротации и смене
++  carrier. Формат файлов не изменился.
++- F05: мутации одного инстанса сериализованы `flock` (`$BASE_DIR/.locks/
++  instance-<host>.lock`), выбор портов до их сохранения — отдельной блокировкой
++  `ports.lock`; порядок instance → ports. Чтение-изменение-запись выполняется над
++  состоянием под блокировкой, поэтому параллельные ротация и смена carrier не
++  теряют изменений. Блокировка снимается при любом выходе; ожидание ограничено
++  (`TWEBPROXY_STATE_LOCK_WAIT`, по умолчанию 120 с).
++- F13: проверка занятости порта читает вывод `ss` целиком (без SIGPIPE под
++  pipefail), учитывает форматы IPv4/IPv6, а отказ `ss` не считается свободным
++  портом. Порты из записей профилей учитываются даже без backend env.
++  Автоматические порты перевыбираются под блокировкой, ручные перепроверяются.
++- `docs/ROADMAP.md` синхронизирован с текущей версией на GitHub (только документ).
++- Stage A/A.1, Stage B/B.1 (firewall, systemd, права libexec, безопасность
++  тестов), DPI, TLS, relay update и protected Stage 4 function set не изменены.
++
+ ## 0.2.13-beta — 2026-10-20 — Stage B.1: исправление прав libexec и безопасность тестов
+ 
+ - Исправлена регрессия 0.2.12 (P0): `rebuild_firewall` переводил существующий
+diff --git a/VERSION b/VERSION
+index 2779245..769ed6a 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.13
++0.2.14
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 42099cf..f8f230d 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1,62 +1,125 @@
+-# Roadmap
++# TWebProxy Manager — Development Roadmap
+ 
+-## 0.2.6 — current beta
++Updated: 2026-10-20. This document tracks **planned work**, not production release status.
+ 
+-Goal: preserve the first known-good E2E baseline and remove issues observed in the successful report.
++## Product goal
+ 
+-Done:
++A dependable, easy-to-operate manager for Telegram native WEB Proxy: official `telegramdesktop/tproxy-server` + stock MTProxy, HTTPS/WebSocket transports, Caddy/Nginx, a real public website on the same hostname, optional carefully scoped anti-DPI methods, secure updates and meaningful diagnostics.
+ 
+-- Caddy + `https` + stock MTProxy baseline;
+-- systemd credential permission model;
+-- MTProxy `AF_NETLINK` correction;
+-- isolation audit;
+-- compact current/history reports;
+-- transactional managed Caddy changes;
+-- reboot/autostart validated on the field VPS;
+-- GitHub manager update channel with checksum validation;
+-- strict TLS and all-listener audit improvements.
++Two supported user journeys:
++- **Quick setup:** domain → HTTPS → real website → WEB proxy → client connection information, with safe defaults.
++- **Advanced administration:** instances, profiles, keys, carriers, backend isolation, diagnostics, certificates, optional anti-DPI and rollback.
+ 
+-## Next field tests
++Keep the public website genuinely functional; do not claim that HTML alone can hide the server's IP, SNI, TLS fingerprint or traffic characteristics. Do not promise complete DPI invisibility.
+ 
+-Do not add a second backend implementation before these tests are separated cleanly:
++## Current checkpoints and release status
+ 
+-1. `https-lanes`.
+-2. `websocket`.
+-3. `websocket-lanes`.
+-4. Nginx + Let's Encrypt.
+-5. large media/file transfer.
+-6. reconnect after client sleep/network switch.
+-7. intentional backend crash and relay crash recovery.
+-8. external scan proving backend/stats ports are unreachable.
++| Checkpoint | Status | Notes |
++| --- | --- | --- |
++| v0.2.9 (`main` at planning time) | Earlier GitHub baseline | Existing field-tested stock setup; not evidence for newer changes |
++| v0.2.10 Stage A | Development completed | DPI state transaction and isolation improvements |
++| v0.2.11 Stage A.1 | Development checkpoint | F01/F02/F11/F12/F18 and TUI shared-IPv4 consent; real nft and ENOSPC gates incomplete |
++| v0.2.12 Stage B | **Blocked for acceptance** | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
++| v0.2.13 Stage B.1 | **Next proposed correction** | Narrow corrections and test safety; not implemented yet |
+ 
+-## 0.2.x cleanup after field matrix
++All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+-Candidates:
++## Non-negotiable engineering constraints
+ 
+-- make managed Nginx configuration changes transactional with rollback, matching the Caddy path;
+-- collect concise per-test metrics without enabling raw request logging;
+-- add an explicit noninteractive preflight command suitable for CI/VPS smoke testing;
+-- document restore/backup semantics before introducing automated migration.
++- No production VPS changes during development, audits or fault injection.
++- No resurrection of rejected advanced Stage 3 recovery, LKG, journal or generic exact-state engine. Use bounded, operation-local transactions and the simple backup-before-update / rollback-to-previous-version approach.
++- Preserve stock MTProxy as the backend baseline; Caddy is the recommended greenfield frontend, Nginx remains supported for existing setups.
++- The six existing DPI mode IDs and pinned nfqws binary remain stable until a separately approved change.
++- Anti-DPI on local outgoing IPv4 TCP:443 may affect unrelated services on the same IP. STOCK default; explicit shared-scope consent; no automatic aggressive DPI changes.
++- Keep protected Stage 4 functions unchanged until updater/supply-chain work is specifically authorized.
++- Any production manager code change bumps machine-readable `VERSION`, `MANAGER_VERSION` and release label coherently; refresh SHA manifests and relevant fixtures.
++- Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
++- No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
+ 
+-## 0.3 experiment branch
++## Immediate work: Stage B.1
+ 
+-Introduce backend abstraction only after stock MTProxy remains a stable baseline:
++Scope: close independently verified Stage B regressions and dangerous test behavior **before Stage C**.
+ 
+-```text
+-backend=stock-mtproxy
+-backend=telemt-direct
+-backend=telemt-middle-end
+-```
++1. **P0 — executable directory permissions:** correct the v0.2.12 `rebuild_firewall()` path that changes `/usr/local/libexec/twebproxy` from traversable 0755 to root-only 0700, breaking the `mtproxy` service user. Apply a minimal independently verified patch and regression for non-root execution.
++2. **P0 — privileged test safety:** make real nftables/systemd/mount/ENOSPC tests opt-in and disposable-environment-only. A production host must never be modified merely by invoking a general test suite.
++3. **Investigate, don't pre-judge:** `nftables.service` reload/restart ownership (audit R1), systemd dependency and stop propagation (R2), nft command timeout and ambiguous kernel outcome (R3). Fix only reproducible defects within a clearly defined B.1 scope.
++4. Preserve all Stage A/A.1 behavior, Stage 4 protected hash, foreign firewall objects, and the existing managed backend service behavior. Do not add protocols, a new UI or generic recovery.
++5. Version proposal: `0.2.13-beta` if this becomes a distinct shipped source checkpoint. Later numbering must be recalculated rather than reused.
+ 
+-Telemt should be evaluated by changing only the backend while keeping hostname, carrier and client test constant.
++Acceptance: regression for permissions, safe negative/positive tests, reviewed diff, verified artifact hashes, explicit limitations. **A correction is not by itself proof of the real-kernel guarantee.**
+ 
+-## RC / external audit
++## Mandatory disposable Linux validation (before RC; prioritize after B.1)
+ 
+-Before 1.0:
++Use a separate sacrificial Linux VM/host with an isolated firewall/network, root test privileges and controlled test filesystems. **Never use the live Telegram proxy VPS.**
+ 
+-1. clean-install E2E on at least two fresh VPS images;
+-2. upgrade from previous manager release without recreating profiles;
+-3. static architecture/security review;
+-4. hostile review of partial-install, rollback, port collision and existing-frontend cases;
+-5. rerun every accepted finding on a real VPS;
+-6. freeze a reproducible release artifact with checksums.
++- Actual nft kernel transactions: valid replacement, invalid candidate, deliberately failed batch, initial install, zero/one/multiple backends, foreign table invariance, restart/reload/uninstall behavior, postconditions.
++- Actual systemd unit lifecycle: normal start/reload/restart/stop and dependency propagation; no unexpected service disruption during routine firewall rebuilds.
++- Actual DPI verifier with nft JSON and rendered rules (F12); six existing modes and scope collisions.
++- Actual ENOSPC interruption using an isolated filesystem or mount namespace; state preservation and truthful test result.
++- Negative control: prove test runner refuses unsafe environments.
++
++Record commands, pre/post states, exit codes and exact environment. An unavailable test is NOT_EXECUTED, not PASS. Real-kernel validation may run while later development proceeds in isolation, but it is a hard release gate.
++
++## Core implementation stages (after B.1)
++
++| Stage | Scope | Acceptance principle |
++| --- | --- | --- |
++| **C1 — state and profiles** | Correct profile selection/clobbered globals, atomic profile/backend persistence, rotation races, local lifecycle locks, port allocation | No wrong target, lost secret, partial state or false success |
++| **C2 — relay lifecycle** | Relay binary update, restart/health failure rollback, instance lifecycle failure propagation | Previous working binary/state retained on failure |
++| **D — frontend / TLS** | Transactional Caddy managed markers, safe Nginx LE issuance/renewal, candidate validation, rollback | Existing website and TLS survive failed changes |
++| **E — operations / diagnostics** | TUI EOF/default-no, read-only diagnostic timeouts, truthful status, logs/report handling | No false-green output, hangs or accidental yes |
++| **F — updater / supply chain** | Explicitly authorized Stage 4 updater changes, lock cleanup, provenance/signatures or strong pinned artifact verification, rollback | Trusted, verifiable update with prior-version recovery |
++| **G — hardening** | Privilege boundaries, config validation, ownership, bounded resources, remaining confirmed audit backlog | Safe defaults and predictable degradation |
++| **H — user experience** | Main-menu Anti-DPI, guided quick setup, advanced controls, actionable statuses, RU/EN, desktop/mobile guidance | Novice usability without bypassing safety gates |
++
++Stage identifiers are fixed planning names; exact `0.2.x` version numbers after B.1 are **TBD** and must be assigned sequentially at implementation time. Keep work bounded; do not turn each stage into a full release audit.
++
++## WEB transport, compatibility and anti-DPI research
++
++Create an evidence-backed **research / design gate before implementation**. Do not blend it into B.1 or the core reliability corrections.
++
++- Re-evaluate pinned official `tproxy-server` versus the current upstream commit/protocol and the third-party `tgwebproxy` implementation. Review license, support, session token signing and `token_key_file` migration, config compatibility, release pinning and client requirements.
++- Compare `https`, `https-lanes`, `websocket`, `websocket-lanes` under consistent network conditions, with throughput, connection survival, background/resume behavior, large media and actual Telegram handshakes. WebSocket is a candidate, **not** a proven universal default.
++- Research official `base_path` capability and routing behind a genuine existing website; it requires matching client capability, frontend rules and safe migration.
++- Compare existing STOCK/Window1152/MSS88/nfqws combinations with current zapret/zapret2 (`nfqws2`) server modes. Assess directionality, nft scope, side effects, overhead and reproducible benefit. Research is not authorization to install or change the pinned anti-DPI binary.
++- Assess CDN only against actual WebView, long-poll and WebSocket behavior; JS challenges and origin routing can break the bridge.
++- Maintain an explicit Desktop / Android / iOS client-version matrix including foreground, background, network switching, reconnect and media tests. Avoid claiming client compatibility from `/readyz` alone.
++- Separate `systemd running`, `TLS valid`, `relay ready`, `WEB handshake proven` and `Telegram client confirmed` in the product status model.
++
++Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
++
++## Public website / Decoy Site Manager — dedicated future stage
++
++Bring the original product idea back: a real, maintainable HTTPS website on the same hostname as the WEB bridge rather than the current generic “Gateway / The service is online” page.
++
++Candidate supported modes:
++1. **Generated real site:** user-selected title, purpose, pages, content, assets, favicon, styling and basic accessibility; sensible template defaults, not an identical fingerprinted placeholder across hosts.
++2. **Upload owned site:** HTML/CSS/JS/assets with path, ownership, symlink and content checks; publish transactionally.
++3. **Use existing website:** explicit reverse proxy to user-managed `public_upstream` without disrupting routes or TLS.
++4. **Authorized snapshot:** import only the operator's own website or content with permission; avoid deceptive copying of third-party branding.
++5. **Redirect:** secondary/manual mode only; warn that it is not an equivalent public site and may impair bridge behavior.
++
++Technical requirements: never expose relay secrets or local ports, validate/candidate-publish web configuration, keep a working site when edits fail, preserve user-managed files and Caddy/Nginx blocks, keep WEB transport paths compatible, and test base-path routing separately. The site's existence alone does not guarantee censorship resistance or transport indistinguishability.
++
++UI: website creation and maintenance belong in quick setup and per-site management, with preview, certificate/status view, undo and clear failure messages.
++
++## Release candidate and v1.0 gates
++
++After implementation milestones, perform an **integrated validation campaign** instead of repeated all-project audit loops after every small stage:
++
++- Fresh Debian/Ubuntu installs and safe upgrades preserving existing profiles and sites.
++- Disposable kernel nft/systemd/ENOSPC failure injection and reproducible test isolation.
++- Independent code/security review of real candidate artifacts; every confirmed blocker has a reproducer and a regression test.
++- Four WEB carriers, desktop and eligible mobile client matrix, sleep/reconnect, media transfer, firewall external scans, cert renewal and restart/crash behavior.
++- Real website and WEB bridge coexistence on a single hostname, no secrets in publicly served content.
++- TUI RU/EN, 40/80/120-column terminal behavior, installation, logs, errors and rollback.
++- Supply-chain and artifact checks: exact pinned dependencies, manifests, reproducible version identity, rollback.
++- Versioned RC checkpoint (proposal `0.9.0-rc1`), then `1.0.0` only with explicit acceptance.
++
++## Historical roadmap notes (kept for continuity)
++
++The earlier v0.2.6–v0.2.9 baseline delivered Caddy + HTTPS + stock MTProxy, systemd credential/AF_NETLINK fixes, isolation audit, compact diagnostics, field reboot/autostart checks, manager update channel and TLS/listener checks.
++
++Earlier planned field tests remain relevant: `https-lanes`, `websocket`, `websocket-lanes`, Nginx + Let's Encrypt, large transfers, sleep/network switch, backend/relay crash, and external backend-port scans. These are incorporated into the client/lab matrix above.
++
++The earlier `0.3 experiment branch` idea (`stock-mtproxy`, `telemt-direct`, `telemt-middle-end`) is **deferred research**, not an approved additional backend for the current 1.0 path. Only evaluate after the stock baseline and WEB/decoy roadmap are proven.
+diff --git a/tests/stagec1/README.md b/tests/stagec1/README.md
+new file mode 100644
+index 0000000..7b18cd7
+--- /dev/null
++++ b/tests/stagec1/README.md
+@@ -0,0 +1,20 @@
++# Stage C1 verification
++
++Profile/instance state integrity (F03 identity, F04 persistence, F05
++concurrency, F13 port allocation). Model tests only: safe on any Linux test
++workstation with Bash, jq, coreutils and util-linux; no system state changes.
++
++```sh
++bash tests/stagec1/run-stage-c1-suite.sh            # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
++bash tests/stagec1/c1-scope-invariants.sh <v0.2.13 source tree>
++```
++
++`state-harness.sh` runs the unmodified manager code with only the host boundary
++replaced (systemctl/ss/curl/journalctl models, a jq-based `tproxy-server -check`,
++scripted prompts). Commands run through `c1_run`/`c1_eval` in a separate bash
++process with production `set -Eeuo pipefail`: bash ignores errexit inside an
++`if` condition even in a `( set -e; ... )` subshell, which would hide failures.
++
++Write failures are injected command failures (one-shot `printf`/`jq` faults),
++not a real ENOSPC; races use barriers inside interactive prompts, not timing.
++None of this proves real systemd, flock-under-load or filesystem behaviour.
+diff --git a/tests/stagec1/c1-scope-invariants.sh b/tests/stagec1/c1-scope-invariants.sh
+new file mode 100644
+index 0000000..d62d970
+--- /dev/null
++++ b/tests/stagec1/c1-scope-invariants.sh
+@@ -0,0 +1,84 @@
++#!/usr/bin/env bash
++# Stage C1 scope against the exact v0.2.13 (Stage B.1) tree: only profile,
++# instance-state, lock and port functions may change; ui_localize_legacy may
++# only gain lines; Stage B/B.1 firewall, DPI, TLS, relay update, Stage 4 and
++# menu code stay byte-identical; README, assets and docs other than the
++# GitHub-synchronized ROADMAP.md are unchanged.
++# Usage: c1-scope-invariants.sh <v0.2.13 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.13 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-c1-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(load_instance load_profile save_instance save_profile port_registered port_listening
++  port_available next_free_port rebuild_profiles_json write_instance_config wait_profile_backend_ready
++  collect_instance_settings collect_profile_settings add_instance_cmd repair_instance_cmd
++  profile_add_cmd profile_delete_cmd profile_rotate_cmd profile_carrier_cmd delete_instance_cmd
++  ui_localize_legacy)
++ADDED=(is_valid_carrier_mode state_read_record profile_record_valid require_instance require_profile
++  state_write_file render_instance_record render_profile_record render_backend_env instance_derive_state
++  profile_state_commit profile_state_remove profile_state_restore state_lock_path instance_lock_acquire
++  instance_lock_release port_lock_acquire port_lock_release claim_instance_ports claim_profile_ports
++  render_profile_json_entry require_profile_file)
++NEW_VARS=(STATE_LOCK_WAIT_SECONDS INSTANCE_LOCK_FD INSTANCE_LOCK_HOST INSTANCE_LOCK_DEPTH PORT_LOCK_FD PORT_LOCK_DEPTH)
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++grep -vE "^declare [-a-zA-Z]+ ($(IFS='|'; echo "${NEW_VARS[*]}"))=" "$TMP/candidate.vars" > "$TMP/candidate.vars.old"
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars.old"
++echo 'PASS top-level variables unchanged except release identity and the C1 lock state'
++
++for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do
++  cmp "$BASE/$f" "$PROJECT/$f"
++done
++for f in "$BASE"/docs/*.md; do
++  [[ "${f##*/}" == ROADMAP.md ]] && continue
++  cmp "$f" "$PROJECT/docs/${f##*/}"
++done
++echo 'PASS README, pinned nfqws assets and docs (except synchronized ROADMAP.md) unchanged'
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS c1-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagec1/concurrency-fixture.sh b/tests/stagec1/concurrency-fixture.sh
+new file mode 100644
+index 0000000..c2a45b3
+--- /dev/null
++++ b/tests/stagec1/concurrency-fixture.sh
+@@ -0,0 +1,126 @@
++#!/usr/bin/env bash
++# F05 regression: concurrent mutations of the same instance are serialized, the
++# state read for a read-modify-write is the state under the lock (no lost
++# update), port allocation is serialized from choice to persistence, locks are
++# released on failure, and an unrelated instance is not blocked.
++#
++# Deterministic: each race parks one process at a barrier inside an
++# interactive prompt (before any lock is taken), runs the competitor to
++# completion, then releases the barrier. No timing assumptions beyond bounded
++# waits.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c1-race.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++export ROOT MGR TMP
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++A=alpha.example; B=bravo.example
++pf() { printf '%s/%s/profiles.d/%s.env' "$INSTANCES_DIR" "$1" "$2"; }
++lockfile() { printf '%s/.locks/instance-%s.lock' "$BASE_DIR" "$1"; }
++all_backend_ports() { cat "$BACKENDS_DIR"/*.env | sed -n 's/^MTPROXY_\(CLIENT\|STATS\)_PORT=//p' | sort; }
++reset_state() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$TMP"/*.reached "$TMP"/*.go "$SITES_DIR"
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"; install -d -m 0755 "$SITES_DIR"
++  c1_seed_instance "$A" 18080 18081; c1_seed_instance "$B" 18082 18083
++  c1_seed_profile "$A" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++  c1_seed_profile "$B" bravo bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb https 23981 28981
++  c1_run rebuild_profiles_json "$A" >/dev/null 2>&1; c1_run rebuild_profiles_json "$B" >/dev/null 2>&1
++}
++# Background operation parked at barrier $1; remaining args are the command.
++park() { local b="$1"; shift; c1_run "$@" > "$TMP/$b.out" 2>&1 & echo $! > "$TMP/$b.pid"; c1_wait_reached "$b"; }
++release() { : > "$TMP/$1.go"; wait "$(cat "$TMP/$1.pid")"; echo $? > "$TMP/$1.rc"; }
++show() { grep -E '\[(x|!)\]' "$1" | tail -n 2 | sed 's/^/  | /'; }
++
++# 1. lost update: carrier change parked at its prompt, secret rotation completes.
++reset_state
++C1_AT_CARRIER=carrier C1_CARRIER=websocket park carrier profile_carrier_cmd "$A" alpha
++check race1_parked test -e "$TMP/carrier.reached"
++C1_SECRET=cccccccccccccccccccccccccccccccc c1_run profile_rotate_cmd "$A" alpha > "$TMP/rotate.out" 2>&1; rc=$?
++check race1_rotation_completes test "$rc" -eq 0
++release carrier
++check race1_carrier_completes test "$(cat "$TMP/carrier.rc")" -eq 0
++check race1_rotated_secret_survives test "$(c1_field "$(pf "$A" alpha)" SECRET)" = cccccccccccccccccccccccccccccccc
++check race1_carrier_applied test "$(c1_field "$(pf "$A" alpha)" CARRIER_MODE)" = websocket
++check race1_backend_matches_record test "$(c1_field "$BACKENDS_DIR/$A--alpha.env" MTPROXY_SECRET)" = cccccccccccccccccccccccccccccccc
++
++# 2. port allocation: an add parked after choosing ports, a second add on
++#    another instance completes; the parked one must not reuse those ports.
++reset_state
++C1_AT_MAXCONN=addA C1_NAME=second park addA profile_add_cmd "$A"
++C1_NAME=other c1_run profile_add_cmd "$B" > "$TMP/addB.out" 2>&1; rc=$?
++check race2_competitor_completes test "$rc" -eq 0
++release addA
++check race2_parked_completes test "$(cat "$TMP/addA.rc")" -eq 0
++check race2_backend_ports_unique test -z "$(all_backend_ports | uniq -d)"
++check race2_four_profiles_present test "$(ls "$BACKENDS_DIR"/*.env | wc -l)" = 4
++
++# 3. manual ports chosen before a competitor took them: refused, nothing overwritten.
++reset_state
++C1_AT_MAXCONN=manual C1_NAME=manual C1_MANUAL_PORTS=1 C1_BACKEND_PORT=24100 C1_STATS_PORT=29100 park manual profile_add_cmd "$A"
++C1_NAME=taker C1_MANUAL_PORTS=1 C1_BACKEND_PORT=24100 C1_STATS_PORT=29100 c1_run profile_add_cmd "$B" > "$TMP/taker.out" 2>&1; rc=$?
++check race3_competitor_completes test "$rc" -eq 0
++release manual
++check race3_conflict_refused test "$(cat "$TMP/manual.rc")" -ne 0
++show "$TMP/manual.out"
++check race3_no_record test ! -e "$(pf "$A" manual)"
++check race3_competitor_backend_intact test "$(c1_field "$BACKENDS_DIR/$B--taker.env" MTPROXY_CLIENT_PORT)" = 24100
++check race3_ports_unique test -z "$(all_backend_ports | uniq -d)"
++
++# 4. same profile name added concurrently: the late one refuses, no overwrite.
++reset_state
++C1_AT_MAXCONN=dupA C1_NAME=gamma C1_SECRET=11111111111111111111111111111111 park dupA profile_add_cmd "$A"
++C1_NAME=gamma C1_SECRET=22222222222222222222222222222222 c1_run profile_add_cmd "$A" > "$TMP/dupB.out" 2>&1
++release dupA
++check race4_late_duplicate_refused test "$(cat "$TMP/dupA.rc")" -ne 0
++show "$TMP/dupA.out"
++check race4_first_secret_kept test "$(c1_field "$(pf "$A" gamma)" SECRET)" = 22222222222222222222222222222222
++
++# 5. same hostname added concurrently: the late one refuses, no overwrite.
++reset_state
++C1_AT_MAXCONN=instA C1_HOST=delta.example C1_NAME=first C1_SECRET=33333333333333333333333333333333 C1_INSTANCE_STUBS=1 park instA add_instance_cmd
++C1_HOST=delta.example C1_NAME=winner C1_SECRET=44444444444444444444444444444444 C1_INSTANCE_STUBS=1 c1_run add_instance_cmd > "$TMP/instB.out" 2>&1; rc=$?
++check race5_competitor_completes test "$rc" -eq 0
++release instA
++check race5_late_instance_refused test "$(cat "$TMP/instA.rc")" -ne 0
++show "$TMP/instA.out"
++check race5_winner_profile_kept test "$(c1_field "$(pf delta.example winner)" SECRET)" = 44444444444444444444444444444444
++check race5_no_late_profile test ! -e "$(pf delta.example first)"
++check race5_ports_unique test -z "$(all_backend_ports | uniq -d)"
++
++# 6. contention: a held instance lock makes a mutation wait and then fail closed.
++reset_state
++install -d -m 0700 "$BASE_DIR/.locks"
++before="$(cat "$(pf "$A" alpha)")"
++exec {holder}>>"$(lockfile "$A")"; flock "$holder"
++start=$SECONDS
++TWEBPROXY_STATE_LOCK_WAIT=1 C1_SECRET=55555555555555555555555555555555 c1_run profile_rotate_cmd "$A" alpha > "$TMP/busy.out" 2>&1; rc=$?
++check contention_fails_closed test "$rc" -ne 0
++check contention_bounded_wait test "$((SECONDS - start))" -le 10
++check contention_state_unchanged test "$(cat "$(pf "$A" alpha)")" = "$before"
++check contention_reports_busy grep -qiE 'busy|занят|lock' "$TMP/busy.out"
++show "$TMP/busy.out"
++# 7. an unrelated instance is not blocked by that lock.
++TWEBPROXY_STATE_LOCK_WAIT=1 C1_SECRET=66666666666666666666666666666666 c1_run profile_rotate_cmd "$B" bravo > "$TMP/other.out" 2>&1; rc=$?
++check independent_instance_not_blocked test "$rc" -eq 0
++exec {holder}>&-
++TWEBPROXY_STATE_LOCK_WAIT=1 C1_SECRET=77777777777777777777777777777777 c1_run profile_rotate_cmd "$A" alpha >/dev/null 2>&1; check after_release_mutation_succeeds test $? -eq 0
++
++# 8. a failed mutation releases its locks; nothing stays held.
++: > "$TMP/fail-validate"
++C1_SECRET=88888888888888888888888888888888 c1_run profile_rotate_cmd "$A" alpha > "$TMP/failed.out" 2>&1; rc=$?
++rm -f "$TMP/fail-validate"
++check failed_mutation_reported test "$rc" -ne 0
++show "$TMP/failed.out"
++check failed_mutation_released_instance_lock flock -n "$(lockfile "$A")" true
++check failed_mutation_released_port_lock bash -c '[[ ! -e "$1" ]] || flock -n "$1" true' _ "$BASE_DIR/.locks/ports.lock"
++TWEBPROXY_STATE_LOCK_WAIT=1 C1_SECRET=99999999999999999999999999999999 c1_run profile_rotate_cmd "$A" alpha >/dev/null 2>&1; check repeated_invocation_after_failure test $? -eq 0
++check lock_files_private test "$(stat -c '%a:%u' "$BASE_DIR/.locks" "$(lockfile "$A")" | sort -u | paste -sd' ')" = "600:0 700:0"
++
++printf 'c1-concurrency: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec1/port-allocation-fixture.sh b/tests/stagec1/port-allocation-fixture.sh
+new file mode 100644
+index 0000000..375572f
+--- /dev/null
++++ b/tests/stagec1/port-allocation-fixture.sh
+@@ -0,0 +1,79 @@
++#!/usr/bin/env bash
++# F13 regression: an occupied port is never reported free. v0.2.13 used
++# `ss | awk | grep -q` under pipefail: grep -q exiting at the first match makes
++# awk die of SIGPIPE, the pipeline fails, and a listening port looks free; a
++# failing ss looked like "nothing listens". Ports recorded only in profiles.d
++# (backend env missing after an interrupted commit) were not seen either.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c1-ports.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++listening() { c1_run port_listening "$1" >/dev/null 2>&1; }
++free() { c1_run port_available "$1" >/dev/null 2>&1; }
++not() { ! "$@"; }
++H=alpha.example
++
++# 1. SIGPIPE: the matching listener comes first, then a large listener table.
++printf 'LISTEN 0 4096 0.0.0.0:23980 0.0.0.0:*\n' > "$TMP/ss-extra"
++export C1_SS_PAD=200000
++check sigpipe_listening_port_detected listening 23980
++check sigpipe_listening_port_not_free not free 23980
++for i in 1 2 3; do check "sigpipe_repeat_$i" listening 23980; done
++unset C1_SS_PAD
++
++# 2. listener formats (IPv4, IPv6, wildcard, mapped, scoped).
++cat > "$TMP/ss-extra" <<'EOF'
++LISTEN 0 4096 [::]:23990 [::]:*
++LISTEN 0 4096 *:23991 *:*
++LISTEN 0 4096 [::ffff:127.0.0.1]:23992 *:*
++LISTEN 0 4096 127.0.0.1%lo:23993 0.0.0.0:*
++LISTEN 0 4096 0.0.0.0:23994 0.0.0.0:*
++LISTEN 0 4096 [fe80::1%eth0]:23995 [::]:*
++LISTEN 0 4096 *:8080 *:*
++EOF
++for p in 23990 23991 23992 23993 23994 23995 8080; do check "format_listening_$p" listening "$p"; done
++check format_absent_port_free free 23996
++check format_suffix_is_not_port not listening 80
++check format_prefix_is_not_port not listening 2399
++
++# 3. ss failure is not proof that a port is free.
++: > "$TMP/fail-ss"
++c1_run port_listening 23996 > "$TMP/out" 2>&1; rc=$?
++check ss_failure_not_listening_unknown test "$rc" -ne 0 -a "$rc" -ne 1
++check ss_failure_port_not_free not free 23996
++check ss_failure_reported grep -qi 'ss' "$TMP/out"
++c1_run next_free_port 23996 23999 > "$TMP/out" 2>/dev/null; rc=$?
++check ss_failure_allocation_refused test "$rc" -ne 0 -a -z "$(cat "$TMP/out")"
++rm -f "$TMP/fail-ss"
++
++# 4. ports recorded in the authoritative profile record count as registered.
++c1_seed_instance "$H" 18080 18081
++c1_seed_profile "$H" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 24500 29500
++rm -f "$BACKENDS_DIR/$H--alpha.env"
++: > "$TMP/ss-extra"
++check profile_record_backend_port_registered not free 24500
++check profile_record_stats_port_registered not free 29500
++check instance_relay_port_registered not free 18080
++check unrelated_port_free free 24501
++
++# 5. allocation skips registered and listening ports, returns a free one.
++printf 'LISTEN 0 4096 [::]:24501 [::]:*\n' > "$TMP/ss-extra"
++check next_free_skips_taken test "$(c1_run next_free_port 24500 24510)" = 24502
++
++# 6. backend readiness is found despite a large listener table (no SIGPIPE flake).
++c1_seed_profile "$H" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 24500 29500
++: > "$TMP/ss-extra"
++start=$SECONDS
++C1_SS_PAD=200000 c1_run start_profile_backend "$H" alpha > "$TMP/out" 2>&1; rc=$?
++check readiness_detected_with_large_table test "$rc" -eq 0
++check readiness_without_retry_loop test "$((SECONDS - start))" -le 8
++
++printf 'c1-port-allocation: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec1/profile-identity-fixture.sh b/tests/stagec1/profile-identity-fixture.sh
+new file mode 100644
+index 0000000..adb2c0a
+--- /dev/null
++++ b/tests/stagec1/profile-identity-fixture.sh
+@@ -0,0 +1,84 @@
++#!/usr/bin/env bash
++# F03 regression: creating, rotating, re-carrying or showing one profile must
++# never target another. v0.2.13 rebuild_profiles_json sourced every profile into
++# the caller's shell, so profile_add_cmd went on to start, report and show the
++# alphabetically last profile instead of the new one.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c1-identity.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++H=alpha.example
++pf() { printf '%s/%s/profiles.d/%s.env' "$INSTANCES_DIR" "$H" "$1"; }
++started() { grep -qx "restart twebproxy-mtproxy@$H--$1.service" "$TMP/systemctl.calls"; }
++
++c1_seed_instance "$H" 18080 18081
++c1_seed_profile "$H" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++c1_seed_profile "$H" zeta ffffffffffffffffffffffffffffffff websocket 23981 28981
++: > "$TMP/systemctl.calls"
++
++# --- add "beta" next to "alpha" and "zeta" (beta is neither first nor last) ---
++out="$(C1_NAME=beta C1_SECRET=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb C1_CARRIER=https-lanes c1_run profile_add_cmd "$H" 2>&1)"; rc=$?
++check add_succeeds test "$rc" -eq 0
++check add_created_beta test -f "$(pf beta)"
++check add_beta_record_is_beta test "$(c1_field "$(pf beta)" PROFILE_NAME)" = beta
++check add_starts_new_backend started beta
++check add_does_not_restart_zeta bash -c '! grep -qx "restart twebproxy-mtproxy@$1--zeta.service" "$2"' _ "$H" "$TMP/systemctl.calls"
++check add_does_not_restart_alpha bash -c '! grep -qx "restart twebproxy-mtproxy@$1--alpha.service" "$2"' _ "$H" "$TMP/systemctl.calls"
++check add_reports_beta grep -q 'beta' <<<"$(grep -iE 'added|добавлен' <<<"$out")"
++check add_shows_beta_secret grep -q 'secret=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' <<<"$out"
++check add_does_not_show_zeta bash -c '! grep -q "secret=ffffffff" <<<"$1"' _ "$out"
++check zeta_untouched test "$(c1_field "$(pf zeta)" SECRET)" = ffffffffffffffffffffffffffffffff
++check alpha_untouched test "$(c1_field "$(pf alpha)" SECRET)" = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
++check profiles_json_three_distinct test "$(jq -r '.profiles|map(.name)|sort|join(",")' "$INSTANCES_DIR/$H/profiles.json")" = alpha,beta,zeta
++check beta_backend_env_matches test "$(c1_field "$BACKENDS_DIR/$H--beta.env" MTPROXY_SECRET)" = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
++
++# --- rotating alpha must only touch alpha (secret) and restart only alpha ---
++: > "$TMP/systemctl.calls"
++out="$(C1_SECRET=cccccccccccccccccccccccccccccccc c1_run profile_rotate_cmd "$H" alpha 2>&1)"; rc=$?
++check rotate_succeeds test "$rc" -eq 0
++check rotate_changed_alpha test "$(c1_field "$(pf alpha)" SECRET)" = cccccccccccccccccccccccccccccccc
++check rotate_kept_alpha_name test "$(c1_field "$(pf alpha)" PROFILE_NAME)" = alpha
++check rotate_left_zeta test "$(c1_field "$(pf zeta)" SECRET)" = ffffffffffffffffffffffffffffffff
++check rotate_left_beta test "$(c1_field "$(pf beta)" SECRET)" = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
++check rotate_restarts_alpha_only test "$(grep -c '^restart twebproxy-mtproxy@' "$TMP/systemctl.calls")" = 1
++check rotate_restarts_alpha started alpha
++check rotate_shows_alpha grep -q 'secret=cccccccccccccccccccccccccccccccc' <<<"$out"
++
++# --- carrier of zeta: only zeta changes ---
++out="$(C1_CARRIER=websocket-lanes c1_run profile_carrier_cmd "$H" zeta 2>&1)"; rc=$?
++check carrier_succeeds test "$rc" -eq 0
++check carrier_changed_zeta test "$(c1_field "$(pf zeta)" CARRIER_MODE)" = websocket-lanes
++check carrier_left_alpha test "$(c1_field "$(pf alpha)" CARRIER_MODE)" = https
++check carrier_left_beta test "$(c1_field "$(pf beta)" CARRIER_MODE)" = https-lanes
++check carrier_reports_zeta grep -q 'zeta: websocket-lanes' <<<"$out"
++
++# --- a helper that rebuilds profiles.json never moves the caller's identity ---
++# Globals as a caller holds them, then the helper, then compare.
++identity_after="$(c1_eval 'PROFILE_NAME=beta SECRET=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb BACKEND_PORT=23982
++  rebuild_profiles_json alpha.example >/dev/null 2>&1
++  printf "%s %s %s" "$PROFILE_NAME" "$SECRET" "$BACKEND_PORT"')"
++check rebuild_keeps_caller_identity test "$identity_after" = "beta bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 23982"
++
++# --- a record whose PROFILE_NAME disagrees with its file is refused, not used ---
++sed -i 's/^PROFILE_NAME=.*/PROFILE_NAME=zeta/' "$(pf beta)"
++before="$(cat "$(pf beta)")"
++out="$(C1_SECRET=dddddddddddddddddddddddddddddddd c1_run profile_rotate_cmd "$H" beta 2>&1)"; rc=$?
++check mismatched_identity_refused test "$rc" -ne 0
++check mismatched_identity_unchanged test "$(cat "$(pf beta)")" = "$before"
++check mismatched_identity_zeta_unchanged test "$(c1_field "$(pf zeta)" SECRET)" = ffffffffffffffffffffffffffffffff
++
++# --- names from the command line are validated before any path is built ---
++out="$(C1_SECRET=dddddddddddddddddddddddddddddddd c1_run profile_rotate_cmd "$H" ../../../outside 2>&1)"; rc=$?
++check traversal_profile_refused test "$rc" -ne 0
++out="$(c1_run profile_carrier_cmd "../$H" alpha 2>&1)"; rc=$?
++check traversal_host_refused test "$rc" -ne 0
++
++printf 'c1-profile-identity: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec1/run-stage-c1-suite.sh b/tests/stagec1/run-stage-c1-suite.sh
+new file mode 100644
+index 0000000..27d3885
+--- /dev/null
++++ b/tests/stagec1/run-stage-c1-suite.sh
+@@ -0,0 +1,19 @@
++#!/usr/bin/env bash
++# 0=all mandatory checks executed/PASS; 1=FAIL; 77=INCOMPLETE.
++# Stage C1 cases are model tests (tests/stagec1/state-harness.sh): they change
++# no system state and need no lab host. Scope: c1-scope-invariants.sh <v0.2.13 tree>.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "C1 profile identity F03 (MODEL)" "$ROOT/tests/stagec1/profile-identity-fixture.sh" 120 "$MGR"
++stage_a_run_case "C1 state persistence F04 (MODEL)" "$ROOT/tests/stagec1/state-persistence-fixture.sh" 300 "$MGR"
++stage_a_run_case "C1 concurrent mutation F05 (MODEL)" "$ROOT/tests/stagec1/concurrency-fixture.sh" 300 "$MGR"
++stage_a_run_case "C1 port allocation F13 (MODEL)" "$ROOT/tests/stagec1/port-allocation-fixture.sh" 300 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-c1-suite: PASS (all mandatory model checks executed)';;
++  77) echo 'stage-c1-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)';;
++  *) echo 'stage-c1-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/tests/stagec1/state-harness.sh b/tests/stagec1/state-harness.sh
+new file mode 100644
+index 0000000..7ecd22e
+--- /dev/null
++++ b/tests/stagec1/state-harness.sh
+@@ -0,0 +1,199 @@
++#!/usr/bin/env bash
++# Behavioral sandbox for the Stage C1 profile/state regressions.
++#
++# The profile, instance, state-writing, locking and port code under test is the
++# unmodified manager. Only the host boundary is replaced: systemctl, ss and curl
++# are small models in $TMP/bin, tproxy-server -check validates profiles.json with
++# jq, and the interactive prompts read scripted answers. Nothing outside $TMP is
++# read or written. This proves control flow and file postconditions, not real
++# systemd behaviour.
++#
++#   TMP=... ; source tests/stagec1/state-harness.sh ; c1_harness
++#
++# Commands under test run through c1_run/c1_eval in a SEPARATE bash process
++# with production `set -Eeuo pipefail`: inside an `if`/`check` condition bash
++# ignores errexit even in a ( set -e; ... ) subshell, which would hide failures
++# of code that relies on errexit. Several processes may share one $TMP.
++
++C1_HARNESS="${BASH_SOURCE[0]}"
++
++c1_harness() {
++  export ROOT MGR TMP C1_HARNESS
++  export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 TWEBPROXY_UI_LANGUAGE=en
++  export TWEBPROXY_LANGUAGE_FILE="$TMP/ui-language"
++  # shellcheck source=/dev/null
++  source "$MGR"
++  trap - ERR
++  set +e
++  BASE_DIR="$TMP/etc"; INSTANCES_DIR="$BASE_DIR/instances"; BACKENDS_DIR="$BASE_DIR/backends"
++  MTPROXY_DATA_DIR="$BASE_DIR/mtproxy"; GLOBAL_ENV="$BASE_DIR/global.env"
++  FIREWALL_FILE="$BASE_DIR/firewall.nft"; DPI_DIR="$BASE_DIR/dpi"
++  DPI_LOCK_FILE="$BASE_DIR/.dpi-mutation.lock"
++  SITES_DIR="$TMP/srv"; LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
++  PROJECT_DIR="$TMP/opt"; LOG_DIR="$PROJECT_DIR/logs"; LOG_MANAGER_DIR="$LOG_DIR/manager"
++  LOG_RUNTIME_DIR="$LOG_DIR/runtime"; LOG_BUNDLE_DIR="$LOG_DIR/bundles"; LOG_FULL_DIR="$LOG_DIR/full"
++  TPROXY_BIN="$TMP/bin/tproxy-server"; MTPROXY_BIN="$LIBEXEC_DIR/mtproto-proxy"
++  UI_LANGUAGE=en
++  export C1_ROOT="$TMP" C1_BACKENDS_DIR="$BACKENDS_DIR"
++  install -d -m 0700 "$BASE_DIR" "$INSTANCES_DIR" "$BACKENDS_DIR" "$MTPROXY_DATA_DIR" "$TMP/bin" "$TMP/units"
++  install -d -m 0755 "$SITES_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR"
++  [[ -x "$TMP/bin/systemctl" ]] || c1_write_models
++  case ":$PATH:" in *":$TMP/bin:"*) ;; *) export PATH="$TMP/bin:$PATH";; esac
++  # Host-only preconditions and the Stage B firewall (covered by its own suite).
++  need_root() { :; }; need_systemd() { :; }; check_platform() { :; }; banner() { :; }
++  ensure_core() { :; }
++  rebuild_firewall() { builtin printf 'rebuild\n' >> "$TMP/firewall.calls"; }
++  c1_answers
++  c1_faults
++  [[ "${C1_INSTANCE_STUBS:-}" != 1 ]] || c1_instance_stubs
++}
++
++# Production semantics, separate process (see header).
++c1_run() { bash -c 'source "$C1_HARNESS"; c1_harness; set -Eeuo pipefail; "$@"' c1-run "$@"; }
++c1_eval() { bash -c 'source "$C1_HARNESS"; c1_harness; set -Eeuo pipefail; eval "$1"' c1-eval "$1"; }
++
++# Injected one-shot write failures (command failures, not a real ENOSPC):
++#   C1_FAULT=<text> + $TMP/fault : the printf whose format contains <text> fails
++#   $TMP/fault-jq                : the final profiles.json jq invocation fails
++c1_faults() {
++  printf() {
++    if [[ -n "${C1_FAULT:-}" && -e "$TMP/fault" && "${1:-}" == *"$C1_FAULT"* ]]; then
++      rm -f "$TMP/fault"; return 1
++    fi
++    builtin printf "$@"
++  }
++  jq() {
++    if [[ -e "$TMP/fault-jq" && "$*" == *'{profiles:$profiles}'* ]]; then rm -f "$TMP/fault-jq"; return 1; fi
++    command jq "$@"
++  }
++}
++
++c1_write_models() {
++  cat > "$TMP/bin/systemctl" <<'SH'
++#!/bin/bash
++# Unit model: a started twebproxy-mtproxy@ID listens on the port of its env file.
++printf '%s\n' "$*" >> "$C1_ROOT/systemctl.calls"
++quiet=0; [[ "${2:-}" == --quiet ]] && quiet=1
++args=("$@"); unit="${args[-1]}"
++case "$1" in
++  reset-failed|daemon-reload|enable) [[ "${2:-}" != --now ]] && exit 0;;
++esac
++start_unit() {
++  local u="$1" id port
++  : > "$C1_ROOT/units/$u"
++  if [[ "$u" == twebproxy-mtproxy@*.service ]]; then
++    id="${u#twebproxy-mtproxy@}"; id="${id%.service}"
++    port="$(sed -n 's/^MTPROXY_CLIENT_PORT=//p' "$C1_BACKENDS_DIR/$id.env" 2>/dev/null)"
++    [[ -n "$port" ]] || { rm -f "$C1_ROOT/units/$u"; exit 1; }
++    printf 'LISTEN 0 4096 0.0.0.0:%s 0.0.0.0:*\n' "$port" > "$C1_ROOT/units/$u"
++  fi
++}
++case "$1" in
++  enable|restart|start) start_unit "$unit";;
++  disable|stop) rm -f "$C1_ROOT/units/$unit";;
++  is-active) [[ -e "$C1_ROOT/units/$unit" ]] || { (( quiet )) || echo inactive; exit 3; }; (( quiet )) || echo active;;
++  *) exit 0;;
++esac
++SH
++  cat > "$TMP/bin/ss" <<'SH'
++#!/bin/bash
++# Listener model: started units, extra lines, optional padding, failure.
++[[ ! -e "$C1_ROOT/fail-ss" ]] || exit 1
++cat "$C1_ROOT"/units/* "$C1_ROOT/ss-extra" 2>/dev/null
++n="${C1_SS_PAD:-0}"
++(( n > 0 )) && awk -v n="$n" 'BEGIN{for(i=0;i<n;i++) printf "LISTEN 0 128 10.%d.%d.%d:%d 0.0.0.0:*\n", i%250, (i/250)%250, 1, 40000+i%20000}'
++exit 0
++SH
++  cat > "$TMP/bin/curl" <<'SH'
++#!/bin/bash
++exit 0
++SH
++  cat > "$TMP/bin/journalctl" <<'SH'
++#!/bin/bash
++echo 'journal model: no entries'
++SH
++  cat > "$TMP/bin/tproxy-server" <<'SH'
++#!/bin/bash
++# -check model: config and profiles must parse; profile names unique; injectable failure.
++[[ ! -e "$C1_ROOT/fail-validate" ]] || { echo 'model: injected validation failure' >&2; exit 1; }
++cfg="" prof=""
++while (( $# )); do case "$1" in -config) cfg="$2"; shift;; -profiles-file) prof="$2"; shift;; esac; shift; done
++jq -e . "$cfg" >/dev/null && jq -e '(.profiles|length) >= 1 and ((.profiles|map(.name)|unique|length) == (.profiles|length))' "$prof" >/dev/null
++SH
++  chmod 0755 "$TMP/bin/"*
++}
++
++# Scripted interactive answers (production prompts are otherwise unchanged).
++#   C1_HOST        hostname answer for add_instance_cmd
++#   C1_NAME        profile name answer
++#   C1_MANUAL_PORTS=1 with C1_BACKEND_PORT/C1_STATS_PORT: manual port answers
++#   C1_CARRIER     carrier answer (https|https-lanes|websocket|websocket-lanes)
++#   C1_SECRET      value returned by `openssl rand -hex 16`
++#   C1_AT_CARRIER  barrier: touch $TMP/<value>.reached, wait for $TMP/<value>.go
++#   C1_AT_MAXCONN  same barrier, at the last profile prompt (after port choice)
++c1_answers() {
++  ask() {
++    case "$1" in
++      'Hostname WEB-proxy (без https://)') printf '%s' "${C1_HOST:-}";;
++      'Имя профиля/секрета') printf '%s' "${C1_NAME:-$2}";;
++      'MTProxy backend port') printf '%s' "${C1_BACKEND_PORT:-$2}";;
++      'MTProxy stats port') printf '%s' "${C1_STATS_PORT:-$2}";;
++      'Max connections на worker') c1_barrier "${C1_AT_MAXCONN:-}"; printf '%s' "$2";;
++      *) printf '%s' "$2";;
++    esac
++  }
++  yesno() {
++    case "$1" in
++      'Backend/stats порты подобрать автоматически?') [[ -z "${C1_MANUAL_PORTS:-}" ]];;
++      *) return 0;;
++    esac
++  }
++  # add_instance_cmd: placeholder site, manual TLS frontend.
++  choose() { case "$1" in 'Обычный сайт на hostname:') printf 1;; 'SSL / reverse proxy:') printf 4;; *) printf 1;; esac; }
++  carrier_choose() { c1_barrier "${C1_AT_CARRIER:-}"; printf '%s' "${C1_CARRIER:-https}"; }
++  openssl() {
++    if [[ "${1:-} ${2:-}" == "rand -hex" && -n "${C1_SECRET:-}" ]]; then printf '%s\n' "$C1_SECRET"; return 0; fi
++    command openssl "$@"
++  }
++}
++
++# Frontend, TLS, DPI, audit and install steps of add_instance_cmd are other
++# subsystems; replace them so its state/port/lock path can be exercised.
++c1_instance_stubs() {
++  check_frontend_compatibility() { :; }; configure_tls_for_instance() { :; }; configure_ufw() { :; }
++  dpi_with_mutation_lock() { :; }; audit_instance_impl() { :; }; install_manager_copy() { :; }
++  show_instance_cmd() { printf 'instance %s\n' "$1"; }
++}
++
++c1_barrier() {
++  local name="$1" i
++  [[ -n "$name" ]] || return 0
++  : > "$TMP/$name.reached"
++  for ((i = 0; i < 400; i++)); do [[ -e "$TMP/$name.go" ]] && return 0; sleep 0.05; done
++  printf 'barrier %s timed out\n' "$name" >&2; return 1
++}
++c1_wait_reached() { local i; for ((i = 0; i < 400; i++)); do [[ -e "$TMP/$1.reached" ]] && return 0; sleep 0.05; done; return 1; }
++
++# Seed state exactly as v0.2.13 save_instance/save_profile wrote it.
++c1_seed_instance() { # $1=host $2=relay $3=admin
++  install -d -m 0700 "$INSTANCES_DIR/$1" "$INSTANCES_DIR/$1/profiles.d"
++  {
++    printf 'HOSTNAME=%q\nRELAY_PORT=%q\nADMIN_PORT=%q\nTLS_MODE=%q\nSITE_MODE=%q\n' "$1" "$2" "$3" manual placeholder
++    printf 'SITE_UPSTREAM=%q\nSOURCE_SITE_DIR=%q\nACME_EMAIL=%q\nNGINX_CERT=%q\nNGINX_KEY=%q\n' '' '' '' '' ''
++    printf 'CREATED_AT=%q\n' 2026-01-01T00:00:00+00:00
++  } > "$INSTANCES_DIR/$1/instance.env"
++  chmod 0600 "$INSTANCES_DIR/$1/instance.env"
++  printf '{"public_hostname":"%s"}\n' "$1" > "$INSTANCES_DIR/$1/config.json"
++}
++c1_seed_profile() { # $1=host $2=name $3=secret $4=carrier $5=backend $6=stats [$7=workers]
++  local f="$INSTANCES_DIR/$1/profiles.d/$2.env"
++  {
++    printf 'PROFILE_NAME=%q\nSECRET=%q\nCARRIER_MODE=%q\nBACKEND_PORT=%q\nSTATS_PORT=%q\n' "$2" "$3" "$4" "$5" "$6"
++    printf 'WORKERS=%q\nMAX_CONNECTIONS=%q\nCREATED_AT=%q\n' "${7:-1}" 4096 2026-01-02T00:00:00+00:00
++  } > "$f"; chmod 0600 "$f"
++  {
++    printf 'MTPROXY_SECRET=%q\nMTPROXY_CLIENT_PORT=%q\nMTPROXY_STATS_PORT=%q\n' "${3#dd}" "$5" "$6"
++    printf 'MTPROXY_WORKERS=%q\nMTPROXY_MAX_CONNECTIONS=%q\n' "${7:-1}" 4096
++  } > "$BACKENDS_DIR/$1--$2.env"; chmod 0600 "$BACKENDS_DIR/$1--$2.env"
++}
++c1_field() { sed -n "s/^$2=//p" "$1"; }   # $1=file $2=key
+diff --git a/tests/stagec1/state-persistence-fixture.sh b/tests/stagec1/state-persistence-fixture.sh
+new file mode 100644
+index 0000000..9ac2b04
+--- /dev/null
++++ b/tests/stagec1/state-persistence-fixture.sh
+@@ -0,0 +1,156 @@
++#!/usr/bin/env bash
++# F04 regression: profile/instance state writes. A failed write must not be
++# reported as success and must not destroy the previous valid record; related
++# profile/backend/profiles.json state ends in a defined consistent state; stale
++# or foreign shell variables never leak into a saved record; the on-disk format
++# stays what v0.2.13 wrote. Write failures are injected command failures, not a
++# real ENOSPC (that needs a disposable lab mount).
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c1-state.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++H=alpha.example
++pf() { printf '%s/%s/profiles.d/%s.env' "$INSTANCES_DIR" "$H" "$1"; }
++bf() { printf '%s/%s--%s.env' "$BACKENDS_DIR" "$H" "$1"; }
++pj() { printf '%s/%s/profiles.json' "$INSTANCES_DIR" "$H"; }
++json_secret() { jq -r --arg n "$1" '.profiles[]|select(.name==$n)|.secret' "$(pj)"; }
++snap() { cat "$(pf alpha)" "$(bf alpha)" "$(pj)" 2>/dev/null | sha256sum; }
++show() { grep -E '\[(x|!)\]' "$TMP/out" | tail -n 2 | sed 's/^/  | /'; }
++no_temp_files() { test -z "$(find "$INSTANCES_DIR" "$BACKENDS_DIR" -name '.*' -type f ! -name '*.lock' 2>/dev/null)"; }
++
++# Write faults: C1_FAULT + $TMP/fault and $TMP/fault-jq (see state-harness.sh).
++reset_state() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR"; install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"
++  c1_seed_instance "$H" 18080 18081
++  c1_seed_profile "$H" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980 4
++  c1_seed_profile "$H" zeta ffffffffffffffffffffffffffffffff websocket 23981 28981
++  c1_run rebuild_profiles_json "$H" >/dev/null 2>&1
++  rm -f "$TMP"/fault* "$TMP/fail-validate"; unset C1_FAULT
++}
++rotate() { C1_SECRET=cccccccccccccccccccccccccccccccc c1_run profile_rotate_cmd "$H" alpha > "$TMP/out" 2>&1; }
++
++# 1. profile record write fails mid-file: no success, previous record intact.
++reset_state; before="$(snap)"; old_pf="$(cat "$(pf alpha)")"
++export C1_FAULT='CARRIER_MODE='; : > "$TMP/fault"
++if rotate; then bad profile_write_failure_reported; else ok profile_write_failure_reported; fi
++show
++check profile_write_previous_record_intact test "$(cat "$(pf alpha)")" = "$old_pf"
++check profile_write_related_state_intact test "$(snap)" = "$before"
++check profile_write_no_temp_files no_temp_files
++
++# 2. backend env write fails after the profile record: defined consistent state.
++reset_state; before="$(snap)"
++export C1_FAULT='MTPROXY_CLIENT_PORT='; : > "$TMP/fault"
++if rotate; then bad backend_write_failure_reported; else ok backend_write_failure_reported; fi
++show
++check backend_write_profile_secret_consistent test "$(c1_field "$(pf alpha)" SECRET)" = "$(c1_field "$(bf alpha)" MTPROXY_SECRET)"
++check backend_write_json_consistent test "$(json_secret alpha)" = "$(c1_field "$(pf alpha)" SECRET)"
++check backend_write_previous_state_kept test "$(snap)" = "$before"
++check backend_write_backend_env_complete test "$(grep -c '^MTPROXY_' "$(bf alpha)")" = 5
++check backend_write_no_temp_files no_temp_files
++
++# 3. profiles.json generation fails: previous profiles.json kept, no success.
++reset_state; before="$(snap)"; : > "$TMP/fault-jq"
++if rotate; then bad json_failure_reported; else ok json_failure_reported; fi
++show
++check json_failure_profiles_json_valid jq -e '.profiles|length==2' "$(pj)"
++check json_failure_consistent test "$(json_secret alpha)" = "$(c1_field "$(pf alpha)" SECRET)"
++check json_failure_previous_state_kept test "$(snap)" = "$before"
++
++# 4. validation rejects the new state: previous record restored.
++reset_state; before="$(snap)"; : > "$TMP/systemctl.calls"; : > "$TMP/fail-validate"
++if rotate; then bad validation_failure_reported; else ok validation_failure_reported; fi
++show
++check validation_failure_state_restored test "$(snap)" = "$before"
++check validation_failure_no_restart bash -c '! grep -q "^restart twebproxy-mtproxy@" "$1" 2>/dev/null' _ "$TMP/systemctl.calls"
++rm -f "$TMP/fail-validate"
++
++# 5. a new profile that fails validation leaves nothing behind.
++reset_state; : > "$TMP/systemctl.calls"; : > "$TMP/fail-validate"
++if C1_NAME=gamma C1_SECRET=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee c1_run profile_add_cmd "$H" > "$TMP/out" 2>&1; then bad add_validation_failure_reported; else ok add_validation_failure_reported; fi
++show
++check add_validation_no_profile_record test ! -e "$(pf gamma)"
++check add_validation_no_backend_env test ! -e "$(bf gamma)"
++check add_validation_json_unchanged test "$(jq -r '.profiles|map(.name)|sort|join(",")' "$(pj)")" = alpha,zeta
++check add_validation_no_backend_started bash -c '! grep -q "gamma" "$1"' _ "$TMP/systemctl.calls"
++rm -f "$TMP/fail-validate"
++
++# 6. success keeps the v0.2.13 record format, ownership/mode and CREATED_AT.
++reset_state
++check rotate_succeeds rotate
++check format_profile_keys_in_order test "$(cut -d= -f1 "$(pf alpha)" | paste -sd, -)" = PROFILE_NAME,SECRET,CARRIER_MODE,BACKEND_PORT,STATS_PORT,WORKERS,MAX_CONNECTIONS,CREATED_AT
++check format_backend_keys_in_order test "$(cut -d= -f1 "$(bf alpha)" | paste -sd, -)" = MTPROXY_SECRET,MTPROXY_CLIENT_PORT,MTPROXY_STATS_PORT,MTPROXY_WORKERS,MTPROXY_MAX_CONNECTIONS
++check format_profile_sourcable bash -c 'source "$1" && [[ $SECRET == cccccccccccccccccccccccccccccccc && $WORKERS == 4 ]]' _ "$(pf alpha)"
++check format_profile_mode test "$(stat -c '%a:%u:%g' "$(pf alpha)")" = 600:0:0
++check format_backend_mode test "$(stat -c '%a:%u:%g' "$(bf alpha)")" = 600:0:0
++check format_json_mode test "$(stat -c '%a:%u:%g' "$(pj)")" = 400:0:0
++check format_json_shape jq -e '.profiles|all(keys==["backend","carrier_mode","name","secret"])' "$(pj)"
++check rotate_preserves_created_at test "$(c1_field "$(pf alpha)" CREATED_AT)" = 2026-01-02T00:00:00+00:00
++C1_CARRIER=websocket c1_run profile_carrier_cmd "$H" zeta >/dev/null 2>&1
++check carrier_preserves_created_at test "$(c1_field "$(pf zeta)" CREATED_AT)" = 2026-01-02T00:00:00+00:00
++C1_SECRET=dd0123456789abcdef0123456789abcdef c1_run profile_rotate_cmd "$H" alpha >/dev/null 2>&1
++check dd_secret_profile_kept test "$(c1_field "$(pf alpha)" SECRET)" = dd0123456789abcdef0123456789abcdef
++check dd_secret_backend_stripped test "$(c1_field "$(bf alpha)" MTPROXY_SECRET)" = 0123456789abcdef0123456789abcdef
++
++# 7. stale globals from an earlier operation in the same shell never leak.
++reset_state
++sed -i '/^WORKERS=/d' "$(pf zeta)"   # damaged record: key missing
++old_zeta="$(cat "$(pf zeta)")"
++if C1_SECRET=dddddddddddddddddddddddddddddddd c1_eval 'load_profile alpha.example alpha; profile_rotate_cmd alpha.example zeta' > "$TMP/out" 2>&1; then bad damaged_record_refused; else ok damaged_record_refused; fi
++show
++check damaged_record_unchanged test "$(cat "$(pf zeta)")" = "$old_zeta"
++check no_inherited_workers bash -c '! grep -qx "WORKERS=4" "$1"' _ "$(pf zeta)"
++
++# 7b. the damaged record can still be deleted, which heals the instance.
++c1_run profile_delete_cmd "$H" zeta > "$TMP/out" 2>&1; rc=$?
++check damaged_record_deletable test "$rc" -eq 0
++check damaged_record_removed test ! -e "$(pf zeta)" -a ! -e "$(bf zeta)"
++check damaged_delete_keeps_alpha test "$(json_secret alpha)" = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
++check healed_instance_mutable rotate
++
++# 8. a record cannot redefine the manager's variables.
++reset_state
++printf 'BACKENDS_DIR=%q\n' "$TMP/foreign" >> "$(pf zeta)"
++foreign_after="$(c1_eval 'rebuild_profiles_json alpha.example >/dev/null 2>&1; load_profile alpha.example zeta; printf "%s" "$BACKENDS_DIR"')"
++check foreign_variable_not_imported test "$foreign_after" = "$BACKENDS_DIR"
++
++# 9. symlinked records are refused and their targets left alone.
++reset_state
++mv "$(pf alpha)" "$TMP/real-alpha.env"; ln -s "$TMP/real-alpha.env" "$(pf alpha)"
++target_before="$(cat "$TMP/real-alpha.env")"
++if rotate; then bad symlink_record_refused; else ok symlink_record_refused; fi
++show
++check symlink_target_untouched test "$(cat "$TMP/real-alpha.env")" = "$target_before"
++
++# 10. an interrupted earlier commit (record new, backend env old) is healed by
++#     the next mutation of the same instance.
++reset_state
++sed -i 's/^SECRET=.*/SECRET=99999999999999999999999999999999/' "$(pf zeta)"
++check heal_precondition_inconsistent test "$(c1_field "$(bf zeta)" MTPROXY_SECRET)" = ffffffffffffffffffffffffffffffff
++check heal_other_mutation_succeeds rotate
++check heal_backend_env_rederived test "$(c1_field "$(bf zeta)" MTPROXY_SECRET)" = 99999999999999999999999999999999
++check heal_json_rederived test "$(json_secret zeta)" = 99999999999999999999999999999999
++
++# 11. instance.env is replaced atomically too.
++reset_state
++old_inst="$(cat "$INSTANCES_DIR/$H/instance.env")"
++save_inst='load_instance alpha.example; TLS_MODE=caddy; save_instance alpha.example'
++export C1_FAULT='TLS_MODE='; : > "$TMP/fault"
++if c1_eval "$save_inst" > "$TMP/out" 2>&1; then bad instance_write_failure_reported; else ok instance_write_failure_reported; fi
++show
++check instance_write_previous_intact test "$(cat "$INSTANCES_DIR/$H/instance.env")" = "$old_inst"
++unset C1_FAULT
++check instance_write_succeeds c1_eval "$save_inst"
++check instance_write_applied test "$(c1_field "$INSTANCES_DIR/$H/instance.env" TLS_MODE)" = caddy
++check instance_write_keeps_created_at test "$(c1_field "$INSTANCES_DIR/$H/instance.env" CREATED_AT)" = 2026-01-01T00:00:00+00:00
++check instance_write_mode test "$(stat -c '%a:%u:%g' "$INSTANCES_DIR/$H/instance.env")" = 600:0:0
++
++printf 'c1-state-persistence: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 3b1ec70..5f98e9c 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.13-beta
++# TWebProxy Manager v0.2.14-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.13"
+-MANAGER_RELEASE_VERSION="0.2.13-beta"
++MANAGER_VERSION="0.2.14"
++MANAGER_RELEASE_VERSION="0.2.14-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -475,6 +475,17 @@ ui_localize_legacy() {
+   [[ "$UI_LANGUAGE" == en ]] || { ui_naturalize_ru_legacy "$text"; return; }
+ 
+   case "$text" in
++    # Stage C1 profile/instance state messages.
++    'Другая операция изменяет '*) value="${text#Другая операция изменяет }"; printf 'Another operation is changing %s (state lock busy); retry later.' "${value%%; повтори позже.}"; return;;
++    'Другая операция выделяет порты; повтори позже.') printf 'Another operation is allocating ports (port lock busy); retry later.'; return;;
++    'Не удалось применить новое состояние '*) value="${text#Не удалось применить новое состояние }"; printf 'The new state of %s could not be applied; the previous state was restored.' "${value%%; прежнее состояние восстановлено.}"; return;;
++    'ОТКАТ НЕ УДАЛСЯ: проверь состояние '*) value="${text#ОТКАТ НЕ УДАЛСЯ: проверь состояние }"; value="${value%% и выполни*}"; printf "ROLLBACK FAILED: inspect the state of %s and run 'twebproxy repair %s'." "$value" "$value"; return;;
++    'Повреждённая запись профиля: '*) printf 'Damaged profile record: %s' "${text#Повреждённая запись профиля: }"; return;;
++    'Повреждённая запись инстанса: '*) printf 'Damaged instance record: %s' "${text#Повреждённая запись инстанса: }"; return;;
++    'Небезопасный файл состояния: '*) printf 'Unsafe state file: %s' "${text#Небезопасный файл состояния: }"; return;;
++    'Небезопасный каталог состояния: '*) printf 'Unsafe state directory: %s' "${text#Небезопасный каталог состояния: }"; return;;
++    'Не удалось записать состояние: '*) printf 'Could not write state: %s' "${text#Не удалось записать состояние: }"; return;;
++    'Не удалось получить список TCP listeners (ss); порт не считается свободным.') printf 'Could not list TCP listeners (ss); the port is not treated as free.'; return;;
+     'Запусти от root:'*) printf 'Run as root:%s' "${text#*:}"; return;;
+     'Нужен systemd.') printf 'systemd is required.'; return;;
+     'jq нужен для --json output.') printf 'jq is required for --json output.'; return;;
+@@ -1072,6 +1083,7 @@ is_valid_hostname() {
+ is_valid_profile_name() { [[ "$1" =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]]; }
+ is_valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( 1 <= 10#$1 && 10#$1 <= 65535 )); }
+ is_valid_secret() { [[ "$1" =~ ^([0-9a-f]{32}|dd[0-9a-f]{32})$ ]]; }
++is_valid_carrier_mode() { [[ "$1" =~ ^(https|https-lanes|websocket|websocket-lanes)$ ]]; }
+ 
+ instance_dir() { printf '%s/%s' "$INSTANCES_DIR" "$1"; }
+ instance_env() { printf '%s/%s/instance.env' "$INSTANCES_DIR" "$1"; }
+@@ -1103,66 +1115,250 @@ list_profiles_array() {
+ count_instances() { list_hosts_array | sed '/^$/d' | wc -l; }
+ count_profiles() { list_profiles_array "$1" | sed '/^$/d' | wc -l; }
+ 
++# ---- Stage C1: operation-local profile/instance state integrity ----
++# Authoritative state: instances/<host>/instance.env and profiles.d/<p>.env.
++# Derived from it: backends/<host>--<p>.env, profiles.json, config.json and the
++# backend firewall. Every file is replaced through a same-directory rename,
++# never rewritten in place. The rename of the profile record is the commit
++# point of a profile mutation; derived files are then regenerated, so an
++# interrupted operation is converged by the next mutation of that instance or
++# by `repair`. No multi-file atomicity or power-loss durability is claimed.
++
++# Records are read in a subshell and only their known fields are assigned:
++# one record can neither inherit values from another nor redefine any other
++# manager variable. A trailing "." keeps empty last fields countable.
++state_read_record() { # $1=file, rest=field names -> one value per line, then "."
++  local f="$1"; shift
++  ( unset "$@"
++    # shellcheck disable=SC1090
++    source "$f" >/dev/null 2>&1 || exit 1
++    for v in "$@"; do printf '%s\n' "${!v-}"; done
++    printf '.\n' )
++}
++
+ load_instance() {
+-  local host="$1" f; f="$(instance_env "$host")"
++  local host="$1" f out; local -a v
++  f="$(instance_env "$host")"
+   [[ -f "$f" ]] || die "Инстанс не найден: $host"
+-  # shellcheck disable=SC1090
+-  source "$f"
++  out="$(state_read_record "$f" HOSTNAME RELAY_PORT ADMIN_PORT TLS_MODE SITE_MODE SITE_UPSTREAM \
++    SOURCE_SITE_DIR ACME_EMAIL NGINX_CERT NGINX_KEY CREATED_AT)" || die "Повреждённая запись инстанса: $f"
++  mapfile -t v <<< "$out"
++  (( ${#v[@]} == 12 )) && [[ "${v[11]}" == . ]] || die "Повреждённая запись инстанса: $f"
++  HOSTNAME="${v[0]}"; RELAY_PORT="${v[1]}"; ADMIN_PORT="${v[2]}"; TLS_MODE="${v[3]}"; SITE_MODE="${v[4]}"
++  SITE_UPSTREAM="${v[5]}"; SOURCE_SITE_DIR="${v[6]}"; ACME_EMAIL="${v[7]}"; NGINX_CERT="${v[8]}"
++  NGINX_KEY="${v[9]}"; CREATED_AT="${v[10]}"
+ }
+ 
++# The record's CREATED_AT is kept in PROFILE_CREATED_AT, apart from the
++# instance's CREATED_AT, so saving a profile preserves its own creation time.
+ load_profile() {
+-  local host="$1" profile="$2" f; f="$(profile_env "$host" "$profile")"
++  local host="$1" profile="$2" f out; local -a v
++  f="$(profile_env "$host" "$profile")"
+   [[ -f "$f" ]] || die "Профиль $profile не найден у $host"
+-  # shellcheck disable=SC1090
+-  source "$f"
++  out="$(state_read_record "$f" PROFILE_NAME SECRET CARRIER_MODE BACKEND_PORT STATS_PORT WORKERS \
++    MAX_CONNECTIONS CREATED_AT)" || die "Повреждённая запись профиля: $f"
++  mapfile -t v <<< "$out"
++  (( ${#v[@]} == 9 )) && [[ "${v[8]}" == . ]] || die "Повреждённая запись профиля: $f"
++  PROFILE_NAME="${v[0]}"; SECRET="${v[1]}"; CARRIER_MODE="${v[2]}"; BACKEND_PORT="${v[3]}"
++  STATS_PORT="${v[4]}"; WORKERS="${v[5]}"; MAX_CONNECTIONS="${v[6]}"; PROFILE_CREATED_AT="${v[7]}"
++}
++
++# The loaded profile globals form a complete record named $1.
++profile_record_valid() {
++  [[ "$PROFILE_NAME" == "$1" ]] && is_valid_profile_name "$PROFILE_NAME" && is_valid_secret "$SECRET" &&
++    is_valid_carrier_mode "$CARRIER_MODE" && is_valid_port "$BACKEND_PORT" && is_valid_port "$STATS_PORT" &&
++    [[ "$BACKEND_PORT" != "$STATS_PORT" && "$WORKERS" =~ ^[1-9][0-9]*$ &&
++       "$MAX_CONNECTIONS" =~ ^[1-9][0-9]*$ ]] && (( WORKERS <= 256 ))
++}
++
++# Mutations act only on a validated, existing hostname/profile, never on a path
++# assembled from unchecked input, and only on a record that names itself.
++require_instance() {
++  is_valid_hostname "$1" || die "Нужен lowercase ASCII/ACE hostname вида proxy.example.com"
++  instance_exists "$1" || die "Нет $1"
++}
++
++require_profile() { # $1=host $2=profile -> profile globals loaded and verified
++  require_profile_file "$1" "$2"
++  load_profile "$1" "$2"
++  profile_record_valid "$2" || die "Повреждённая запись профиля: $(profile_env "$1" "$2")"
++}
++
++# Deletion targets only the path of a validated name, so a damaged record can
++# still be removed (which is how an instance with one is healed).
++require_profile_file() { # $1=host $2=profile
++  local f
++  is_valid_profile_name "$2" || die "Имя: a-z, 0-9, _ и -, максимум 32 символа."
++  f="$(profile_env "$1" "$2")"
++  [[ ! -L "$f" ]] || die "Небезопасный файл состояния: $f"
++  [[ -f "$f" ]] || die "Профиль $2 не найден у $1"
++}
++
++# Replaces $1 (mode $2) with the stdout of "${@:3}": a same-directory temporary
++# file owned by root, then rename. A failing producer, an empty result, a
++# symlinked target/directory or any failed step leaves the old file untouched.
++state_write_file() {
++  local target="$1" mode="$2" dir tmp
++  shift 2
++  dir="$(dirname -- "$target")"
++  [[ -d "$dir" && ! -L "$dir" ]] || { warn "Небезопасный каталог состояния: $dir" >&2; return 1; }
++  [[ ! -L "$target" && ( ! -e "$target" || -f "$target" ) ]] ||
++    { warn "Небезопасный файл состояния: $target" >&2; return 1; }
++  tmp="$(mktemp "$dir/.${target##*/}.XXXXXX")" || return 1
++  if "$@" > "$tmp" && [[ -s "$tmp" ]] && chown root:root -- "$tmp" && chmod "$mode" -- "$tmp" &&
++      mv -fT -- "$tmp" "$target"; then
++    return 0
++  fi
++  rm -f -- "$tmp"
++  return 1
++}
++
++render_instance_record() {
++  printf 'HOSTNAME=%q\nRELAY_PORT=%q\nADMIN_PORT=%q\nTLS_MODE=%q\nSITE_MODE=%q\nSITE_UPSTREAM=%q\nSOURCE_SITE_DIR=%q\nACME_EMAIL=%q\nNGINX_CERT=%q\nNGINX_KEY=%q\nCREATED_AT=%q\n' \
++    "$HOSTNAME" "$RELAY_PORT" "$ADMIN_PORT" "$TLS_MODE" "$SITE_MODE" "${SITE_UPSTREAM:-}" \
++    "${SOURCE_SITE_DIR:-}" "${ACME_EMAIL:-}" "${NGINX_CERT:-}" "${NGINX_KEY:-}" "${CREATED_AT:-$(date -Is)}"
+ }
+ 
+ save_instance() {
+   local host="$1" d; d="$(instance_dir "$host")"
+-  install -d -m 0700 "$d" "$(profile_dir "$host")"
+-  {
+-    printf 'HOSTNAME=%q\n' "$HOSTNAME"
+-    printf 'RELAY_PORT=%q\n' "$RELAY_PORT"
+-    printf 'ADMIN_PORT=%q\n' "$ADMIN_PORT"
+-    printf 'TLS_MODE=%q\n' "$TLS_MODE"
+-    printf 'SITE_MODE=%q\n' "$SITE_MODE"
+-    printf 'SITE_UPSTREAM=%q\n' "${SITE_UPSTREAM:-}"
+-    printf 'SOURCE_SITE_DIR=%q\n' "${SOURCE_SITE_DIR:-}"
+-    printf 'ACME_EMAIL=%q\n' "${ACME_EMAIL:-}"
+-    printf 'NGINX_CERT=%q\n' "${NGINX_CERT:-}"
+-    printf 'NGINX_KEY=%q\n' "${NGINX_KEY:-}"
+-    printf 'CREATED_AT=%q\n' "${CREATED_AT:-$(date -Is)}"
+-  } > "$(instance_env "$host")"
+-  chmod 0600 "$(instance_env "$host")"
++  [[ "$HOSTNAME" == "$host" ]] || die "Повреждённая запись инстанса: $(instance_env "$host")"
++  install -d -m 0700 "$d" "$(profile_dir "$host")" || die "Не удалось записать состояние: $d"
++  state_write_file "$(instance_env "$host")" 0600 render_instance_record ||
++    die "Не удалось записать состояние: $(instance_env "$host")"
++}
++
++render_profile_record() {
++  printf 'PROFILE_NAME=%q\nSECRET=%q\nCARRIER_MODE=%q\nBACKEND_PORT=%q\nSTATS_PORT=%q\nWORKERS=%q\nMAX_CONNECTIONS=%q\nCREATED_AT=%q\n' \
++    "$PROFILE_NAME" "$SECRET" "$CARRIER_MODE" "$BACKEND_PORT" "$STATS_PORT" "$WORKERS" \
++    "$MAX_CONNECTIONS" "${PROFILE_CREATED_AT:-$(date -Is)}"
+ }
+ 
++# Writes only the authoritative record held in the profile globals; backend
++# env files and profiles.json are derived by instance_derive_state.
+ save_profile() {
+   local host="$1" profile="$2" f; f="$(profile_env "$host" "$profile")"
+-  install -d -m 0700 "$(profile_dir "$host")" "$BACKENDS_DIR"
+-  {
+-    printf 'PROFILE_NAME=%q\n' "$PROFILE_NAME"
+-    printf 'SECRET=%q\n' "$SECRET"
+-    printf 'CARRIER_MODE=%q\n' "$CARRIER_MODE"
+-    printf 'BACKEND_PORT=%q\n' "$BACKEND_PORT"
+-    printf 'STATS_PORT=%q\n' "$STATS_PORT"
+-    printf 'WORKERS=%q\n' "$WORKERS"
+-    printf 'MAX_CONNECTIONS=%q\n' "$MAX_CONNECTIONS"
+-    printf 'CREATED_AT=%q\n' "${PROFILE_CREATED_AT:-$(date -Is)}"
+-  } > "$f"
+-  chmod 0600 "$f"
+-
+-  local backend_secret="$SECRET" bfile
++  profile_record_valid "$profile" || die "Повреждённая запись профиля: $f"
++  install -d -m 0700 "$(profile_dir "$host")" "$BACKENDS_DIR" || return 1
++  state_write_file "$f" 0600 render_profile_record
++}
++
++# Backend env of one profile, derived from its record on disk (subshell: the
++# caller's profile globals stay untouched).
++render_backend_env() ( # $1=host $2=profile
++  load_profile "$1" "$2"
++  profile_record_valid "$2" || exit 1
++  backend_secret="$SECRET"
+   [[ "$backend_secret" == dd* && ${#backend_secret} -eq 34 ]] && backend_secret="${backend_secret:2}"
+-  bfile="$(backend_env "$host" "$profile")"
+-  {
+-    printf 'MTPROXY_SECRET=%q\n' "$backend_secret"
+-    printf 'MTPROXY_CLIENT_PORT=%q\n' "$BACKEND_PORT"
+-    printf 'MTPROXY_STATS_PORT=%q\n' "$STATS_PORT"
+-    printf 'MTPROXY_WORKERS=%q\n' "$WORKERS"
+-    printf 'MTPROXY_MAX_CONNECTIONS=%q\n' "$MAX_CONNECTIONS"
+-  } > "$bfile"
+-  chown root:root "$bfile"
+-  chmod 0600 "$bfile"
++  printf 'MTPROXY_SECRET=%q\nMTPROXY_CLIENT_PORT=%q\nMTPROXY_STATS_PORT=%q\nMTPROXY_WORKERS=%q\nMTPROXY_MAX_CONNECTIONS=%q\n' \
++    "$backend_secret" "$BACKEND_PORT" "$STATS_PORT" "$WORKERS" "$MAX_CONNECTIONS"
++)
++
++# Regenerates every backend env of $1 and its profiles.json from the profile
++# records; unchanged files are not rewritten. BACKEND_PORTS_CHANGED=1 tells the
++# caller that a backend env appeared or changed ports (firewall rebuild needed).
++instance_derive_state() {
++  local host="$1" p bfile content
++  BACKEND_PORTS_CHANGED=0
++  while read -r p; do
++    [[ -n "$p" ]] || continue
++    bfile="$(backend_env "$host" "$p")"
++    content="$(render_backend_env "$host" "$p")" || return 1
++    [[ -f "$bfile" && "$(cat -- "$bfile")" == "$content" ]] && continue
++    if [[ ! -f "$bfile" ]] || [[ "$(grep -E '^MTPROXY_(CLIENT|STATS)_PORT=' "$bfile")" != \
++        "$(grep -E '^MTPROXY_(CLIENT|STATS)_PORT=' <<< "$content")" ]]; then
++      BACKEND_PORTS_CHANGED=1
++    fi
++    state_write_file "$bfile" 0600 printf '%s\n' "$content" || return 1
++  done < <(list_profiles_array "$host")
++  rebuild_profiles_json "$host"
++}
++
++# Commits the profile record held in the globals, derives, validates. Any
++# failure before the relay accepted the state restores the previous record
++# ($3, empty = none) and fails; runtime (systemd) changes are the caller's.
++profile_state_commit() { # $1=host $2=profile $3=previous record
++  if save_profile "$1" "$2" && instance_derive_state "$1" && validate_instance "$1"; then
++    return 0
++  fi
++  profile_state_restore "$1" "$2" "$3"
++  die "Не удалось применить новое состояние $1; прежнее состояние восстановлено."
++}
++
++# Removes a profile record and its backend env, derives, validates; restores on failure.
++profile_state_remove() { # $1=host $2=profile $3=previous record
++  if rm -f -- "$(profile_env "$1" "$2")" "$(backend_env "$1" "$2")" &&
++      instance_derive_state "$1" && validate_instance "$1"; then
++    return 0
++  fi
++  profile_state_restore "$1" "$2" "$3"
++  die "Не удалось применить новое состояние $1; прежнее состояние восстановлено."
++}
++
++profile_state_restore() { # $1=host $2=profile $3=previous record ("" = remove)
++  local f; f="$(profile_env "$1" "$2")"
++  if [[ -n "$3" ]]; then
++    state_write_file "$f" 0600 printf '%s\n' "$3"
++  else
++    rm -f -- "$f" "$(backend_env "$1" "$2")"
++  fi || die "ОТКАТ НЕ УДАЛСЯ: проверь состояние $1 и выполни 'twebproxy repair $1'."
++  if (( $(count_profiles "$1") == 0 )); then
++    rm -f -- "$(profiles_json "$1")"
++  else
++    instance_derive_state "$1" || die "ОТКАТ НЕ УДАЛСЯ: проверь состояние $1 и выполни 'twebproxy repair $1'."
++  fi
++}
++
++# Narrow flock locks under $BASE_DIR/.locks: instance-<host> serializes the
++# mutations of one instance; ports serializes port choice until persistence.
++# Order: instance -> ports -> (DPI lock, backend firewall helper); the port
++# lock is a leaf. Closing the descriptor or process exit (die) releases them.
++STATE_LOCK_WAIT_SECONDS="${TWEBPROXY_STATE_LOCK_WAIT:-120}"
++INSTANCE_LOCK_FD=""; INSTANCE_LOCK_HOST=""; INSTANCE_LOCK_DEPTH=0
++PORT_LOCK_FD=""; PORT_LOCK_DEPTH=0
++
++state_lock_path() { # $1=name -> STATE_LOCK_PATH (re-derived from the current BASE_DIR)
++  local dir="$BASE_DIR/.locks"
++  [[ ! -L "$dir" ]] || return 1
++  install -d -o root -g root -m 0700 "$dir" || return 1
++  STATE_LOCK_PATH="$dir/$1.lock"
++  [[ ! -L "$STATE_LOCK_PATH" && ( ! -e "$STATE_LOCK_PATH" || -f "$STATE_LOCK_PATH" ) ]] || return 1
++  : >> "$STATE_LOCK_PATH" && chmod 0600 "$STATE_LOCK_PATH"
++}
++
++instance_lock_acquire() { # $1=validated hostname
++  if (( INSTANCE_LOCK_DEPTH > 0 )); then
++    [[ "$INSTANCE_LOCK_HOST" == "$1" ]] || return 1
++    INSTANCE_LOCK_DEPTH=$((INSTANCE_LOCK_DEPTH + 1)); return 0
++  fi
++  (( PORT_LOCK_DEPTH == 0 )) || return 1
++  state_lock_path "instance-$1" || return 1
++  exec {INSTANCE_LOCK_FD}>>"$STATE_LOCK_PATH" || return 1
++  if ! flock -w "$STATE_LOCK_WAIT_SECONDS" "$INSTANCE_LOCK_FD"; then
++    exec {INSTANCE_LOCK_FD}>&-; return 1
++  fi
++  INSTANCE_LOCK_HOST="$1"; INSTANCE_LOCK_DEPTH=1
++}
++
++instance_lock_release() {
++  (( INSTANCE_LOCK_DEPTH > 0 )) || return 0
++  INSTANCE_LOCK_DEPTH=$((INSTANCE_LOCK_DEPTH - 1))
++  (( INSTANCE_LOCK_DEPTH > 0 )) || { exec {INSTANCE_LOCK_FD}>&-; INSTANCE_LOCK_HOST=""; }
++}
++
++port_lock_acquire() {
++  if (( PORT_LOCK_DEPTH > 0 )); then PORT_LOCK_DEPTH=$((PORT_LOCK_DEPTH + 1)); return 0; fi
++  state_lock_path ports || return 1
++  exec {PORT_LOCK_FD}>>"$STATE_LOCK_PATH" || return 1
++  if ! flock -w "$STATE_LOCK_WAIT_SECONDS" "$PORT_LOCK_FD"; then
++    exec {PORT_LOCK_FD}>&-; return 1
++  fi
++  PORT_LOCK_DEPTH=1
++}
++
++port_lock_release() {
++  (( PORT_LOCK_DEPTH > 0 )) || return 0
++  PORT_LOCK_DEPTH=$((PORT_LOCK_DEPTH - 1))
++  (( PORT_LOCK_DEPTH > 0 )) || exec {PORT_LOCK_FD}>&-
+ }
+ 
+ # ---- Stage X-DPI: optional, IPv4-address-scoped compatibility subsystem ----
+@@ -4022,6 +4218,13 @@ ensure_core() {
+ port_registered() {
+   local needle="$1" f
+   shopt -s nullglob
++  # The authoritative profile record counts even when its derived backend env
++  # is missing (interrupted commit): such a port is never handed out twice.
++  for f in "$INSTANCES_DIR"/*/profiles.d/*.env; do
++    if ( unset BACKEND_PORT STATS_PORT; source "$f"; [[ "${BACKEND_PORT:-}" == "$needle" || "${STATS_PORT:-}" == "$needle" ]] ); then
++      shopt -u nullglob; return 0
++    fi
++  done
+   for f in "$INSTANCES_DIR"/*/instance.env; do
+     if ( unset RELAY_PORT ADMIN_PORT; source "$f"; [[ "${RELAY_PORT:-}" == "$needle" || "${ADMIN_PORT:-}" == "$needle" ]] ); then
+       shopt -u nullglob; return 0
+@@ -4036,20 +4239,37 @@ port_registered() {
+   return 1
+ }
+ 
++# 0 = a TCP listener uses port $1, 1 = none does, 2 = unknown because ss
++# failed. The whole ss output is captured first: an early-exiting pipeline
++# reader under pipefail (SIGPIPE) made occupied ports look free.
+ port_listening() {
+-  local p="$1"
+-  ss -H -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)${p}$"
++  local p="$1" out local_addr
++  if ! out="$(ss -H -ltn 2>/dev/null)"; then
++    warn "Не удалось получить список TCP listeners (ss); порт не считается свободным." >&2
++    return 2
++  fi
++  while read -r _ _ _ local_addr _; do
++    [[ "$local_addr" == *":$p" ]] && return 0
++  done <<< "$out"
++  return 1
+ }
+ 
++# Free only when valid, not registered by TWebProxy and positively not
++# listened on; an ss failure is never proof of a free port (rc 2).
+ port_available() {
+-  local p="$1"
+-  is_valid_port "$p" && ! port_registered "$p" && ! port_listening "$p"
++  local p rc=0
++  is_valid_port "$1" || return 1
++  p="$((10#$1))"
++  port_registered "$p" && return 1
++  port_listening "$p" || rc=$?
++  case "$rc" in 0) return 1;; 1) return 0;; *) return 2;; esac
+ }
+ 
+ next_free_port() {
+-  local start="$1" end="${2:-65535}" p
++  local start="$1" end="${2:-65535}" p rc
+   for ((p=start; p<=end; p++)); do
+-    if port_available "$p"; then printf '%s' "$p"; return 0; fi
++    rc=0; port_available "$p" || rc=$?
++    case "$rc" in 0) printf '%s' "$p"; return 0;; 2) return 2;; esac
+   done
+   return 1
+ }
+@@ -4142,7 +4362,7 @@ write_instance_config() {
+     upstream) source_line="\"public_upstream\": \"$SITE_UPSTREAM\"," ;;
+     *) die "Неизвестный SITE_MODE=$SITE_MODE" ;;
+   esac
+-  cat > "$d/config.json" <<EOF
++  state_write_file "$d/config.json" 0600 cat <<EOF || die "Не удалось записать состояние: $d/config.json"
+ {
+   "public_hostname": "$HOSTNAME",
+   "listen": "127.0.0.1:$RELAY_PORT",
+@@ -4187,28 +4407,31 @@ write_instance_config() {
+ }
+ EOF
+   # The service receives config.json via systemd LoadCredential, so the source
+-  # can remain root-only and no root-owned state directory needs to be traversable
+-  # by the tproxy account.
+-  chown root:root "$d/config.json"; chmod 0600 "$d/config.json"
++  # can remain root-only (state_write_file: root:root 0600) and no root-owned
++  # state directory needs to be traversable by the tproxy account.
+ }
+ 
++# One profiles.json entry, read in a subshell from a verified record.
++render_profile_json_entry() ( # $1=host $2=profile
++  load_profile "$1" "$2"
++  profile_record_valid "$2" || exit 1
++  jq -cn --arg n "$PROFILE_NAME" --arg s "$SECRET" --arg b "127.0.0.1:$BACKEND_PORT" --arg c "$CARRIER_MODE" \
++    '{name:$n,secret:$s,backend:$b,carrier_mode:$c}'
++)
++
++# Regenerates profiles.json without touching the caller's profile globals;
++# returns non-zero (old file kept) when a record or the write fails.
+ rebuild_profiles_json() {
+-  local host="$1" d f arr='[]' name secret carrier backend
++  local host="$1" d p entry arr='[]' profiles=()
+   d="$(profile_dir "$host")"
+   [[ -d "$d" ]] || die "Нет каталога профилей у $host"
+-  shopt -s nullglob
+-  local files=("$d"/*.env)
+-  shopt -u nullglob
+-  ((${#files[@]} > 0)) || die "У $host должен оставаться хотя бы один профиль."
+-  for f in "${files[@]}"; do
+-    unset PROFILE_NAME SECRET CARRIER_MODE BACKEND_PORT STATS_PORT WORKERS MAX_CONNECTIONS PROFILE_CREATED_AT || true
+-    # shellcheck disable=SC1090
+-    source "$f"
+-    name="$PROFILE_NAME"; secret="$SECRET"; carrier="$CARRIER_MODE"; backend="127.0.0.1:$BACKEND_PORT"
+-    arr="$(jq -c --argjson a "$arr" --arg n "$name" --arg s "$secret" --arg b "$backend" --arg c "$carrier" '$a + [{name:$n,secret:$s,backend:$b,carrier_mode:$c}]' <<<null)"
++  while read -r p; do [[ -n "$p" ]] && profiles+=("$p"); done < <(list_profiles_array "$host")
++  ((${#profiles[@]} > 0)) || die "У $host должен оставаться хотя бы один профиль."
++  for p in "${profiles[@]}"; do
++    entry="$(render_profile_json_entry "$host" "$p")" || return 1
++    arr="$(jq -c --argjson a "$arr" --argjson e "$entry" '$a + [$e]' <<<null)" || return 1
+   done
+-  jq -n --argjson profiles "$arr" '{profiles:$profiles}' > "$(profiles_json "$host")"
+-  chown root:root "$(profiles_json "$host")"; chmod 0400 "$(profiles_json "$host")"
++  state_write_file "$(profiles_json "$host")" 0400 jq -n --argjson profiles "$arr" '{profiles:$profiles}'
+ }
+ 
+ validate_instance() {
+@@ -4217,13 +4440,12 @@ validate_instance() {
+ }
+ 
+ wait_profile_backend_ready() {
+-  local host="$1" profile="$2" id unit i
++  local host="$1" profile="$2" id unit i port
+   id="$(backend_id "$host" "$profile")"
+   unit="twebproxy-mtproxy@$id.service"
+-  load_profile "$host" "$profile"
++  port="$(load_profile "$host" "$profile"; printf '%s' "$BACKEND_PORT")" || die "Профиль $profile не найден у $host"
+   for i in {1..15}; do
+-    if systemctl is-active --quiet "$unit" \
+-      && ss -H -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)${BACKEND_PORT}$"; then
++    if systemctl is-active --quiet "$unit" && port_listening "$port" 2>/dev/null; then
+       return 0
+     fi
+     sleep 1
+@@ -4612,7 +4834,9 @@ collect_instance_settings() {
+     printf "%bWEB Proxy использует публичный HTTPS/443 — порт в клиенте не задаётся.%b\n" "$C_YELLOW" "$C_RESET"
+   fi
+   local auto rdef adef
++  INSTANCE_PORTS_AUTO=0
+   if yesno "Внутренние relay/admin порты подобрать автоматически?" y; then
++    INSTANCE_PORTS_AUTO=1
+     RELAY_PORT="$(next_free_port 18080 19999)" || die "Нет свободного relay port."
+     ADMIN_PORT="$(next_free_port $((RELAY_PORT+1)) 20999)" || die "Нет свободного admin port."
+   else
+@@ -4665,7 +4889,9 @@ collect_profile_settings() {
+   fi
+   CARRIER_MODE="$(carrier_choose)"
+ 
++  PROFILE_PORTS_AUTO=0
+   if yesno "Backend/stats порты подобрать автоматически?" y; then
++    PROFILE_PORTS_AUTO=1
+     BACKEND_PORT="$(next_free_port 23980 26999)" || die "Нет свободного backend port."
+     STATS_PORT="$(next_free_port 28980 31999)" || die "Нет свободного stats port."
+   else
+@@ -4681,6 +4907,29 @@ collect_profile_settings() {
+   PROFILE_CREATED_AT="$(date -Is)"
+ }
+ 
++# Under the port lock, right before persistence: automatically chosen ports
++# are chosen again and manually entered ones must still be free, so two
++# concurrent operations never persist the same port.
++claim_instance_ports() {
++  if [[ "${INSTANCE_PORTS_AUTO:-1}" == 1 ]]; then
++    RELAY_PORT="$(next_free_port 18080 19999)" || die "Нет свободного relay port."
++    ADMIN_PORT="$(next_free_port $((RELAY_PORT+1)) 20999)" || die "Нет свободного admin port."
++  else
++    port_available "$RELAY_PORT" || die "Порт $RELAY_PORT уже занят или зарегистрирован TWebProxy."
++    port_available "$ADMIN_PORT" || die "Порт $ADMIN_PORT уже занят или зарегистрирован TWebProxy."
++  fi
++}
++
++claim_profile_ports() {
++  if [[ "${PROFILE_PORTS_AUTO:-1}" == 1 ]]; then
++    BACKEND_PORT="$(next_free_port 23980 26999)" || die "Нет свободного backend port."
++    STATS_PORT="$(next_free_port 28980 31999)" || die "Нет свободного stats port."
++  else
++    port_available "$BACKEND_PORT" || die "Порт $BACKEND_PORT уже занят или зарегистрирован TWebProxy."
++    port_available "$STATS_PORT" || die "Порт $STATS_PORT уже занят или зарегистрирован TWebProxy."
++  fi
++}
++
+ add_instance_cmd() {
+   need_root; need_systemd; check_platform; banner; ensure_core
+   collect_instance_settings
+@@ -4688,8 +4937,9 @@ add_instance_cmd() {
+   echo
+   [[ "$UI_LANGUAGE" == en ]] && printf "%bFirst profile for %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET" \
+     || printf "%bПервый профиль для %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET"
+-  local host="$HOSTNAME"
++  local host="$HOSTNAME" profile
+   collect_profile_settings "$host" default
++  profile="$PROFILE_NAME"
+ 
+   echo
+   if [[ "$UI_LANGUAGE" == en ]]; then cat <<EOF
+@@ -4725,14 +4975,20 @@ EOF
+     check_dns_for_host "$host" || yesno "DNS пока не совпадает. Продолжить?" n || exit 1
+   fi
+ 
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  instance_exists "$host" && die "Инстанс $host уже существует."
++  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
++  claim_instance_ports
++  claim_profile_ports
++  [[ "$(printf '%s\n' "$RELAY_PORT" "$ADMIN_PORT" "$BACKEND_PORT" "$STATS_PORT" | sort -u | wc -l)" == 4 ]] ||
++    die "Порты должны быть разными."
+   save_instance "$host"
+   prepare_site_for_instance "$host"
+-  save_profile "$host" "$PROFILE_NAME"
+-  rebuild_profiles_json "$host"
+   write_instance_config "$host"
+-  validate_instance "$host"
++  profile_state_commit "$host" "$profile" ""
++  port_lock_release
+   rebuild_firewall
+-  start_profile_backend "$host" "$PROFILE_NAME"
++  start_profile_backend "$host" "$profile"
+   restart_relay_wait_ready "$host"
+   configure_tls_for_instance "$host"
+   configure_ufw
+@@ -4740,6 +4996,7 @@ EOF
+   if ! audit_instance_impl "$host"; then
+     die "Инстанс создан, но isolation audit для $host не пройден."
+   fi
++  instance_lock_release
+   install_manager_copy
+   ok "Инстанс $host создан и прошёл isolation audit."
+   show_instance_cmd "$host"
+@@ -4749,7 +5006,8 @@ repair_instance_cmd() {
+   need_root; need_systemd; check_platform; banner; ensure_core
+   local host="${1:-}"
+   [[ -n "$host" ]] || host="$(select_instance)"
+-  instance_exists "$host" || die "Нет $host"
++  require_instance "$host"
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+ 
+   log "Проверяю и восстанавливаю runtime для $host..."
+   # Recreate generated artifacts from the canonical per-instance/profile state.
+@@ -4759,7 +5017,8 @@ repair_instance_cmd() {
+   # systemd templates from the currently running manager version before restarts.
+   write_runner_helpers
+   write_systemd_templates
+-  rebuild_profiles_json "$host"
++  # Converges backend env files and profiles.json left behind by an interrupted operation.
++  instance_derive_state "$host" || die "Не удалось записать состояние: $(instance_dir "$host")"
+   write_instance_config "$host"
+   validate_instance "$host"
+   rebuild_firewall
+@@ -4772,6 +5031,7 @@ repair_instance_cmd() {
+   if ! audit_instance_impl "$host"; then
+     die "Runtime восстановлен, но isolation audit для $host не пройден."
+   fi
++  instance_lock_release
+   write_global_env
+   install_manager_copy
+   ok "Инстанс $host восстановлен и прошёл readiness/isolation checks."
+@@ -4780,64 +5040,94 @@ repair_instance_cmd() {
+ 
+ profile_add_cmd() {
+   need_root; ensure_core; banner
+-  local host="${1:-}"; [[ -n "$host" ]] || host="$(select_instance)"
+-  instance_exists "$host" || die "Нет $host"
+-  local count; count="$(count_profiles "$host")"; (( count < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
++  local host="${1:-}" profile count; [[ -n "$host" ]] || host="$(select_instance)"
++  require_instance "$host"
++  count="$(count_profiles "$host")"; (( count < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
+   collect_profile_settings "$host" "profile$((count+1))"
+-  save_profile "$host" "$PROFILE_NAME"
+-  rebuild_profiles_json "$host"
+-  validate_instance "$host"
++  # From here on the target is this local name, whatever helpers do to globals.
++  profile="$PROFILE_NAME"
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_instance "$host"
++  [[ ! -e "$(profile_env "$host" "$profile")" && ! -L "$(profile_env "$host" "$profile")" ]] || die "Профиль уже существует."
++  (( $(count_profiles "$host") < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
++  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
++  claim_profile_ports
++  profile_state_commit "$host" "$profile" ""
++  port_lock_release
+   rebuild_firewall
+-  start_profile_backend "$host" "$PROFILE_NAME"
++  start_profile_backend "$host" "$profile"
+   warn "Добавление профиля перезапускает relay и сбрасывает активные WEB-сессии; Telegram переподключится автоматически."
+   restart_relay_wait_ready "$host"
+-  ok "Профиль $PROFILE_NAME добавлен."
+-  show_profile_cmd "$host" "$PROFILE_NAME"
++  instance_lock_release
++  ok "Профиль $profile добавлен."
++  show_profile_cmd "$host" "$profile"
+ }
+ 
+ profile_delete_cmd() {
+   need_root; banner
+-  local host="${1:-}" profile="${2:-}"
++  local host="${1:-}" profile="${2:-}" prev
+   [[ -n "$host" ]] || host="$(select_instance)"
++  require_instance "$host"
+   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
+   (( $(count_profiles "$host") > 1 )) || die "Нельзя удалить последний профиль. Удали весь hostname через 'twebproxy delete'."
+-  load_profile "$host" "$profile"
++  require_profile_file "$host" "$profile"
+   warn "Удалится secret $profile и его backend. Клиенты с этим secret сразу перестанут подключаться."
+   yesno "Удалить профиль $profile?" n || exit 0
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_profile_file "$host" "$profile"
++  (( $(count_profiles "$host") > 1 )) || die "Нельзя удалить последний профиль. Удали весь hostname через 'twebproxy delete'."
++  prev="$(cat -- "$(profile_env "$host" "$profile")")"
++  profile_state_remove "$host" "$profile" "$prev"
+   stop_profile_backend "$host" "$profile"
+-  rm -f "$(profile_env "$host" "$profile")" "$(backend_env "$host" "$profile")"
+-  rebuild_profiles_json "$host"; validate_instance "$host"; rebuild_firewall; restart_relay_wait_ready "$host"
++  rebuild_firewall; restart_relay_wait_ready "$host"
++  instance_lock_release
+   ok "Профиль $profile удалён."
+ }
+ 
+ profile_rotate_cmd() {
+   need_root; banner
+-  local host="${1:-}" profile="${2:-}" new_secret backend_secret f bfile
++  local host="${1:-}" profile="${2:-}" new_secret prev
+   [[ -n "$host" ]] || host="$(select_instance)"
++  require_instance "$host"
+   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
+-  load_profile "$host" "$profile"
++  require_profile "$host" "$profile"
+   if yesno "Сгенерировать новый secret?" y; then new_secret="$(openssl rand -hex 16)"; else
+-    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'New secret: ' || printf 'Новый secret: ')" new_secret; echo; is_valid_secret "$new_secret" || die "Некорректный secret."
+-  fi
++    read -r -s -p "$([[ "$UI_LANGUAGE" == en ]] && printf 'New secret: ' || printf 'Новый secret: ')" new_secret; echo
++  fi
++  is_valid_secret "$new_secret" || die "Некорректный secret."
++  # Read-modify-write on the record as it is under the lock, not as it was
++  # before the prompt: a concurrent change to other fields is kept.
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_profile "$host" "$profile"
++  prev="$(cat -- "$(profile_env "$host" "$profile")")"
+   SECRET="$new_secret"
+-  save_profile "$host" "$profile"
+-  rebuild_profiles_json "$host"; validate_instance "$host"
++  profile_state_commit "$host" "$profile" "$prev"
++  [[ "$BACKEND_PORTS_CHANGED" != 1 ]] || rebuild_firewall
+   start_profile_backend "$host" "$profile"
+   restart_relay_wait_ready "$host"
++  instance_lock_release
+   ok "Secret $profile заменён. Старый больше не работает."
+   show_profile_cmd "$host" "$profile"
+ }
+ 
+ profile_carrier_cmd() {
+   need_root; banner
+-  local host="${1:-}" profile="${2:-}"
++  local host="${1:-}" profile="${2:-}" carrier prev
+   [[ -n "$host" ]] || host="$(select_instance)"
++  require_instance "$host"
+   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
+-  load_profile "$host" "$profile"
+-  CARRIER_MODE="$(carrier_choose)"
+-  save_profile "$host" "$profile"
+-  rebuild_profiles_json "$host"; validate_instance "$host"; restart_relay_wait_ready "$host"
+-  ok "Carrier профиля $profile: $CARRIER_MODE"
++  require_profile "$host" "$profile"
++  carrier="$(carrier_choose)"
++  is_valid_carrier_mode "$carrier" || return 0
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_profile "$host" "$profile"
++  prev="$(cat -- "$(profile_env "$host" "$profile")")"
++  CARRIER_MODE="$carrier"
++  profile_state_commit "$host" "$profile" "$prev"
++  [[ "$BACKEND_PORTS_CHANGED" != 1 ]] || rebuild_firewall
++  restart_relay_wait_ready "$host"
++  instance_lock_release
++  ok "Carrier профиля $profile: $carrier"
+ }
+ 
+ select_instance() {
+@@ -5877,9 +6167,11 @@ diagnose_cmd() {
+ delete_instance_cmd() {
+   need_root; banner
+   local host="${1:-}" p old_ip=""
+-  [[ -n "$host" ]] || host="$(select_instance)"; instance_exists "$host" || die "Нет $host"
++  [[ -n "$host" ]] || host="$(select_instance)"; require_instance "$host"
+   warn "Будет удалён hostname $host, все его secrets/backends и управляемый reverse-proxy block."
+   yesno "Удалить $host?" n || exit 0
++  instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_instance "$host"
+   old_ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
+   load_instance "$host"
+   systemctl disable --now "twebproxy@$host.service" >/dev/null 2>&1 || true
+@@ -5892,6 +6184,7 @@ delete_instance_cmd() {
+   rm -rf "$(instance_dir "$host")" "$(site_dir "$host")"
+   rebuild_firewall
+   dpi_with_mutation_lock dpi_remove_host_state_if_orphaned "$old_ip" || warn "$(ui_msg dpi_repair_warning)"
++  instance_lock_release
+   ok "$host удалён."
+ }
+ 

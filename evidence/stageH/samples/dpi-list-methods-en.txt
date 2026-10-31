@@ -1,0 +1,17 @@
+stock                  No traffic modification; production default.
+                       Nothing is installed or changed.
+window1152             Set TCP receive window 1152 on outbound IPv4 SYN+ACK from port 443.
+                       Direction: server to client, outbound IPv4 SYN+ACK from :443. Overhead: low; the first data may arrive in smaller pieces. Status: experimental.
+mss88                  Advertise TCP MSS 88 in outbound IPv4 SYN+ACK from port 443.
+                       Direction: server to client, outbound IPv4 SYN+ACK from :443. Overhead: high; clients send many small TCP segments. Status: aggressive, experimental.
+nfqws                  Queue the first server reply packets to the pinned nfqws strategy.
+                       Direction: server to client, the first reply packets of each HTTPS connection, handled in user space by the pinned nfqws. Overhead: one extra service and CPU for every new connection. Status: experimental.
+window1152_nfqws       Apply receive window 1152, then the pinned nfqws strategy.
+                       Direction and overhead: those of window1152 and nfqws together. Status: experimental.
+mss88_nfqws            Apply MSS 88, then the pinned nfqws strategy.
+                       Direction and overhead: those of mss88 and nfqws together, the highest of all modes. Status: most aggressive, experimental.
+
+nfqws v72.13, pinned commit 87e058624c72863db53bdaf7fb6f16576dddb6ab
+
+All modes except STOCK work on IPv4 only (IPv6 stays STOCK) and affect every HTTPS connection from the same public IPv4 on port 443, including other hostnames and services on it; enabling one needs explicit confirmation (--accept-shared-scope).
+No mode guarantees getting past DPI. Start with STOCK, change one mode at a time, test with a real client, and go back with: twebproxy dpi disable HOST

@@ -1,0 +1,129 @@
+{
+  "schema": "twebproxy.stageB.evidence.v1",
+  "status": "PARTIAL",
+  "baseline": {
+    "release": "0.2.11-dpi-beta",
+    "zip_sha256": "45f1fb7f83c02be0293d81fe0bd472e55c5c4d7a454eed47ce9566cd5c118d29",
+    "manager_sha256": "91998dd80e019a5aed54043578b271b95fe6eb89f54e20084c307cab9c31a7b8",
+    "github_commit": "b7179106c8937da526ab04713cbee51947593e5e",
+    "github_tree": "6b4ed07435c721f66bdf93db92f27cdd54d3b610",
+    "normalization": "COMPLETE_EXACT",
+    "normalized_local_commit": "ae676992817a8e806b323b48f421db42d63a6916",
+    "github_blob_count": 42,
+    "overlap_with_stage_a": {
+      "unchanged": 27,
+      "changed_exact_stage_a_files": 9,
+      "repository_only": 6
+    }
+  },
+  "candidate": {
+    "version": "0.2.12",
+    "release_label": "0.2.12-beta",
+    "manager_sha256": "805a574911a1448c8e07d22c7466636e3e8eee63b8329b3799547cd4b61a53b6"
+  },
+  "invariants": {
+    "stage4_sha256": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb",
+    "old_functions_unchanged": 317,
+    "old_functions_modified": [
+      "rebuild_firewall",
+      "write_runner_helpers",
+      "write_systemd_templates"
+    ],
+    "backend_functions_added": 11,
+    "unrelated_generated_payloads_unchanged": 6,
+    "dpi_functions": "BYTE_IDENTICAL",
+    "repository_only_docs": "BYTE_IDENTICAL",
+    "assets": "BYTE_IDENTICAL",
+    "production_accessed": false,
+    "push_or_merge": false,
+    "stage_c_started": false
+  },
+  "tests": [
+    {
+      "name": "v0.2.11 original failures",
+      "status": "REPRODUCED",
+      "evidence": "before-v0211.log"
+    },
+    {
+      "name": "Stage B model",
+      "status": "PASS",
+      "assertions_pass": 47,
+      "assertions_fail": 0
+    },
+    {
+      "name": "Stage B JSON schema",
+      "status": "PASS",
+      "assertions_pass": 13
+    },
+    {
+      "name": "TG7 backend isolation",
+      "status": "PASS",
+      "assertions_pass": 12,
+      "original_assertions_retained": true
+    },
+    {
+      "name": "Stage B real kernel",
+      "status": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+      "reason": "nft unavailable; CAP_NET_ADMIN/CAP_SYS_ADMIN absent; unshare denied",
+      "exit_code": 77
+    },
+    {
+      "name": "Stage B real systemd",
+      "status": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+      "reason": "nft unavailable; disposable namespace unavailable",
+      "exit_code": 77
+    },
+    {
+      "name": "Stage A suite",
+      "status": "INCOMPLETE",
+      "pass_cases": 7,
+      "fail_cases": 0,
+      "not_executed_cases": 2,
+      "exit_code": 77
+    },
+    {
+      "name": "A.1 targeted corrections",
+      "status": "PASS",
+      "assertions_pass": 32,
+      "assertions_fail": 0
+    },
+    {
+      "name": "A.1 DPI real nft JSON round-trip",
+      "status": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+      "exit_code": 77
+    },
+    {
+      "name": "A.1 real ENOSPC",
+      "status": "NOT_EXECUTED_ENVIRONMENT_LIMITATION",
+      "reason": "private tmpfs mount unavailable",
+      "exit_code": 77
+    },
+    {
+      "name": "static smoke",
+      "status": "PASS"
+    },
+    {
+      "name": "certificate smoke",
+      "status": "PASS"
+    },
+    {
+      "name": "Bash syntax",
+      "status": "PASS"
+    },
+    {
+      "name": "scope/invariants",
+      "status": "PASS"
+    },
+    {
+      "name": "git diff --check",
+      "status": "PASS"
+    }
+  ],
+  "limitations": [
+    "Model results do not prove kernel transaction or real systemd semantics.",
+    "No cross-kernel/filesystem atomic commit or fsync/power-loss guarantee.",
+    "Concurrent backend-state writers are not serialized by the backend apply lock.",
+    "Unexpected contents in the reserved table fail closed; no generic recovery.",
+    "Real validation must run in a disposable VM; not production."
+  ]
+}

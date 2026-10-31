@@ -1,0 +1,7 @@
+name	rc	last_line
+operations-on-v0.2.18	1	e-operations: pass=14 fail=34
+operations-on-mutant-select-no-propagation	1	e-operations: pass=47 fail=1
+operations-on-mutant-unbounded-probes	1	e-operations: pass=42 fail=6
+operations-on-mutant-no-incomplete-verdict	1	e-operations: pass=46 fail=2
+operations-on-mutant-no-reredaction	1	e-operations: pass=45 fail=3
+operations-on-mutant-eof-answers-default	1	e-operations: pass=46 fail=2

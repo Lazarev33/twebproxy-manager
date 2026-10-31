@@ -1,0 +1,1478 @@
+[
+ {
+  "label": "netns-add",
+  "start": {
+   "utc": "2026-10-30T23:05:58.725237+00:00",
+   "mono_ns": 135427689102973
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.733608+00:00",
+   "mono_ns": 135427697465965
+  },
+  "argv": [
+   "ip",
+   "netns",
+   "add",
+   "tpx2p1255334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "veth-add",
+  "start": {
+   "utc": "2026-10-30T23:05:58.733735+00:00",
+   "mono_ns": 135427697585080
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.738214+00:00",
+   "mono_ns": 135427702070071
+  },
+  "argv": [
+   "ip",
+   "link",
+   "add",
+   "tpxh55334",
+   "type",
+   "veth",
+   "peer",
+   "name",
+   "tpxn55334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "veth-move",
+  "start": {
+   "utc": "2026-10-30T23:05:58.738250+00:00",
+   "mono_ns": 135427702098245
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.746902+00:00",
+   "mono_ns": 135427710759636
+  },
+  "argv": [
+   "ip",
+   "link",
+   "set",
+   "tpxn55334",
+   "netns",
+   "tpx2p1255334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "host-addr",
+  "start": {
+   "utc": "2026-10-30T23:05:58.746939+00:00",
+   "mono_ns": 135427710786918
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.750766+00:00",
+   "mono_ns": 135427714624534
+  },
+  "argv": [
+   "ip",
+   "addr",
+   "add",
+   "10.214.31.1/30",
+   "dev",
+   "tpxh55334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "host-up",
+  "start": {
+   "utc": "2026-10-30T23:05:58.750812+00:00",
+   "mono_ns": 135427714659953
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.758090+00:00",
+   "mono_ns": 135427721963015
+  },
+  "argv": [
+   "ip",
+   "link",
+   "set",
+   "tpxh55334",
+   "up"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "peer-addr",
+  "start": {
+   "utc": "2026-10-30T23:05:58.758139+00:00",
+   "mono_ns": 135427721986997
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.771340+00:00",
+   "mono_ns": 135427735199966
+  },
+  "argv": [
+   "ip",
+   "netns",
+   "exec",
+   "tpx2p1255334",
+   "ip",
+   "addr",
+   "add",
+   "10.214.31.2/30",
+   "dev",
+   "tpxn55334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "peer-up",
+  "start": {
+   "utc": "2026-10-30T23:05:58.771386+00:00",
+   "mono_ns": 135427735236340
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.780530+00:00",
+   "mono_ns": 135427744395881
+  },
+  "argv": [
+   "ip",
+   "netns",
+   "exec",
+   "tpx2p1255334",
+   "ip",
+   "link",
+   "set",
+   "tpxn55334",
+   "up"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "peer-lo",
+  "start": {
+   "utc": "2026-10-30T23:05:58.780586+00:00",
+   "mono_ns": 135427744434367
+  },
+  "end": {
+   "utc": "2026-10-30T23:05:58.790346+00:00",
+   "mono_ns": 135427754205947
+  },
+  "argv": [
+   "ip",
+   "netns",
+   "exec",
+   "tpx2p1255334",
+   "ip",
+   "link",
+   "set",
+   "lo",
+   "up"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-nftables-start:start",
+  "start": {
+   "utc": "2026-10-30T23:06:01.146517+00:00",
+   "mono_ns": 135430110367656
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:01.287399+00:00",
+   "mono_ns": 135430251261080
+  },
+  "argv": [
+   "systemctl",
+   "start",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-nftables-reload:reload",
+  "start": {
+   "utc": "2026-10-30T23:06:04.511222+00:00",
+   "mono_ns": 135433475071078
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:04.552186+00:00",
+   "mono_ns": 135433516041612
+  },
+  "argv": [
+   "systemctl",
+   "reload",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-nftables-restart:restart",
+  "start": {
+   "utc": "2026-10-30T23:06:07.858122+00:00",
+   "mono_ns": 135436821973915
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:08.129442+00:00",
+   "mono_ns": 135437093299472
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-nftables-stop:stop",
+  "start": {
+   "utc": "2026-10-30T23:06:11.408593+00:00",
+   "mono_ns": 135440372444975
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:11.559604+00:00",
+   "mono_ns": 135440523482009
+  },
+  "argv": [
+   "systemctl",
+   "stop",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-firewall-restart:restart",
+  "start": {
+   "utc": "2026-10-30T23:06:14.842670+00:00",
+   "mono_ns": 135443806520912
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:15.121519+00:00",
+   "mono_ns": 135444085379992
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-firewall-reload:reload",
+  "start": {
+   "utc": "2026-10-30T23:06:18.366120+00:00",
+   "mono_ns": 135447329969913
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:18.550450+00:00",
+   "mono_ns": 135447514308450
+  },
+  "argv": [
+   "systemctl",
+   "reload",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-firewall-stop:stop",
+  "start": {
+   "utc": "2026-10-30T23:06:21.944487+00:00",
+   "mono_ns": 135450908343960
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:22.024472+00:00",
+   "mono_ns": 135450988329771
+  },
+  "argv": [
+   "systemctl",
+   "stop",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-firewall-start:start",
+  "start": {
+   "utc": "2026-10-30T23:06:25.150877+00:00",
+   "mono_ns": 135454114727406
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:25.344552+00:00",
+   "mono_ns": 135454308428601
+  },
+  "argv": [
+   "systemctl",
+   "start",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-daemon-reload:daemon-reload",
+  "start": {
+   "utc": "2026-10-30T23:06:28.617283+00:00",
+   "mono_ns": 135457581132931
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:28.987285+00:00",
+   "mono_ns": 135457951146955
+  },
+  "argv": [
+   "systemctl",
+   "daemon-reload"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-backend-restarts:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:06:32.520596+00:00",
+   "mono_ns": 135461484448629
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:32.728582+00:00",
+   "mono_ns": 135461692459719
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-backend-restarts:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:06:32.520844+00:00",
+   "mono_ns": 135461484694452
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:32.745860+00:00",
+   "mono_ns": 135461709721641
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "normal-foreign-flush:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:06:36.025054+00:00",
+   "mono_ns": 135464988904061
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:36.031925+00:00",
+   "mono_ns": 135464995785658
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "nftables-start-for-faults",
+  "start": {
+   "utc": "2026-10-30T23:06:39.195717+00:00",
+   "mono_ns": 135468159565479
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:39.332407+00:00",
+   "mono_ns": 135468296269920
+  },
+  "argv": [
+   "systemctl",
+   "start",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-1:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:06:39.541112+00:00",
+   "mono_ns": 135468504962518
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:39.547438+00:00",
+   "mono_ns": 135468511299208
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1257237"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-1:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:06:39.541282+00:00",
+   "mono_ns": 135468505132658
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:39.906483+00:00",
+   "mono_ns": 135468870344013
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-2:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:06:46.202603+00:00",
+   "mono_ns": 135475166453225
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:46.205557+00:00",
+   "mono_ns": 135475169419669
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1258754"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-2:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:06:46.202752+00:00",
+   "mono_ns": 135475166600686
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:46.534512+00:00",
+   "mono_ns": 135475498390683
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-3:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:06:52.218859+00:00",
+   "mono_ns": 135481182711976
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:52.223378+00:00",
+   "mono_ns": 135481187241285
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1259346"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart-3:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:06:52.219078+00:00",
+   "mono_ns": 135481182930244
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:52.558488+00:00",
+   "mono_ns": 135481522346800
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-1:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:06:58.253477+00:00",
+   "mono_ns": 135487217326980
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:58.260479+00:00",
+   "mono_ns": 135487224336205
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1259939"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-1:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:06:58.253883+00:00",
+   "mono_ns": 135487217734010
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:58.476394+00:00",
+   "mono_ns": 135487440254771
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 1,
+  "stdout": "",
+  "stderr": "Job for twebproxy-mtproxy@<test-host-1>--default.service canceled.\n"
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-1:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:06:58.253744+00:00",
+   "mono_ns": 135487217594551
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:58.478717+00:00",
+   "mono_ns": 135487442573270
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 1,
+  "stdout": "",
+  "stderr": "Job for twebproxy-mtproxy@<test-host-2>--default.service canceled.\n"
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-1:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:06:58.253513+00:00",
+   "mono_ns": 135487217360986
+  },
+  "end": {
+   "utc": "2026-10-30T23:06:58.729510+00:00",
+   "mono_ns": 135487693366887
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-2:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:07:04.526392+00:00",
+   "mono_ns": 135493490243697
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:04.531619+00:00",
+   "mono_ns": 135493495506441
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1260570"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-2:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:07:04.526549+00:00",
+   "mono_ns": 135493490399587
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:04.672422+00:00",
+   "mono_ns": 135493636279785
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 1,
+  "stdout": "",
+  "stderr": "Job for twebproxy-mtproxy@<test-host-1>--default.service canceled.\n"
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-2:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:07:04.526636+00:00",
+   "mono_ns": 135493490485315
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:04.679422+00:00",
+   "mono_ns": 135493643296868
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 1,
+  "stdout": "",
+  "stderr": "Job for twebproxy-mtproxy@<test-host-2>--default.service canceled.\n"
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-2:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:07:04.526735+00:00",
+   "mono_ns": 135493490584330
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:04.872438+00:00",
+   "mono_ns": 135493836294588
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-3:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:07:10.534992+00:00",
+   "mono_ns": 135499498843579
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:10.540833+00:00",
+   "mono_ns": 135499504691538
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1261186"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-3:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:07:10.535412+00:00",
+   "mono_ns": 135499499261208
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:10.749840+00:00",
+   "mono_ns": 135499713699562
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-3:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:07:10.535279+00:00",
+   "mono_ns": 135499499129247
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:10.755804+00:00",
+   "mono_ns": 135499719665642
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+nft-restart+backend-restarts-3:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:07:10.535325+00:00",
+   "mono_ns": 135499499173621
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:11.005432+00:00",
+   "mono_ns": 135499969291706
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-1:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:07:16.825945+00:00",
+   "mono_ns": 135505789794032
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:16.829903+00:00",
+   "mono_ns": 135505793780500
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1261914"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-1:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:07:16.826106+00:00",
+   "mono_ns": 135505789962798
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:16.835582+00:00",
+   "mono_ns": 135505799436180
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-2:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:07:23.214806+00:00",
+   "mono_ns": 135512178655977
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:23.217871+00:00",
+   "mono_ns": 135512181730136
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1262452"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-2:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:07:23.214837+00:00",
+   "mono_ns": 135512178684959
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:23.222775+00:00",
+   "mono_ns": 135512186635417
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-3:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:07:30.091912+00:00",
+   "mono_ns": 135519055765040
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:30.097729+00:00",
+   "mono_ns": 135519061599648
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1263059"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+foreign-flush-3:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:07:30.092056+00:00",
+   "mono_ns": 135519055909998
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:30.105656+00:00",
+   "mono_ns": 135519069519996
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-1:kill-shell",
+  "start": {
+   "utc": "2026-10-30T23:07:36.429034+00:00",
+   "mono_ns": 135525392887375
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:36.434438+00:00",
+   "mono_ns": 135525400492020
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1263577"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-1:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:07:36.429337+00:00",
+   "mono_ns": 135525393243586
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:36.724357+00:00",
+   "mono_ns": 135525688215777
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-2:kill-shell",
+  "start": {
+   "utc": "2026-10-30T23:07:42.594441+00:00",
+   "mono_ns": 135531558292516
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:42.598798+00:00",
+   "mono_ns": 135531562655518
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1264170"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-2:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:07:42.594663+00:00",
+   "mono_ns": 135531558514725
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:42.989583+00:00",
+   "mono_ns": 135531953443323
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-3:kill-shell",
+  "start": {
+   "utc": "2026-10-30T23:07:48.786665+00:00",
+   "mono_ns": 135537750515029
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:48.795461+00:00",
+   "mono_ns": 135537759321624
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1264768"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+nft-restart-3:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:07:48.786698+00:00",
+   "mono_ns": 135537750546482
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:49.126744+00:00",
+   "mono_ns": 135538090606532
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+foreign-flush+backend-restarts:kill-shell",
+  "start": {
+   "utc": "2026-10-30T23:07:54.904690+00:00",
+   "mono_ns": 135543868557588
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:54.910508+00:00",
+   "mono_ns": 135543874366490
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1265365"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+foreign-flush+backend-restarts:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:07:54.904768+00:00",
+   "mono_ns": 135543868618376
+  },
+  "end": {
+   "utc": "2026-10-30T23:07:54.932830+00:00",
+   "mono_ns": 135543896689216
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+foreign-flush+backend-restarts:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:07:54.904841+00:00",
+   "mono_ns": 135543868693743
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:00.346310+00:00",
+   "mono_ns": 135549310167280
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "shell-kill+foreign-flush+backend-restarts:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:07:54.904910+00:00",
+   "mono_ns": 135543868778457
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:00.353325+00:00",
+   "mono_ns": 135549317185487
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-1:daemon-reload",
+  "start": {
+   "utc": "2026-10-30T23:08:03.580554+00:00",
+   "mono_ns": 135552544403239
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:03.999435+00:00",
+   "mono_ns": 135552963295254
+  },
+  "argv": [
+   "systemctl",
+   "daemon-reload"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-1:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:03.580476+00:00",
+   "mono_ns": 135552544324902
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:04.352159+00:00",
+   "mono_ns": 135553316018056
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-1:firewall-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:03.580001+00:00",
+   "mono_ns": 135552543853318
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:04.521293+00:00",
+   "mono_ns": 135553485153008
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-1:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:08:03.580387+00:00",
+   "mono_ns": 135552544236170
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:04.609221+00:00",
+   "mono_ns": 135553573078494
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-1:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:08:03.580258+00:00",
+   "mono_ns": 135552544108812
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:04.616898+00:00",
+   "mono_ns": 135553580757480
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-2:daemon-reload",
+  "start": {
+   "utc": "2026-10-30T23:08:07.914775+00:00",
+   "mono_ns": 135556878626008
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:08.291118+00:00",
+   "mono_ns": 135557254977222
+  },
+  "argv": [
+   "systemctl",
+   "daemon-reload"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-2:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:07.914906+00:00",
+   "mono_ns": 135556878755842
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:08.643537+00:00",
+   "mono_ns": 135557607394882
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-2:firewall-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:07.915078+00:00",
+   "mono_ns": 135556878926847
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:08.807394+00:00",
+   "mono_ns": 135557771250757
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-2:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:08:07.914576+00:00",
+   "mono_ns": 135556878427706
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:08.909546+00:00",
+   "mono_ns": 135557873405601
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-2:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:08:07.914991+00:00",
+   "mono_ns": 135556878840689
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:08.918719+00:00",
+   "mono_ns": 135557882578434
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-3:daemon-reload",
+  "start": {
+   "utc": "2026-10-30T23:08:12.217693+00:00",
+   "mono_ns": 135561181543502
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:12.580536+00:00",
+   "mono_ns": 135561544395958
+  },
+  "argv": [
+   "systemctl",
+   "daemon-reload"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-3:nftables-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:12.218349+00:00",
+   "mono_ns": 135561182198353
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:12.941830+00:00",
+   "mono_ns": 135561905714789
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-3:firewall-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:12.217510+00:00",
+   "mono_ns": 135561181362621
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:13.135585+00:00",
+   "mono_ns": 135562099436610
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-3:backend-restart-0",
+  "start": {
+   "utc": "2026-10-30T23:08:12.218265+00:00",
+   "mono_ns": 135561182115768
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:13.219739+00:00",
+   "mono_ns": 135562183627404
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-1>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "concurrent-fw+nft+backend+daemon-reload-3:backend-restart-1",
+  "start": {
+   "utc": "2026-10-30T23:08:12.218427+00:00",
+   "mono_ns": 135561182275593
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:13.228239+00:00",
+   "mono_ns": 135562192096149
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-mtproxy@<test-host-2>--default.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+firewall-restart+flush:kill-child",
+  "start": {
+   "utc": "2026-10-30T23:08:16.610550+00:00",
+   "mono_ns": 135565574399962
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:16.614491+00:00",
+   "mono_ns": 135565578350040
+  },
+  "argv": [
+   "kill",
+   "-KILL",
+   "1267499"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+firewall-restart+flush:foreign-flush",
+  "start": {
+   "utc": "2026-10-30T23:08:16.610921+00:00",
+   "mono_ns": 135565574790204
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:16.619661+00:00",
+   "mono_ns": 135565583514189
+  },
+  "argv": [
+   "nft",
+   "flush",
+   "ruleset"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "child-kill+firewall-restart+flush:firewall-restart",
+  "start": {
+   "utc": "2026-10-30T23:08:16.610584+00:00",
+   "mono_ns": 135565574447934
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:16.845027+00:00",
+   "mono_ns": 135565808884845
+  },
+  "argv": [
+   "systemctl",
+   "restart",
+   "twebproxy-firewall.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "nftables-stop-final",
+  "start": {
+   "utc": "2026-10-30T23:08:20.087550+00:00",
+   "mono_ns": 135569051399999
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:20.311129+00:00",
+   "mono_ns": 135569274989624
+  },
+  "argv": [
+   "systemctl",
+   "stop",
+   "nftables.service"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "netns-delete",
+  "start": {
+   "utc": "2026-10-30T23:08:21.786801+00:00",
+   "mono_ns": 135570750663821
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:21.790827+00:00",
+   "mono_ns": 135570754701268
+  },
+  "argv": [
+   "ip",
+   "netns",
+   "delete",
+   "tpx2p1255334"
+  ],
+  "rc": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "label": "veth-delete",
+  "start": {
+   "utc": "2026-10-30T23:08:21.790883+00:00",
+   "mono_ns": 135570754731728
+  },
+  "end": {
+   "utc": "2026-10-30T23:08:21.801189+00:00",
+   "mono_ns": 135570765070521
+  },
+  "argv": [
+   "ip",
+   "link",
+   "delete",
+   "tpxh55334"
+  ],
+  "rc": 1,
+  "stdout": "",
+  "stderr": "Cannot find device \"tpxh55334\"\n"
+ }
+]

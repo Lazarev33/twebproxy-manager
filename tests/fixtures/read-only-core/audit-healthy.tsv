@@ -3,9 +3,13 @@ relay.service.active	OK	hostname:fixture.example
 relay.listener.loopback	OK	hostname:fixture.example
 admin.listener.loopback	OK	hostname:fixture.example
 firewall.backend.boundary	OK	global
+firewall.guard.owned	OK	global
+backend.egress.dc_coverage	OK	global
+procfs.secret.protection	OK	global
 profiles.present	OK	hostname:fixture.example
 profile.backend.service.active	OK	profile:fixture.example/default
 profile.backend.sandbox.af_netlink	OK	profile:fixture.example/default
+profile.backend.socket_filter	OK	profile:fixture.example/default
 profile.backend.firewall.coverage	OK	profile:fixture.example/default
 profile.backend.listener.isolation	OK	profile:fixture.example/default
 profile.stats.firewall.coverage	OK	profile:fixture.example/default

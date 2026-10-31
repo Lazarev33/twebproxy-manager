@@ -1,0 +1,2 @@
+backend-start-check: the effective /proc shows other users' command lines (hidepid=''); run: twebproxy proc-hardening enable; refusing to start
+backend-start-check: the effective /proc shows other users' command lines (hidepid=''); run: twebproxy proc-hardening enable; refusing to start

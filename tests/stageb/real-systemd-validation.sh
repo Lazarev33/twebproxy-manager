@@ -40,10 +40,15 @@ BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR
 LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
 install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR"
 write_backend_firewall_helper
+write_firewall_guard_helper
 write_backend_firewall_unit
 # Identical ExecStart/Reload/Stop semantics; only this test unit enters our netns.
-sed "/^Type=oneshot$/a NetworkNamespacePath=/proc/$BASHPID/ns/net" \
+# v0.2.23 unit: Type=exec with an owned-guard session. Refuse to continue unless
+# the namespace injection really happened.
+sed "/^Type=exec$/a NetworkNamespacePath=/proc/$BASHPID/ns/net" \
   "$SYSTEMD_DIR/twebproxy-firewall.service" > "$unit_path"
+grep -qxF "NetworkNamespacePath=/proc/$BASHPID/ns/net" "$unit_path" ||
+  { echo 'FAIL: unit would not run in the isolated namespace'; exit 1; }
 chmod 0644 "$unit_path"
 timeout 15 systemctl daemon-reload
 printf 'MTPROXY_CLIENT_PORT=23980\nMTPROXY_STATS_PORT=28980\n' > "$BACKENDS_DIR/a.env"
@@ -51,11 +56,28 @@ timeout 45 systemctl start "$unit"
 nft -j -n list table inet twebproxy_backend > "$TMP/initial"
 [[ "$(backend_fw_ports_json "$TMP/initial")" == 23980,28980 ]]
 echo 'PASS real-systemd-start'
+guard_ports() { nft -j list set inet twebproxy_guard ports | jq -r '[.nftables[]|select(.set)|(.set.elem//[])[]]|sort|map(tostring)|join(",")'; }
+nft list table inet twebproxy_guard | grep -qE '^[[:space:]]*flags owner'
+[[ "$(guard_ports)" == 23980,28980 ]]
+echo 'PASS real-systemd-owned-guard-started'
 printf 'MTPROXY_CLIENT_PORT=23981\nMTPROXY_STATS_PORT=28981\n' > "$BACKENDS_DIR/b.env"
 timeout 45 systemctl reload "$unit"
 nft -j -n list table inet twebproxy_backend > "$TMP/multiple"
 [[ "$(backend_fw_ports_json "$TMP/multiple")" == 23980,23981,28980,28981 ]]
 echo 'PASS real-systemd-reload'
+[[ "$(guard_ports)" == 23980,23981,28980,28981 ]]
+echo 'PASS real-systemd-reload-updates-guard'
+# A foreign "flush ruleset" (what nftables.service runs) removes ordinary tables
+# but not the owned guard; the unit stays active.
+nft flush ruleset
+nft list table inet twebproxy_guard >/dev/null
+! nft list table inet twebproxy_backend >/dev/null 2>&1
+[[ "$(guard_ports)" == 23980,23981,28980,28981 ]] && systemctl is-active --quiet "$unit"
+echo 'PASS real-systemd-guard-survives-foreign-flush'
+timeout 45 systemctl reload "$unit"
+nft -j -n list table inet twebproxy_backend > "$TMP/multiple"
+[[ "$(backend_fw_ports_json "$TMP/multiple")" == 23980,23981,28980,28981 ]]
+echo 'PASS real-systemd-reload-reapplies-backend-table'
 printf 'MTPROXY_CLIENT_PORT=23982\n' > "$BACKENDS_DIR/broken.env"
 if timeout 45 systemctl reload "$unit"; then echo 'FAIL invalid reload returned success'; exit 1; fi
 nft -j -n list table inet twebproxy_backend > "$TMP/after"
@@ -71,3 +93,5 @@ timeout 15 systemctl stop "$unit"
 nft -j -n list table inet twebproxy_backend > "$TMP/after"
 [[ "$(backend_fw_ports_json "$TMP/after")" == 23980,23981,28980,28981 ]]
 echo 'PASS real-systemd-stop-retains-isolation'
+sleep 1; ! nft list table inet twebproxy_guard >/dev/null 2>&1
+echo 'PASS real-systemd-stop-ends-guard-session'

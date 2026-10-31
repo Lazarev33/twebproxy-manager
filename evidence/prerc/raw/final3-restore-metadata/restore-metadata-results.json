@@ -1,0 +1,136 @@
+{
+ "installed_version": "0.2.23",
+ "candidate_version": "0.2.73",
+ "installed_sha256": "995036e467e1fb41",
+ "start": {
+  "bin": "995036e467e1fb41",
+  "copy": "995036e467e1fb41",
+  "global_env_version": "0.2.23"
+ },
+ "helper": {
+  "exit_code": 3,
+  "outcome": [
+   "RESTORE_PARTIAL backup_id=update-20261029T180223Z-237d5355cdf9 manager_version=0.2.23 metadata=stale"
+  ],
+  "executables_restored": true,
+  "metadata": "0.2.73",
+  "false_success": false
+ },
+ "cli": {
+  "update2_exit": 0,
+  "exit_code": 3,
+  "outcome": [
+   "RESTORE_PARTIAL backup_id=update-20261029T180228Z-b22c0411d9b2 manager_version=0.2.23 metadata=stale"
+  ],
+  "executables_restored": true,
+  "metadata": "0.2.73",
+  "false_success": false
+ },
+ "repair_while_immutable": {
+  "exit_code": 1,
+  "metadata": "0.2.73",
+  "stderr_tail": []
+ },
+ "recovery": {
+  "exit_code": 0,
+  "metadata": "0.2.23",
+  "consistent": true
+ },
+ "end": {
+  "bin": "995036e467e1fb41",
+  "copy": "995036e467e1fb41",
+  "global_env_version": "0.2.23"
+ },
+ "end_matches_start": true,
+ "runs": [
+  {
+   "step": "update",
+   "command": "bash <corr>/evidence/final3-restore-metadata/wrapper.sh --sha256 e313d229670b963064d7edd58dbe9fdee3c7305220d43e14e91901fb0e83de22",
+   "exit_code": 0,
+   "seconds": 3.62,
+   "outcome_lines": [
+    "UPDATE_SUCCESS backup_id=update-20261029T180223Z-237d5355cdf9"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "e313d229670b9630",
+    "copy": "e313d229670b9630",
+    "global_env_version": "0.2.73"
+   }
+  },
+  {
+   "step": "helper-restore-latest-immutable",
+   "command": "/usr/local/libexec/twebproxy/restore-update-backup restore-latest",
+   "exit_code": 3,
+   "seconds": 1.79,
+   "outcome_lines": [
+    "RESTORE_PARTIAL backup_id=update-20261029T180223Z-237d5355cdf9 manager_version=0.2.23 metadata=stale"
+   ],
+   "stderr_tail": [
+    "mv: cannot move '/etc/twebproxy/.global.env.3ORfX4' to '/etc/twebproxy/global.env': Operation not permitted",
+    "restore-update-backup: executables restored to 0.2.23, but MANAGER_VERSION in /etc/twebproxy/global.env could not be updated (read-only, immutable or full?); make it writable (e.g. chattr -i /etc/twebproxy/global.env) and run 'twebproxy repair <hostname>'"
+   ],
+   "state": {
+    "bin": "995036e467e1fb41",
+    "copy": "995036e467e1fb41",
+    "global_env_version": "0.2.73"
+   }
+  },
+  {
+   "step": "update-2",
+   "command": "bash <corr>/evidence/final3-restore-metadata/wrapper.sh --sha256 e313d229670b963064d7edd58dbe9fdee3c7305220d43e14e91901fb0e83de22 --force",
+   "exit_code": 0,
+   "seconds": 4.13,
+   "outcome_lines": [
+    "UPDATE_SUCCESS backup_id=update-20261029T180228Z-b22c0411d9b2"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "e313d229670b9630",
+    "copy": "e313d229670b9630",
+    "global_env_version": "0.2.73"
+   }
+  },
+  {
+   "step": "cli-rollback-immutable",
+   "command": "twebproxy manager-rollback latest",
+   "exit_code": 3,
+   "seconds": 2.42,
+   "outcome_lines": [
+    "RESTORE_PARTIAL backup_id=update-20261029T180228Z-b22c0411d9b2 manager_version=0.2.23 metadata=stale"
+   ],
+   "stderr_tail": [],
+   "state": {
+    "bin": "995036e467e1fb41",
+    "copy": "995036e467e1fb41",
+    "global_env_version": "0.2.73"
+   }
+  },
+  {
+   "step": "repair-while-immutable",
+   "command": "twebproxy repair <host-2>",
+   "exit_code": 1,
+   "seconds": 7.44,
+   "outcome_lines": [],
+   "stderr_tail": [],
+   "state": {
+    "bin": "995036e467e1fb41",
+    "copy": "995036e467e1fb41",
+    "global_env_version": "0.2.73"
+   }
+  },
+  {
+   "step": "repair-after-clearing",
+   "command": "twebproxy repair <host-2>",
+   "exit_code": 0,
+   "seconds": 7.89,
+   "outcome_lines": [],
+   "stderr_tail": [],
+   "state": {
+    "bin": "995036e467e1fb41",
+    "copy": "995036e467e1fb41",
+    "global_env_version": "0.2.23"
+   }
+  }
+ ]
+}

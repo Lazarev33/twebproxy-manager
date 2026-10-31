@@ -1,0 +1,38 @@
+name	rc	seconds	last_line
+git-diff-check	0	0	git diff --check a3a2bf4 (excluding captured evidence): clean
+bash-n-all	0	0	bash -n OK
+e-operations	0	91	e-operations: pass=48 fail=0
+suite-stage-e	0	89	stage-e-suite: PASS (all mandatory model checks executed)
+f-updater	0	62	updater-fixture: 278 pass, 0 fail
+suite-stage-f	0	82	stage-f-suite: PASS (all mandatory model checks executed)
+f-scope-vs-v0219	0	7	PASS f-scope unchanged=385 modified=15 added=14
+stage4-mandatory-suite	0	31	stage4-mandatory-suite: PASS (A-V all executed)
+stage-x-dpi-installed-asset	0	2	stage-x-dpi-installed-asset-fixture: PASS
+updater-function-hashes	0	1	29479800bfd4afec9edc48d9154e61f198d7f275ebf9acfdab6f1a0ed3b5933f  stage4-protected-function-set-full
+d-frontend-tls	0	36	d-frontend-tls: pass=122 fail=0
+suite-stage-d	0	35	stage-d-suite: PASS (all mandatory model checks executed)
+suite-stage-c2	0	29	stage-c2-suite: PASS (all mandatory model checks executed)
+suite-stage-c1	0	42	stage-c1-suite: PASS (all mandatory model checks executed)
+audit-c11-cross-instance-orphan	0	0	PASS
+audit-c11-backend-id-collision	0	1	PASS: existing B/x backend env preserved
+audit-c1-failed-backend-stop	0	0	FW collection ports=[23980,23981,28980,28981]
+audit-c1-orphan-backend	0	0	API profiles=[alpha]
+suite-stage-b	77	13	stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)
+suite-stage-a	77	66	stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)
+protocol-meta	0	0	PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct
+sa6-release-metadata	0	0	sa6-release-metadata: 6 pass, 0 fail
+fg-tg5	0	1	tg5: pass=13 fail=0
+fg-tg5b	0	0	tg5b: pass=19 fail=0
+fg-tg7	0	1	tg7: pass=12 fail=0
+fg-df3	0	10	df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail
+fg-df3b	0	2	df3b-nfqws-cleanup-propagation: 37 pass, 0 fail
+read-only-core	0	7	read-only-core-fixture: PASS
+l10n-static-C	0	5	localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)
+l10n-static-UTF8	0	7	localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)
+l10n-flow-C	0	3	localization-flow-fixture: PASS (locale=C)
+l10n-flow-UTF8	0	3	localization-flow-fixture: PASS (locale=C.UTF-8)
+static-smoke	0	0	static-smoke: PASS
+certificate-smoke	0	0	certificate-smoke: PASS
+tui-presentation	0	2	tui-presentation-fixture: PASS
+stage-x-fixui	0	67	stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)
+stage4-hash	0	0	c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b  stage4-protected-function-set

@@ -1,0 +1,49 @@
+TWebProxy Manager v0.2.22-beta
+
+Использование: twebproxy [--json|--raw] [--no-color] [команда] [аргументы]
+
+Быстрый старт: запустите «sudo twebproxy» и выберите быструю настройку
+или выполните «sudo twebproxy add». Затем «twebproxy show HOSTNAME» покажет
+ссылки для Telegram и помощь по подключению, а «twebproxy status HOSTNAME» —
+состояние. Руководство: docs/SETUP.md
+
+TWebProxy Manager / основа:
+  check-update                 проверить новую версию TWebProxy Manager
+  manager-update [--force] [--sha256 HEX]
+                               проверенный релиз, резервная копия, проверка и точный откат
+  manager-backup-list          показать проверенные локальные резервные копии обновлений
+  manager-rollback [latest|id] восстановить обе копии TWebProxy Manager из резервной копии
+  core-install                 установить зависимости, relay и MTProxy
+  update                       обновить tproxy-server с проверкой конфигурации и откатом
+  core-uninstall               удалить основу, когда нет инстансов
+
+Инстансы:
+  overview                     сводка только для чтения; поддерживает --json/--raw
+  add | list | show [hostname] | manual-snippet [hostname]
+  restart [hostname] | repair [hostname] | delete [hostname]
+  status [hostname] [--verbose]  краткий статус; --verbose показывает подробности
+  stats [hostname] [--verbose]   краткая статистика; --verbose показывает raw данные
+  cert-status [hostname]
+  cert-renew [hostname] [--dry-run|--force]
+  audit [hostname] | diagnose [hostname]
+
+Дополнительная совместимость сети (IPv4; по умолчанию STOCK):
+  dpi status [hostname] | dpi list-methods
+  dpi set HOST MODE [--accept-shared-scope] | dpi disable HOST
+
+Профили:
+  profile-list | profile-add | profile-show | profile-rotate
+  profile-carrier | profile-delete
+
+Логи:
+  logs | logs-tail [строки] | logs-collect [--full]
+  logs-pack [--full] | report
+  field-report HOST [--instant] [--keep-pcap]
+                               полевой диагностический архив одной командой
+
+Интерактивный режим:
+  menu                         двуязычный интерфейс по задачам
+
+Флаги вывода можно указывать до или после команды. --json и --raw взаимно
+исключаются, не задают вопросов и используют стабильные нелокализованные поля.
+Telegram WEB Proxy всегда использует публичный HTTPS-порт 443.

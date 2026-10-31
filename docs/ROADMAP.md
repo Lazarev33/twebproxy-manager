@@ -1,15 +1,10 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-31. This document tracks **development checkpoints, active work and plans**, not production-release authorization.
+Updated: 2026-10-29. This document tracks **planned work**, not production release status.
 
-## Repository publication and evidence status
+## Repository publication update
 
-- **GitHub `main` source remains v0.2.22-beta Stage H** as of this roadmap revision. Documentation updates do not publish later implementation code.
-- **v0.2.24-beta** is an independently **ACCEPTED focused correction** for the two reproduced v0.2.23 P1 security defects (nftables/guard loss backend exposure; MTProxy argv/procfs protection on failure). Accepted *for this correction scope*, **not RC- or production-ready**. Exact handoff commit: `83e001ed49bfe210dc4d79aaccd15d72e406045d`. Its source is in verified handoff artifacts, not `main`.
-- **Bridge Gate 1: CONDITIONAL GO.** A genuine two-disposable-VPS lab passed WireGuard/TCP transport, a 4 MiB integrity transfer, stock MTProxy protocol/authentication, a server-side Telegram DC response and recovery checks. **A genuine WEB-capable Telegram client has not yet been tested**; neither censorship resistance nor user-facing operation is established by synthetic probes.
-- **Bridge Gate 2: CONDITIONAL ACCEPTANCE.** The complete Gate 2 handoff records 17 PASS, 0 FAIL, 8 NOT_EXECUTED for automated SSH provisioning and managed Bridge lifecycle. Genuine Telegram-client operation and full clean-install acceptance remain unverified. The implementation is not in GitHub `main`.
-- **Bridge Gate 3: IN PROGRESS.** A separate v0.2.25-beta was observed on the authorized Russian Entry test VPS. Real TLS/site and server-side probes do not establish genuine end-user Telegram operation. A reproduced interactive Bridge duplicate-add error (return to shell instead of the menu) is under targeted correction. Gate 3 is not finally accepted.
-- Keep production/live VPS isolated. Work on explicitly authorized test systems; do not automatically merge, install, release, or replace the original single-VPS mode.
+> **Repository publication update — 2026-10-29:** The `main` source now targets **v0.2.22-beta Stage H** (development only). The independent Pre-RC campaign found blocking P1 defects in firewall lifecycle, offline-rollback truthfulness and local MTProxy secret exposure. This is not a production release. The older per-stage notes below are historical and may describe earlier GitHub publication status.
 
 ## Product goal
 
@@ -25,7 +20,7 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 
 | Checkpoint | Status | Notes |
 | --- | --- | --- |
-| v0.2.9 | Historical published baseline | Superseded by published v0.2.22-beta Stage H |
+| v0.2.9 (`main`) | Published code baseline | Still the source shown on `main`; not the latest accepted development checkpoint |
 | v0.2.10 Stage A | Development completed | DPI state/isolation model improvements |
 | v0.2.11 Stage A.1 | Development checkpoint | Real nft and ENOSPC gates remain |
 | v0.2.12 Stage B | Superseded by B.1 | Backend firewall and isolated test corrections |
@@ -38,24 +33,15 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | v0.2.19 Stage E | **Development accepted (model gates)** | 48/48 independently repeated; TUI EOF/default-no, bounded probes, honest UNKNOWN/INCOMPLETE, redacted safe log bundles; pre-RC lab tests pending; source still pending GitHub branch publication |
 | v0.2.20 Stage F | **Development accepted with backlog; 2 P1 failures** | Real Ubuntu integration: 24 REAL_HOST_PASS, 2 REAL_HOST_FAIL (health stdout and inherited curl lock), 4 MODEL_PASS, 3 NOT_EXECUTED; no confirmed P0; source ZIP/Git bundle verified, GitHub source branch still not published |
 | v0.2.21 Stage G | **Codex ACCEPTED_WITH_BACKLOG (real Linux)** | RED Stage F 6 expected failures; Stage G oracle 18/18 PASS; real update/rollback/flock/SIGKILL/ENOSPC, Nginx & limited systemd PASS; 2 reproducible P1 in backlog, no confirmed P0; source ZIP/Git bundle not yet published to a branch |
-| v0.2.22 Stage H | **DEVELOPMENT_ACCEPTED; published on `main`** | Independent 98/98 Stage H UX PASS; source on GitHub is development-only, not production-ready |
-| v0.2.23 pre-RC | **REJECTED — superseded** | Focused independent testing reproduced two security P1 defects; do not use as accepted baseline |
-| v0.2.24 pre-RC correction | **FOCUSED P1 ACCEPTED** | Independent disposable-Linux acceptance of both corrections; other release/client/platform checks remain pending; code not published to `main` |
-| Bridge Gate 1 — network PoC | **CONDITIONAL GO** | Real two-VPS transport and MTProxy protocol proven; genuine Telegram WEB client NOT_EXECUTED |
-| Bridge Gate 2 — automated provisioning | **CONDITIONAL ACCEPTANCE** | 17 PASS / 0 FAIL / 8 NOT_EXECUTED; automatic SSH provisioning and lifecycle tested on two VPSs; not in `main` |
-| Bridge Gate 3 — client/site/TLS validation | **IN PROGRESS** | Single RU-facing link, actual Telegram client, ACME TLS, default static website and TUI recovery still require complete acceptance |
-| Full RC integration | **PENDING** | Real clients, cross-platform, ACME/site, hardening, upgrade/rollback, provenance and release approval are separate gates |
+| v0.2.22 Stage H | **DEVELOPMENT_ACCEPTED (model checks)** | Independent 98/98 Stage H UX PASS, 687/687 Git tree, RU/EN, guided setup and safer network-mode explanations; still untested real TLS/clients; GitHub source branch not yet published |
+| v0.2.23 pre-RC corrections | **Development complete (awaits independent acceptance)** | Owned nftables guard held by twebproxy-firewall (survives nftables.service flush; no stop cascade), RESTORE_PARTIAL/exit 3, procfs hidepid policy, truthful DPI failure + kernel consistency, bounded Caddy certificate wait, clean core-uninstall; RED on v0.2.22 / GREEN on real Linux; not an RC |
+| Pre-RC integration | **NEXT — tests and two P1 fixes required** | Disposable real Linux, nft/systemd, Caddy/Nginx/ACME, genuine clients, source publication, signed artifact provenance and readiness criteria |
 
-**Current activity: Bridge Gate 3 and focused TUI corrections, while full RC readiness remains pending.** The historical Stage G/Pre-RC defects must not be presented as still-open blockers after their focused v0.2.24 acceptance. The correction does not establish full release readiness.
+**Current activity: RC integration / pre-release validation.** Stage H has been independently accepted as a development checkpoint, not a production release. The previous Codex Stage G findings P1-G-01 and P1-INHERITED-01 remain open before RC.
 
-Development handoffs and Bridge lab artifacts are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
 
 ## Non-negotiable engineering constraints
-
-- **Delivery discipline:** accept only reproduced, stage-relevant P0/P1 as blockers. Put P2/P3 and unrelated improvements in a bounded backlog. Test the actual stage contract, not a new full-project audit after every fix.
-- **Developer handoff:** each completed stage gets exactly one independently usable all-in-one ZIP with the complete changed sources, SHA256SUMS, evidence, environment identity, honest PASS/FAIL/NOT_EXECUTED and clear next gate. Prefer source and real reproducibility over formatting/polish.
-- **Operator-facing design:** make complex backend networking a guided workflow; the end user should not manually configure WireGuard, proxying, firewall or systemd when using managed Bridge. Passwords, private SSH keys, tunnel keys and MTProxy secrets must not go into Git, stdout logs, public links or evidence archives.
-- **Scope:** research and proof of concept may precede unrelated release tasks on isolated lab hosts. A focused security correction must be accepted before integrating with affected Manager paths, but unrelated RC checks do not automatically block a separate lab PoC.
 
 - No production VPS changes during development, audits or fault injection.
 - No resurrection of rejected advanced Stage 3 recovery, LKG, journal or generic exact-state engine. Use bounded, operation-local transactions and the simple backup-before-update / rollback-to-previous-version approach.
@@ -67,23 +53,21 @@ Development handoffs and Bridge lab artifacts are **not authorized for productio
 - Every stage requires its own source checkpoint, targeted tests, error-path evidence and honest PASS / FAIL / NOT_EXECUTED reporting. No claim of kernel behavior from mocks alone.
 - No unreviewed merge, push to `main`, automatic deployment or release from an engineering checkpoint.
 
-## Immediate work: Gate 3 validation → targeted fixes → RC preparation
+## Immediate work: integrated pre-RC validation
 
-The A/B/C/D/E/F/G/H history below remains historical. GitHub `main` still publishes v0.2.22-beta. The independently accepted focused v0.2.24 corrections and subsequent Bridge development have not been promoted to the published source tree.
+**Stage H v0.2.22-beta DEVELOPMENT_ACCEPTED** after independently rerunning the Stage H suite: 98/98 model UX assertions, 0 failures, static heredoc guard PASS, RU/EN catalog PASS, exact Git source tree 687/687 and unchanged updater/protected function hashes. First-run/quick/advanced workflows, DNS refusal, cancel/EOF, site/TLS choices, client help, status hints, main-menu routing and Anti-DPI risk explanations are implemented.
 
-**v0.2.24 focused closure:** the two previously reproduced security P1 failures (backend-port exposure after nftables guard loss; MTProxy secret exposure when procfs protection failed) passed their scoped independent correction acceptance. This does not establish full RC or production readiness.
+**Scope is complete for A/B/C/D/E/F/G/H development, not yet proven for production.** Real Telegram clients and a production-like public HTTPS site have not been tested. Current quick setup can use a temporary placeholder, supplied static directory or local upstream; it does not implement a website builder.
 
-**Bridge Gate 1 — CONDITIONAL GO:** real two-host WireGuard/TCP forwarding, binary data integrity, MTProxy server responses and recovery were demonstrated. End-user Telegram operation was NOT_EXECUTED.
+**Confirmed P1 gates before production RC:**
+- `P1-G-01`: offline restore may return `RESTORE_SUCCESS` / exit 0 despite failure to replace `global.env` version metadata.
+- `P1-INHERITED-01`: stock MTProxy uses a `-S` secret in argv; local users may read `/proc/<pid>/cmdline` on permissive procfs.
 
-**Bridge Gate 2 — CONDITIONAL ACCEPTANCE:** full all-in-one handoff available; 17 PASS, 0 FAIL, 8 NOT_EXECUTED. Automatic SSH onboarding, Manager orchestration and lifecycle were tested, but clean-install and genuine Telegram-client evidence remain incomplete. Do not count Gate 2 as RC or as published `main` functionality.
+**Development incident note:** During Stage H creation, unquoted heredoc help text containing backticks caused several noninteractive calls to the host's installed manager, leaving 18 log files. Host canary found no service/configuration changes. The final help text no longer executes commands and a static guard and dynamic sentinel tripwire check cover this.
 
-**Bridge Gate 3 — IN PROGRESS:** test the intended clean installation, HTTPS/static site, single RU-entry link, actual compatible Telegram client, messaging/media/reconnect and safe lifecycle recovery. A separate test deployment presented v0.2.25-beta and a manually reproduced menu defect when an existing Bridge node prevented a duplicate Add: the refusal should return to the Bridge menu without terminating the manager. Apply the smallest targeted correction and verify interactive and CLI behavior. Distinguish server-side MTProto probes from real user-client acceptance.
+**RC acceptance plan:** privileged disposable VM tests for nftables and systemd; genuine Caddy/Nginx with ACME and a public site over 80/443; end-to-end Telegram Desktop and mobile client connections; stock and targeted Anti-DPI behavior checks across controlled networks; trust bootstrap and an actually signed release; failure/recovery behavior and closure or explicitly approved mitigations of both P1. Record exact real vs model coverage, failures and NOT_EXECUTED truthfully. A failed test does not automatically require a new development stage unless it exposes a material blocker.
 
-**UX follow-up:** simplify repeated technical prompts with safe defaults and numbered presets, especially Anti-DPI. Never infer a working censorship-bypass method without evidence; preserve STOCK and rollback, and retain security/destructive confirmations.
-
-**Later RC gate:** independently validate compatible clients, certificates, OS matrix, upgrade/rollback, provenance and release process. Do not automatically publish new versioned source to `main` from a lab snapshot. No unapproved production changes.
-
-**Historical note:** prior Stage G/Pre-RC fixes should not be reopened without a new reproducer. Report PASS, FAIL and NOT_EXECUTED separately and keep P2/P3 out of stage-blocking loops.
+**GitHub source publication remains incomplete.** The verified history.bundle includes Stage D–H, but `main` remains v0.2.9 and no remote accepted source branches have been verified. Publish exact approved source commits to separate dev branches before release readiness; do not claim that README/roadmap changes published code, do not push to `main`, force-push or create a release.
 
 ## Mandatory disposable Linux validation (before RC; prioritize after B.1)
 
@@ -125,68 +109,7 @@ Create an evidence-backed **research / design gate before implementation**. Do n
 
 Output: candidate matrix, measured results, threat/compatibility assumptions, implementation design, migration gates and non-goals. Implement only approved, proved improvements in a separate post-core stage.
 
-## Optional RU-entry → foreign-exit Bridge — approved development track, not a released feature
-
-**Product decision:** implement a managed **single-entry / one-foreign-exit** mode as an optional TWebProxy Manager feature. This is **not** a manual two-VPS recipe. The normal single-VPS install stays the default. Integration and deployment must retain all accepted v0.2.24 security invariants; the bridge is independent of the six DPI mode IDs. The proposed "post-RC only" research restriction has been superseded by the owner's authorization of isolated Bridge Gate 1 and Gate 2 development; this does not authorize RC or production rollout.
-
-**One public client endpoint — no second foreign-client URL:**
-
-```text
-Telegram WEB-capable client
-  -> ONE RU-facing hostname (lab: martins.ortositi.ru):443 HTTPS/WSS
-  -> Caddy/Nginx, genuine static website on /, WEB proxy on compatible routes
-  -> local official tproxy-server relay, loopback-only backend contract
-  -> local TCP forwarder / socket proxy
-  -> authenticated WireGuard tunnel
-  -> foreign VPS stock MTProxy, private tunnel listener only
-  -> Telegram DC
-```
-
-The end user sees only the RU hostname. The foreign VPS must not expose a public client-facing MTProxy or issue a second user proxy link. A separate foreign test hostname (lab proposal: `codex.ortositi.ru`) is **not required** for this design and may be used for authorized private diagnostics only, not as a second connection URL.
-
-**One-click managed node user journey:**
-
-1. Install TWebProxy Manager on the RU entry VPS and open its existing RU/EN menu.
-2. Select **Foreign Nodes → Add Foreign Node**; enter foreign IP/hostname, SSH port, username and password **or** SSH-key authentication.
-3. Independently verify/approve the remote SSH host key and show a non-destructive preflight plan: OS, privileges, service/port conflicts, existing profile/site and intended firewall changes.
-4. On approval, bootstrap the minimum required restricted management access and provision both servers automatically: keys, WireGuard, bounded routes, scoped firewall/systemd controls, stock foreign MTProxy, entry forwarder and WEB profile.
-5. Validate the complete path before switching traffic. Display one client connection link for the RU hostname, not instructions for manual WG/MTProxy setup.
-6. Provide truthful node status, diagnostics, idempotent repair and safe removal/rollback. Preserve unrelated services, original local profiles, certificates and website, even on failure or repeated installation.
-
-Prefer an **SSH/agentless management workflow** without a new publicly reachable management API. Never embed passwords in a prompt, URL, shell arguments, long-term config or ZIP; use constrained keys and revoke temporary lab credentials after testing. Scope the first MVP to one foreign node; leave multi-node balancing and remote fleet orchestration to a later optional stage.
-
-**Security/compatibility requirements:**
-
-- Preserve the relay's local backend requirement; do not expand it to arbitrary public IPs. Keep foreign backend tunnel-only and fail closed when tunnel, forwarding, peer or backend fails.
-- Preserve nftables + systemd cgroup/IPAddressDeny protection. Add only explicit tunnel peer addresses to the allowed traffic; do **not** switch protections off to make Bridge work.
-- Handle Ubuntu 26.04 WireGuard/AppArmor key path restrictions with protected `/etc/wireguard/` locations and restrictive permissions rather than disabling AppArmor; verify on each supported OS.
-- Re-run provisioning safely, detect occupied ports and service conflicts, roll back partial changes and uninstall only owned services/users/routes/files. Do not delete remote management accounts from their own active sessions.
-- Record precise evidence for the 4 MiB real-host transfer, MTProto/Telegram DC replies and failure/recovery; do not overgeneralize a lab MTU value (1280 worked where 1420 failed) as universal.
-- A Russian-hosted IP alone does not prove accessibility under censorship. Check client→RU and RU→foreign paths independently and document limitations/cost/latency.
-
-**Delivery gates (distinct, not one never-ending audit):**
-
-| Gate | Objective | Current status |
-| --- | --- | --- |
-| **Gate 1 — Network PoC** | Two disposable VPSs, WG, binary TCP, stock MTProxy protocol, failure/recovery, real evidence | **CONDITIONAL GO**: server path proven; real Telegram WEB client NOT_EXECUTED |
-| **Gate 2 — Auto Provisioning MVP** | Existing Manager TUI/CLI, SSH bootstrap, remote + local deployment, status, repair, rollback and removal | **CONDITIONAL ACCEPTANCE**: 17 PASS, 0 FAIL, 8 NOT_EXECUTED; not published in `main` |
-| **Gate 3 — Real-client validation + site/TLS** | One RU public endpoint, valid cert, default static website, compatible client link, real client messaging/media/reconnect logs | **IN PROGRESS** on authorized test hosts; client acceptance pending |
-| **Later operational hardening** | Compatibility matrix, multiple optional foreign nodes if justified, updates/key rotation, broader RC tests | **BACKLOG**; not Gate 2 blockers absent reproduced impact |
-
-**Gate 3 test layout (not part of published `main`):**
-- RU entry: `martins.ortositi.ru` — sole public TLS/WEB proxy hostname; existing lab RU test VPS.
-- Foreign exit: existing authorized nonproduction test VPS; reachable through WireGuard, private backend only. `codex.ortositi.ru` is not a second client endpoint.
-- ACME: verify RU DNS, ports 80/443, existing web-server conflicts and obtain a valid certificate using the **operator-supplied ACME contact address** in the private run-time configuration (do not commit personal addresses).
-- Static website on `/`: **«Культурные маршруты Подмосковья»** — a substantive Russian-language informational landing page about Kolomna, Sergiev Posad, Zaraysk, architecture and crafts; accessible mobile-first design, licensed locally served assets, no trackers or false official affiliation.
-- Preserve WEB transport routes and WebSocket Upgrade semantics next to the site. Do not invent a `wss://` or `tg://` link: derive **one real connection link** from the actually supported WEB-capable client protocol and live configuration.
-- Operator runs a real Telegram session on their device. Collect timestamps, handshake and connection outcomes, message/media/reconnect timings and sanitized system logs from entry and exit; **never** log chat content, tokens, passwords, or private keys. Report PASS/FAIL/NOT_EXECUTED separately for supported clients.
-- Gate 3 has been authorized separately; continue only its defined acceptance work. Do not treat isolated TLS/server-side successes as proof of a working Telegram client.
-
-**Success principle:** a person installs Manager on the RU VPS, supplies foreign SSH details, approves the plan and gets a functioning RU-facing WEB proxy without manually assembling the tunnel. Verify actual client functionality and measurable network benefit before broader rollout; if there is no benefit, remain with the normal single-VPS mode.
-
 ## Public website / Decoy Site Manager — dedicated future stage
-
-**Near-term, narrowly scoped Gate 3 deliverable:** deploy one real, maintainable static site **«Культурные маршруты Подмосковья»** on the RU lab hostname alongside WEB transport with valid HTTPS. This is not a license to expand Gate 2 or a requirement to implement the full site generator. ACME contact is supplied privately at deployment.
 
 Bring the original product idea back: a real, maintainable HTTPS website on the same hostname as the WEB bridge rather than the current generic “Gateway / The service is online” page.
 

@@ -73,3 +73,12 @@ exit status and output. No secrets or real hostnames.
   restart cascades as try-restart; stop stops them (fail-closed).
 - **R3 ambiguous apply:** not reproducible on demand; the model fixture covers
   the decision logic. Optionally slow the netlink path and use a short timeout.
+
+## Installed-host harnesses (v0.2.23)
+
+`tests/prerc/*` need the opposite of a clean lab: an installed TWebProxy on a
+host carrying the same machine-bound marker. They run only with
+`TWEBPROXY_PRERC_REAL=installed-test-host` (`installed_host_gate_or_exit` in
+`tests/lib/lab-gate.sh`) and refuse with 77 otherwise. `tg3` now removes the
+directories, files and accounts it creates on the shared filesystem, so a later
+gated run is not refused because of its residue.

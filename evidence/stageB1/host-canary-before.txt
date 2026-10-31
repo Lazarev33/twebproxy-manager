@@ -1,0 +1,7 @@
+/usr/local/libexec/twebproxy directory 755 0:0 mtime=1792468474
+/etc/twebproxy directory 700 0:0 mtime=1792468474
+/etc/systemd/system directory 755 0:0 mtime=1792468474
+/usr/local/sbin directory 755 0:0 mtime=1792468045
+/opt/twebproxy-manager directory 700 0:0 mtime=1792494154
+/srv/twebproxy directory 755 0:0 mtime=1792469080
+f7ab41c8a44baa6cef8d9336f5312d8f7b1ca3d28b590e9230cc128db90c6b3e  mount-table-hash

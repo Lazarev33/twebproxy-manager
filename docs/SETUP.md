@@ -1,6 +1,6 @@
 # Настройка TWebProxy Manager / Setting up TWebProxy Manager
 
-Руководство относится к v0.2.22 (Stage H). Это development-checkpoint, а не
+Руководство относится к v0.2.23 (корректирующий pre-RC checkpoint). Это development-checkpoint, а не
 релиз: не ставьте его на рабочий VPS до предрелизных испытаний.
 The English version follows the Russian one.
 
@@ -107,17 +107,25 @@ secret, carrier, workers и лимит соединений. `sudo twebproxy add
 - Частые причины: запись `A` указывает не на этот сервер; порт 80 или 443 занят
   другим веб-сервером; закрыт межсетевой экран провайдера.
 
-### Известные ограничения (предрелизный backlog)
+### Безопасность хоста (v0.2.23)
 
-- P1-G-01: офлайн-восстановление (`restore-update-backup`) сообщает
-  `RESTORE_SUCCESS`, даже если обновить `MANAGER_VERSION` в `global.env` не
-  удалось (например, файл неизменяемый). Исполняемые файлы при этом
-  восстановлены. Сообщение об этом выводится в stderr; `twebproxy repair`
-  переписывает метаданные.
-- P1-INHERITED-01: stock MTProxy получает secret клиента через `-S`; локальные
-  пользователи сервера могут прочитать его в `/proc`. Не используйте сервер с
-  недоверенными локальными учётными записями либо смонтируйте `/proc` с
-  `hidepid=2`.
+- **Изоляция backend.** Порты MTProxy закрыты снаружи таблицей `inet twebproxy_guard`
+  с флагом `owner`, которую держит служба `twebproxy-firewall`. Команда
+  `flush ruleset` из `nftables.service` (start, reload, restart, stop) её не
+  удаляет, поэтому порты не открываются; обычная таблица `twebproxy_backend`
+  восстанавливается автоматически. Остановка `nftables.service` больше не
+  останавливает прокси. Если остановить саму `twebproxy-firewall`, backend
+  останавливаются (защита в закрытую сторону); её запуск возвращает их.
+- **Secret MTProxy и `/proc`.** Штатный MTProxy получает secret клиента в
+  командной строке. `core-install`, `add` и `repair` монтируют `/proc` с
+  `hidepid=invisible` (запись в `/etc/fstab`; группа-исключение
+  `twebproxy-procview` для мониторинга). Проверка: `twebproxy proc-hardening status`.
+  Отказ — `twebproxy proc-hardening disable` (аудит покажет принятый риск).
+  `core-uninstall` политику не снимает.
+- **Офлайн-откат.** Если исполняемые файлы восстановлены, а `global.env` обновить
+  не удалось, выводится `RESTORE_PARTIAL … metadata=stale` и код 3; сделайте файл
+  записываемым (например, `chattr -i /etc/twebproxy/global.env`) и выполните
+  `twebproxy repair <hostname>`.
 
 ---
 
@@ -221,13 +229,22 @@ with a real client.
 - Common causes: the `A` record points elsewhere; another web server holds
   port 80 or 443; the provider's firewall blocks them.
 
-### Known limitations (pre-release backlog)
+### Host security (v0.2.23)
 
-- P1-G-01: the offline restore (`restore-update-backup`) prints
-  `RESTORE_SUCCESS` even when it could not update `MANAGER_VERSION` in
-  `global.env` (for example, an immutable file). The executables are restored;
-  the problem is reported on stderr, and `twebproxy repair` rewrites the
-  metadata.
-- P1-INHERITED-01: stock MTProxy receives the client secret with `-S`, so local
-  users of the server can read it in `/proc`. Do not run the proxy on a host
-  with untrusted local accounts, or mount `/proc` with `hidepid=2`.
+- **Backend isolation.** The MTProxy ports are closed to the outside by
+  `inet twebproxy_guard`, a table with the `owner` flag held by the
+  `twebproxy-firewall` service. The `flush ruleset` that `nftables.service`
+  runs (start, reload, restart, stop) cannot remove it, so the ports never open;
+  the ordinary `twebproxy_backend` table is re-applied automatically. Stopping
+  `nftables.service` no longer stops the proxies. Stopping `twebproxy-firewall`
+  itself stops the backends (fail-closed); starting it brings them back.
+- **MTProxy secret and `/proc`.** Stock MTProxy receives the client secret on its
+  command line. `core-install`, `add` and `repair` mount `/proc` with
+  `hidepid=invisible` (persisted in `/etc/fstab`; exempt group
+  `twebproxy-procview` for monitoring tools). Check with
+  `twebproxy proc-hardening status`; opt out with `twebproxy proc-hardening disable`
+  (the audit then reports an accepted risk). `core-uninstall` keeps the policy.
+- **Offline rollback.** When the executables are restored but `global.env`
+  cannot be updated, the outcome is `RESTORE_PARTIAL … metadata=stale` with
+  status 3. Make the file writable (e.g. `chattr -i /etc/twebproxy/global.env`)
+  and run `twebproxy repair <hostname>`.

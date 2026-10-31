@@ -1,0 +1,400 @@
+{
+ "stage": "F",
+ "version": "0.2.20-beta",
+ "verdict": "STAGE F DEVELOPMENT_COMPLETE / NEXT: G (Security Hardening), pending independent review and the separate production RC lab gates",
+ "baseline": {
+  "commit": "a3a2bf48e29ba2b7f2532d7147c82fdba7c5bbd0",
+  "tree": "c2b0d036f941731087752d88a7dd477fce1164c0",
+  "manager_sha256": "831522cc6da679e74a6699ab9bf94ed22425a292685fe8e621a83c71dfd57665",
+  "input_zip_sha256_prefix": "1f6a11f6e493a017cbd806ce649a1dd0d89434d910"
+ },
+ "github_publication": {
+  "status": "NOT_EXECUTED (blocked)",
+  "detail": "repository reachable read-only (main 56baf16); no GitHub credentials in the environment; push dry-run of stage-d/v0.2.18 and stage-e/v0.2.19 failed with 'could not read Username' (rc 128); nothing pushed; remote commit/tree identities not verifiable; README/ROADMAP taken from main 56baf16"
+ },
+ "result_protocol": "0=PASS 1=FAIL 77=NOT_EXECUTED; NOT_EXECUTED is never counted as PASS",
+ "environment": "production host: model/static tests only; sentinel stubs first in PATH; curl model instead of the network; ephemeral test signing keys; 0 sentinel calls; host canary (incl. /run/lock/twebproxy-manager-update.lock) unchanged",
+ "stage4_protected_hashes": {
+  "legacy_tool": "tests/fieldgate/stage4-function-set-hash.sh",
+  "legacy_before": "fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb",
+  "legacy_after": "c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b",
+  "full_body_tool": "tests/stagef/updater-function-hashes.sh",
+  "full_body_before": "07129826f873f8210a09bf12b2778793cac3fdb4e1080f85f1be766050e21d0c",
+  "full_body_after": "29479800bfd4afec9edc48d9154e61f198d7f275ebf9acfdab6f1a0ed3b5933f",
+  "modified": [
+   "stage4_render_restore_helper",
+   "stage4_install_restore_helper",
+   "stage4_prepare_backup_root",
+   "stage4_acquire_update_lock",
+   "stage4_install_candidate_target",
+   "load_manager_update_cache",
+   "fetch_manager_update_info",
+   "manager_check_update_impl",
+   "set_global_manager_version",
+   "manager_update_cmd",
+   "fetch_manager_update_hint_info"
+  ],
+  "unchanged_count": 17,
+  "per_function": "stage4-function-hashes-v0.2.19.txt / stage4-function-hashes-v0.2.20.txt"
+ },
+ "summary": {
+  "PASS": 35,
+  "FAIL": 0,
+  "NOT_EXECUTED": 2
+ },
+ "red": {
+  "updater-fixture-on-v0.2.19": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 130 pass, 148 fail"
+  },
+  "updater-fixture-on-mutant-branch-fallback": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 277 pass, 1 fail"
+  },
+  "updater-fixture-on-mutant-cache-sourced": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 277 pass, 1 fail"
+  },
+  "updater-fixture-on-mutant-copy-without-lock": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 277 pass, 1 fail"
+  },
+  "updater-fixture-on-mutant-helper-not-refreshed": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 277 pass, 1 fail"
+  },
+  "updater-fixture-on-mutant-lenient-identity": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 275 pass, 3 fail"
+  },
+  "updater-fixture-on-mutant-lenient-manifest": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 258 pass, 20 fail"
+  },
+  "updater-fixture-on-mutant-lock-kept-after-return": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 275 pass, 3 fail"
+  },
+  "updater-fixture-on-mutant-lock-no-wait": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 276 pass, 2 fail"
+  },
+  "updater-fixture-on-mutant-metadata-in-place": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 276 pass, 2 fail"
+  },
+  "updater-fixture-on-mutant-no-interrupt-cleanup": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 244 pass, 34 fail"
+  },
+  "updater-fixture-on-mutant-no-recovery-guidance": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 276 pass, 2 fail"
+  },
+  "updater-fixture-on-mutant-no-signal-deferral": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 276 pass, 2 fail"
+  },
+  "updater-fixture-on-mutant-no-signature-check": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 269 pass, 9 fail"
+  },
+  "updater-fixture-on-mutant-no-staging-cleanup": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 240 pass, 38 fail"
+  },
+  "updater-fixture-on-mutant-probes-inherit-lock": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 276 pass, 2 fail"
+  },
+  "updater-fixture-on-mutant-probe-without-kill": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 275 pass, 3 fail"
+  },
+  "updater-fixture-on-mutant-redirects-followed": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 269 pass, 9 fail"
+  },
+  "updater-fixture-on-mutant-same-source-checksum-trusted": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 263 pass, 15 fail"
+  },
+  "updater-fixture-on-mutant-strict-shared-parent": {
+   "exit_status": 1,
+   "last_line": "updater-fixture: 229 pass, 49 fail"
+  },
+  "stage4-fixture-unadapted-on-0.2.20": {
+   "exit_status": 1,
+   "last_line": "stage4-update-backup-fixture: FAIL [A-valid-update]: assertion failed: test 1 -eq 0"
+  }
+ },
+ "mutants": {
+  "same-source-checksum-trusted": "without a trust anchor the same-source SHA256SUMS is accepted again",
+  "branch-fallback": "the development-branch VERSION is used when no release answers",
+  "no-signature-check": "the manifest signature is not verified",
+  "lenient-manifest": "manifest validation accepts any JSON",
+  "redirects-followed": "redirects to any host are followed for artifact and metadata",
+  "lenient-identity": "bash -n / MANAGER_VERSION / MANAGER_RELEASE_VERSION checks skipped",
+  "cache-sourced": "the update cache is sourced as shell code",
+  "lock-kept-after-return": "the update lock is not released on return",
+  "probes-inherit-lock": "health probes inherit the lock descriptor",
+  "probe-without-kill": "health probes are not SIGKILLed after the timeout",
+  "copy-without-lock": "install_manager_copy ignores the update lock",
+  "lock-no-wait": "no bounded wait for the lock",
+  "no-interrupt-cleanup": "no EXIT/INT/TERM/HUP cleanup handlers",
+  "no-signal-deferral": "signals are not deferred between the two copies",
+  "no-staging-cleanup": "staging and stale temp files are not removed",
+  "metadata-in-place": "global.env is rewritten in place",
+  "no-recovery-guidance": "no offline recovery command on rollback failure / mixed state",
+  "helper-not-refreshed": "the restore helper is never refreshed",
+  "strict-shared-parent": "the shared /var/lib/twebproxy parent must be exactly 0700 again"
+ },
+ "red_notes": [
+  "updater fixture on v0.2.19: 148 of 278 checks FAIL in 53 of 61 cases (the passing checks are guards).",
+  "P0: a mutable development branch was a trusted production source (no release exists today: check-update/hint offered main's VERSION; manager-update installed raw main; --force downgraded to main's 0.2.9).",
+  "P0: the only authentication was a SHA256SUMS from the same ref/host; redirects to any HTTPS host followed.",
+  "P1: draft/prerelease/foreign releases accepted; only the first MANAGER_VERSION checked; cache sourced as code; lock kept after return (TUI) and inherited by health probes (lingering candidate process blocked later updates); no bounded wait; probe without SIGKILL hung the update; add/repair copy overlapped updates non-atomically; SIGINT/TERM/HUP between the copies left them mixed with no recovery hint; candidates leaked into /tmp on every failure path; shared /var/lib/twebproxy (ACME webroot, 0755) made every backup fail.",
+  "P2: global.env rewritten in place (failed write emptied it, reported success); no offline command after a failed rollback; helper never refreshed; unknown options ignored.",
+  "All 19 mutants of the final manager are caught (see red/SUMMARY.tsv).",
+  "The unadapted Stage 4 fixture is refused on 0.2.20 (UPDATE_REFUSED reason=no-trust-anchor): expected under the new trust policy; the adapted fixture passes A-V."
+ ],
+ "green": [
+  {
+   "name": "git-diff-check",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "git diff --check a3a2bf4 (excluding captured evidence): clean"
+  },
+  {
+   "name": "bash-n-all",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "bash -n OK"
+  },
+  {
+   "name": "e-operations",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "e-operations: pass=48 fail=0"
+  },
+  {
+   "name": "suite-stage-e",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-e-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "f-updater",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "updater-fixture: 278 pass, 0 fail"
+  },
+  {
+   "name": "suite-stage-f",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-f-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "f-scope-vs-v0219",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS f-scope unchanged=385 modified=15 added=14"
+  },
+  {
+   "name": "stage4-mandatory-suite",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage4-mandatory-suite: PASS (A-V all executed)"
+  },
+  {
+   "name": "stage-x-dpi-installed-asset",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-x-dpi-installed-asset-fixture: PASS"
+  },
+  {
+   "name": "updater-function-hashes",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "29479800bfd4afec9edc48d9154e61f198d7f275ebf9acfdab6f1a0ed3b5933f  stage4-protected-function-set-full"
+  },
+  {
+   "name": "d-frontend-tls",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "d-frontend-tls: pass=122 fail=0"
+  },
+  {
+   "name": "suite-stage-d",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-d-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c2",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c2-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "suite-stage-c1",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-c1-suite: PASS (all mandatory model checks executed)"
+  },
+  {
+   "name": "audit-c11-cross-instance-orphan",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS"
+  },
+  {
+   "name": "audit-c11-backend-id-collision",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS: existing B/x backend env preserved"
+  },
+  {
+   "name": "audit-c1-failed-backend-stop",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "FW collection ports=[23980,23981,28980,28981]"
+  },
+  {
+   "name": "audit-c1-orphan-backend",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "API profiles=[alpha]"
+  },
+  {
+   "name": "suite-stage-b",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)"
+  },
+  {
+   "name": "suite-stage-a",
+   "exit_status": 77,
+   "result": "NOT_EXECUTED",
+   "summary": "stage-a-suite: INCOMPLETE (mandatory checks NOT_EXECUTED)"
+  },
+  {
+   "name": "protocol-meta",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "PASS stage-a1-runner-status: PASS/FAIL/NOT_EXECUTED stay distinct"
+  },
+  {
+   "name": "sa6-release-metadata",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "sa6-release-metadata: 6 pass, 0 fail"
+  },
+  {
+   "name": "fg-tg5",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5: pass=13 fail=0"
+  },
+  {
+   "name": "fg-tg5b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg5b: pass=19 fail=0"
+  },
+  {
+   "name": "fg-tg7",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tg7: pass=12 fail=0"
+  },
+  {
+   "name": "fg-df3",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3-dpi-cleanup-stage-diagnostics: 171 pass, 0 fail"
+  },
+  {
+   "name": "fg-df3b",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "df3b-nfqws-cleanup-propagation: 37 pass, 0 fail"
+  },
+  {
+   "name": "read-only-core",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "read-only-core-fixture: PASS"
+  },
+  {
+   "name": "l10n-static-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)"
+  },
+  {
+   "name": "l10n-static-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-static-audit: PASS (252 bilingual keys; 391 legacy call-sites)"
+  },
+  {
+   "name": "l10n-flow-C",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C)"
+  },
+  {
+   "name": "l10n-flow-UTF8",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "localization-flow-fixture: PASS (locale=C.UTF-8)"
+  },
+  {
+   "name": "static-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "static-smoke: PASS"
+  },
+  {
+   "name": "certificate-smoke",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "certificate-smoke: PASS"
+  },
+  {
+   "name": "tui-presentation",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "tui-presentation-fixture: PASS"
+  },
+  {
+   "name": "stage-x-fixui",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "stage-x-fixui-suite: PASS (all mandatory tests executed; none skipped)"
+  },
+  {
+   "name": "stage4-hash",
+   "exit_status": 0,
+   "result": "PASS",
+   "summary": "c94a32e5b0c3dee6f05cc399121c4d70162381b34ed7273d4124ed269665001b  stage4-protected-function-set"
+  }
+ ],
+ "contracts": [
+  "backup format twebproxy.update-backup.v1, manager-rollback, manager-backup-list and the offline helper interface unchanged",
+  "manager-update and manager-update --force keep working; --sha256 added; unknown options refused (security change, documented)",
+  "UPDATE_SUCCESS / UPDATE_FAILED_ROLLBACK_SUCCESS / UPDATE_FAILED_ROLLBACK_FAILED lines unchanged; UPDATE_FAILED_UNCHANGED and UPDATE_REFUSED reason=... added",
+  "check-update output line format unchanged; source is always release",
+  "C1-E logic, firewall, DPI/nfqws, relay lifecycle, frontend/TLS, profiles and systemd units unchanged (f-scope: 385 functions identical)"
+ ],
+ "not_executed_gates": [
+  "real signed GitHub release (no signing key exists): API shape, asset redirect host, rate limits, immutable releases",
+  "real /run/lock, /usr/local/sbin, /opt; SSH loss (SIGHUP) during the install window; SIGKILL/power loss and offline recovery on a VM",
+  "health gate against the real installed manager with real systemd/journald",
+  "ENOSPC during staging/backup/global.env on a real filesystem",
+  "jq 1.6 / Debian 12 and Ubuntu 22.04 userland",
+  "tg3 installed-manager lifecycle (lab gate); Stage A/B lab-only cases (suites exit 77)"
+ ]
+}

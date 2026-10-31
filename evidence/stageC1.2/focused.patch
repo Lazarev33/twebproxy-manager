@@ -1,0 +1,709 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e6d2e08..ec84241 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,34 @@
+ # Changelog
+ 
++## 0.2.16-beta — 2026-10-26 — Stage C1.2: владение именами backend
++
++Имя backend — `<hostname>--<profile>`, а `--` допустим в обеих частях, поэтому
++одно имя могло принадлежать двум разным парам (hostname, profile). Формат и
++имена существующих однозначных backend не меняются, миграции нет.
++
++- C11-AUD-04: создание инстанса отклоняется, если его hostname и уже
++  существующий отличаются только суффиксом `--X`, при котором имена backend
++  могут совпасть (например `alpha.example` и `alpha.example--b`); `X` с точкой
++  (`alpha.example--b.com`) совпадений не даёт и разрешён. Новый профиль
++  (`add`, `profile add`) отклоняется, если его имя backend уже даёт живой профиль
++  другого инстанса. Проверки выполняются под общей блокировкой выделения портов
++  до записи любого файла, остановки unit или изменения firewall.
++- Если имя backend уже общее для профилей двух инстансов (состояние, записанное
++  прежними версиями), `rotate`, `carrier`, `profile add/delete`, `repair` и
++  `delete` для этих инстансов ничего не меняют и сообщают о конфликте; его нужно
++  разрешить вручную.
++- C11-AUD-03: backend env без профиля относится к инстансу только если имя
++  раскладывается в допустимые (hostname, profile) единственным способом.
++  Иначе `repair`, создание инстанса и `delete` не останавливают unit, не
++  удаляют env и не снимают защиту firewall, а завершаются отказом. Ограничение:
++  если `--` есть в последней метке hostname (IDN-зона, например `xn--p1ai`),
++  такие env всегда неоднозначны и убираются вручную.
++- Stage A/A.1, B/B.1, Stage 4, DPI, TLS, relay update и остальная логика
++  C1/C1.1 не изменены.
++- Статус: C1.2 принят по модельным тестам разработки; следующий этап — C2
++  (relay lifecycle). Реальные проверки systemd/nft/гонок/ENOSPC остаются
++  обязательными перед RC. `docs/ROADMAP.md`: обновлена таблица статусов.
++
+ ## 0.2.15-beta — 2026-10-21 — Stage C1.1: проверенная остановка backend и сироты
+ 
+ - C1-AUD-01: удаление профиля сначала останавливает его MTProxy backend и
+diff --git a/VERSION b/VERSION
+index b005e30..9097948 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.15
++0.2.16
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index f8f230d..da24810 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1,6 +1,6 @@
+ # TWebProxy Manager — Development Roadmap
+ 
+-Updated: 2026-10-20. This document tracks **planned work**, not production release status.
++Updated: 2026-10-26. This document tracks **planned work**, not production release status.
+ 
+ ## Product goal
+ 
+@@ -19,8 +19,13 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
+ | v0.2.9 (`main` at planning time) | Earlier GitHub baseline | Existing field-tested stock setup; not evidence for newer changes |
+ | v0.2.10 Stage A | Development completed | DPI state transaction and isolation improvements |
+ | v0.2.11 Stage A.1 | Development checkpoint | F01/F02/F11/F12/F18 and TUI shared-IPv4 consent; real nft and ENOSPC gates incomplete |
+-| v0.2.12 Stage B | **Blocked for acceptance** | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
+-| v0.2.13 Stage B.1 | **Next proposed correction** | Narrow corrections and test safety; not implemented yet |
++| v0.2.12 Stage B | Superseded by B.1 | Transactional backend firewall model implemented; independent Claude audit identified a confirmed MTProxy executable-directory permission regression; real nft/systemd and ENOSPC not proven |
++| v0.2.13 Stage B.1 | Development checkpoint | libexec permissions, privileged-test safety gate, R1/R3; real nft/systemd NOT_EXECUTED |
++| v0.2.14 Stage C1 | Superseded by C1.1/C1.2 | F03/F04/F05/F13 state and profile integrity; independent audit: C1-AUD-01/02 |
++| v0.2.15 Stage C1.1 | Superseded by C1.2 | C1-AUD-01/02 fixed; independent audit: C11-AUD-03/04 |
++| v0.2.16 Stage C1.2 | **Development accepted (model gates)** | C11-AUD-03/04 backend-id ownership fixed; real systemd/nft/race/ENOSPC gates remain mandatory before an RC |
++
++**Next development stage: C2 — relay lifecycle** (see "Core implementation stages").
+ 
+ All development checkpoints are **not authorized for production deployment**. The authoritative working files are versioned ZIPs, reports, SHA manifests and matching source commits/branches. Never infer that uploading documentation to `main` promotes newer code to a release.
+ 
+diff --git a/tests/stagec1/README.md b/tests/stagec1/README.md
+index 7b18cd7..d4889f2 100644
+--- a/tests/stagec1/README.md
++++ b/tests/stagec1/README.md
+@@ -7,6 +7,8 @@ workstation with Bash, jq, coreutils and util-linux; no system state changes.
+ ```sh
+ bash tests/stagec1/run-stage-c1-suite.sh            # exit 0 PASS, 1 FAIL, 77 INCOMPLETE
+ bash tests/stagec1/c1-scope-invariants.sh <v0.2.13 source tree>
++bash tests/stagec1/c11-scope-invariants.sh <v0.2.14 source tree>
++bash tests/stagec1/c12-scope-invariants.sh <v0.2.15 source tree>
+ ```
+ 
+ `state-harness.sh` runs the unmodified manager code with only the host boundary
+diff --git a/tests/stagec1/backend-identity-fixture.sh b/tests/stagec1/backend-identity-fixture.sh
+new file mode 100644
+index 0000000..cb09f81
+--- /dev/null
++++ b/tests/stagec1/backend-identity-fixture.sh
+@@ -0,0 +1,210 @@
++#!/usr/bin/env bash
++# C1.2 regression (C11-AUD-03, C11-AUD-04): a backend id is <host>--<profile>
++# and both parts may contain "--", so one id can name two (hostname, profile)
++# pairs. No operation on instance A may stop, rewrite or remove a backend that
++# could belong to another instance B; a collision is refused before any file,
++# unit or firewall change; an id whose owner cannot be proven is kept (with its
++# firewall protection) and the operation fails closed.
++# Overlapping/colliding states are seeded directly: they model data written by
++# earlier versions, which the current create paths no longer allow.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c12-identity.XXXXXX)"
++trap 'kill $(jobs -p) 2>/dev/null; rm -rf -- "$TMP"' EXIT
++export C1_INSTANCE_STUBS=1   # repair/delete/add never reach frontend, users or Stage 4 paths
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++not() { ! "$@"; }
++show() { grep -E '\[(x|!)\]' "$TMP/out" | tail -n 3 | sed 's/\x1b\[[0-9;]*m//g; s/^/  | /'; }
++A=alpha.example; B=alpha.example--b
++unit() { printf 'twebproxy-mtproxy@%s.service' "$1"; }
++running() { [[ -e "$TMP/units/$(unit "$1")" ]]; }
++pf() { printf '%s/%s/profiles.d/%s.env' "$INSTANCES_DIR" "$1" "$2"; }
++bf() { printf '%s/%s.env' "$BACKENDS_DIR" "$1"; }
++protected() { [[ -f "$TMP/firewall.applied" ]] && tr ',' '\n' < "$TMP/firewall.applied" | grep -qx "$1"; }
++touched() { grep -qE "systemctl (disable|restart|enable|stop|start)( --now)? $(unit "$1")\$" "$TMP/events"; }
++reset() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$SITES_DIR" "$TMP"/units/* "$TMP"/fail-* "$TMP"/state-* \
++    "$TMP/firewall.applied" "$TMP"/*.reached "$TMP"/*.go
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"; install -d -m 0755 "$SITES_DIR"
++}
++start() { for id; do "$TMP/bin/systemctl" start "$(unit "$id")"; done; }
++finish_setup() { # rebuild profiles.json of the given hosts, apply firewall, clear event log
++  local h; for h; do c1_run rebuild_profiles_json "$h" >/dev/null 2>&1; done
++  c1_eval rebuild_firewall >/dev/null 2>&1; : > "$TMP/events"
++}
++# Duplicate concurrent creation: the test holds the shared port lock, starts two
++# creates of one backend id (without the held fd, which would keep the lock),
++# waits until both block in flock, then releases.
++in_flock() { local c; for c in $(pgrep -P "$1"); do [[ "$(cat "/proc/$c/comm" 2>/dev/null)" == flock ]] && return 0; in_flock "$c" && return 0; done; return 1; }
++wait_in_flock() { local i; for ((i = 0; i < 200; i++)); do in_flock "$1" && return 0; sleep 0.05; done; return 1; }
++hold_ports() { install -d -m 0700 "$BASE_DIR/.locks"; exec {held}>>"$BASE_DIR/.locks/ports.lock"; flock "$held"; }
++field() { sed -n "s/^$1=//p" "$2" 2>/dev/null; }   # $1=key $2=file
++won() { [[ -f "$(pf "$1" "$2")" ]]; }
++snap_b() { cat "$(bf "$B--x")" 2>/dev/null; cat "$TMP/units/$(unit "$B--x")" 2>/dev/null; }
++
++# ---------- C11-AUD-04: colliding ids on create paths ----------
++# 1. B/x live; creating A with first profile b--x would alias B/x.
++reset; c1_seed_instance "$B" 18082 18083
++c1_seed_profile "$B" x bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb https 23981 28981
++start "$B--x"; finish_setup "$B"; before="$(snap_b)"
++C1_HOST="$A" C1_NAME='b--x' C1_SECRET=dddddddddddddddddddddddddddddddd c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_collision_refused test "$rc" -ne 0
++show
++check create_collision_b_env_and_unit_unchanged test "$(snap_b)" = "$before"
++check create_collision_b_unit_not_touched not touched "$B--x"
++check create_collision_no_instance_a test ! -e "$INSTANCES_DIR/$A"
++check create_collision_no_firewall_rebuild not grep -q '^rebuild' "$TMP/events"
++check create_collision_b_ports_protected protected 23981
++# 2. Any hostname that is a "--" extension of an existing one (either way) is refused.
++C1_HOST="$A" C1_NAME=main c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_prefix_of_existing_refused test "$rc" -ne 0 -a ! -e "$INSTANCES_DIR/$A"
++check create_prefix_reports_overlap grep -q "overlaps with $B in backend names" "$TMP/out"
++reset; c1_seed_instance "$A" 18080 18081
++c1_seed_profile "$A" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++start "$A--alpha"; finish_setup "$A"
++C1_HOST="$B" C1_NAME=x c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_extension_of_existing_refused test "$rc" -ne 0 -a ! -e "$INSTANCES_DIR/$B"
++check create_extension_a_untouched not touched "$A--alpha"
++# 3. Controls: unrelated, single-dash and dotted "--" extensions (b.com--<profile>
++#    is no profile name, so ids cannot coincide) are still created normally.
++C1_HOST=beta.example C1_NAME=default c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_unrelated_host_allowed test "$rc" -eq 0 -a -f "$(pf beta.example default)"
++C1_HOST=alpha.example-b C1_NAME=default c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_single_dash_host_allowed test "$rc" -eq 0 -a -f "$(pf alpha.example-b default)"
++C1_HOST="$A--b.com" C1_NAME=default c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_dotted_extension_allowed test "$rc" -eq 0 -a -f "$(pf "$A--b.com" default)"
++check create_dotted_extension_a_untouched not touched "$A--alpha"
++# 4. Concurrent creation of A and B: the parked one must see the other under the shared lock.
++reset; C1_AT_MAXCONN=pa C1_HOST="$A" C1_NAME=main c1_run add_instance_cmd > "$TMP/pa.out" 2>&1 & pa=$!
++c1_wait_reached pa
++C1_HOST="$B" C1_NAME=x c1_run add_instance_cmd > "$TMP/out" 2>&1; rc_b=$?
++: > "$TMP/pa.go"; wait "$pa"; rc_a=$?
++check concurrent_create_first_succeeds test "$rc_b" -eq 0
++check concurrent_create_overlap_refused test "$rc_a" -ne 0 -a ! -e "$INSTANCES_DIR/$A"
++# 4b. Both first profiles give alpha.example--b--x; both creates wait on the held lock.
++reset; hold_ports
++C1_HOST="$A" C1_NAME='b--x' C1_SECRET=a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1 c1_run add_instance_cmd > "$TMP/ra.out" 2>&1 {held}>&- & ra=$!
++C1_HOST="$B" C1_NAME=x C1_SECRET=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2 c1_run add_instance_cmd > "$TMP/rb.out" 2>&1 {held}>&- & rb=$!
++wait_in_flock "$ra"; wait_in_flock "$rb"
++check dup_create_both_waited_on_port_lock eval 'in_flock "$ra" && in_flock "$rb"'
++exec {held}>&-; wait "$ra"; rc_a=$?; wait "$rb"; rc_b=$?
++check dup_create_exactly_one_wins test "$(( (rc_a == 0) + (rc_b == 0) ))" -eq 1
++check dup_create_exactly_one_instance test "$(find "$INSTANCES_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1
++if won "$A" 'b--x'; then wh="$A"; wp='b--x'; else wh="$B"; wp=x; fi
++check dup_create_env_is_winners test -f "$(bf "$A--b--x")" -a "$(field MTPROXY_SECRET "$(bf "$A--b--x")")" = "$(field SECRET "$(pf "$wh" "$wp")")" \
++  -a "$(field MTPROXY_CLIENT_PORT "$(bf "$A--b--x")")" = "$(field BACKEND_PORT "$(pf "$wh" "$wp")")"
++check dup_create_winner_port_protected protected "$(field BACKEND_PORT "$(pf "$wh" "$wp")")"
++
++# ---------- profile ids in a state with overlapping hostnames (earlier versions) ----------
++legacy() {
++  reset; c1_seed_instance "$A" 18080 18081; c1_seed_instance "$B" 18082 18083
++  c1_seed_profile "$A" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++  c1_seed_profile "$B" x bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb https 23981 28981
++  c1_seed_profile "$B" y cccccccccccccccccccccccccccccccc https 23982 28982
++  start "$A--alpha" "$B--x" "$B--y"; finish_setup "$A" "$B"
++}
++# 5. A cannot add b--x while B/x is live.
++legacy; before="$(snap_b)"
++C1_NAME='b--x' c1_run profile_add_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check profile_collision_refused test "$rc" -ne 0
++check profile_collision_b_unchanged test "$(snap_b)" = "$before"
++check profile_collision_no_a_record test ! -e "$(pf "$A" 'b--x')"
++check profile_collision_no_firewall_rebuild not grep -q '^rebuild' "$TMP/events"
++# 6. Control: B can add z (no live pair shares that id); A then cannot add b--z.
++C1_NAME=z c1_run profile_add_cmd "$B" > "$TMP/out" 2>&1; rc=$?
++check profile_noncolliding_allowed test "$rc" -eq 0 -a -f "$(pf "$B" z)"
++C1_NAME='b--z' c1_run profile_add_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check profile_collision_after_add_refused test "$rc" -ne 0 -a ! -e "$(pf "$A" 'b--z')"
++# 6b. Concurrent A/b--w and B/w (same new id) on existing hosts, both waiting on the held lock.
++legacy; hold_ports
++C1_NAME='b--w' C1_SECRET=c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 c1_run profile_add_cmd "$A" > "$TMP/ra.out" 2>&1 {held}>&- & ra=$!
++C1_NAME=w C1_SECRET=d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4 c1_run profile_add_cmd "$B" > "$TMP/rb.out" 2>&1 {held}>&- & rb=$!
++wait_in_flock "$ra"; wait_in_flock "$rb"
++check dup_profile_both_waited_on_port_lock eval 'in_flock "$ra" && in_flock "$rb"'
++exec {held}>&-; wait "$ra"; rc_a=$?; wait "$rb"; rc_b=$?
++check dup_profile_exactly_one_wins test "$(( (rc_a == 0) + (rc_b == 0) ))" -eq 1
++check dup_profile_exactly_one_record test "$(( $(won "$A" 'b--w' && echo 1 || echo 0) + $(won "$B" w && echo 1 || echo 0) ))" -eq 1
++if won "$A" 'b--w'; then wh="$A"; wp='b--w'; else wh="$B"; wp=w; fi
++check dup_profile_env_is_winners test -f "$(bf "$A--b--w")" -a "$(field MTPROXY_SECRET "$(bf "$A--b--w")")" = "$(field SECRET "$(pf "$wh" "$wp")")" \
++  -a "$(field MTPROXY_CLIENT_PORT "$(bf "$A--b--w")")" = "$(field BACKEND_PORT "$(pf "$wh" "$wp")")"
++check dup_profile_loser_reports_collision grep -q 'already used by a profile of another instance' "$TMP/ra.out" "$TMP/rb.out"
++check dup_profile_others_untouched eval 'running "$A--alpha" && running "$B--x" && running "$B--y"'
++
++# ---------- C11-AUD-04: an id already shared by two live pairs (written by an earlier version) ----------
++shared() {
++  legacy; c1_seed_profile "$A" 'b--x' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb https 23981 28981
++  finish_setup "$A" "$B"; before="$(snap_b)"
++}
++for op in "profile_rotate_cmd $A b--x" "profile_carrier_cmd $B x" "profile_delete_cmd $A b--x" \
++          "profile_delete_cmd $B x" "repair_instance_cmd $A" "repair_instance_cmd $B" "delete_instance_cmd $A"; do
++  shared; name="shared_${op// /_}"; name="${name//./_}"
++  C1_SECRET=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee C1_CARRIER=websocket c1_run $op > "$TMP/out" 2>&1; rc=$?
++  check "${name}_refused" test "$rc" -ne 0
++  check "${name}_backend_unchanged" test "$(snap_b)" = "$before"
++  check "${name}_unit_not_touched" not touched "$B--x"
++  check "${name}_records_kept" test -f "$(pf "$A" 'b--x')" -a -f "$(pf "$B" x)" -a -f "$INSTANCES_DIR/$A/instance.env"
++  check "${name}_ports_protected" protected 23981
++done
++show
++
++# ---------- C11-AUD-03: orphan whose name another instance could own ----------
++orphan_b() { legacy; rm -f "$(pf "$B" x)"; finish_setup "$B"; before="$(snap_b)"; }
++# 7. repair(A) must not touch B's orphan (audit scenario) ...
++orphan_b; c1_run repair_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_cross_repair_a_fails_closed test "$rc" -ne 0
++show
++check orphan_cross_repair_a_b_untouched test "$(snap_b)" = "$before"
++check orphan_cross_repair_a_unit_not_touched not touched "$B--x"
++check orphan_cross_repair_a_ports_protected protected 23981
++# ... nor repair(B): the name also splits into (alpha.example, b--x); owner unproven.
++orphan_b; c1_run repair_instance_cmd "$B" > "$TMP/out" 2>&1; rc=$?
++check orphan_cross_repair_b_fails_closed test "$rc" -ne 0 -a "$(snap_b)" = "$before"
++# 8. delete_instance(A) refuses and deletes nothing while such a leftover exists.
++orphan_b; c1_run delete_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_cross_delete_a_refused test "$rc" -ne 0 -a -f "$INSTANCES_DIR/$A/instance.env"
++check orphan_cross_delete_a_b_untouched test "$(snap_b)" = "$before"
++check orphan_cross_delete_a_own_backend_running running "$A--alpha"
++# 9. Leftover of a fully deleted B: still not attributable to A.
++orphan_b; rm -rf "$INSTANCES_DIR/$B"; finish_setup "$A"; before="$(snap_b)"
++c1_run repair_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_deleted_owner_repair_fails_closed test "$rc" -ne 0 -a "$(snap_b)" = "$before"
++check orphan_deleted_owner_ports_protected protected 23981
++# 10. ... and creating A over such a leftover is refused without touching it.
++rm -rf "$INSTANCES_DIR/$A" "$SITES_DIR/$A"; rm -f "$(bf "$A--alpha")"; finish_setup; before="$(snap_b)"
++C1_HOST="$A" C1_NAME=main c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check create_over_unattributable_leftover_refused test "$rc" -ne 0 -a "$(snap_b)" = "$before"
++check create_over_unattributable_leftover_no_instance test ! -e "$INSTANCES_DIR/$A"
++# 11. Control: an orphan whose name splits only one way is still reconciled.
++legacy; c1_seed_profile "$A" beta 99999999999999999999999999999999 https 23985 28985
++start "$A--beta"; rm -f "$(pf "$A" beta)"; finish_setup "$A" "$B"
++c1_run repair_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_unique_reconciled test "$rc" -eq 0 -a ! -e "$(bf "$A--beta")"
++check orphan_unique_unit_stopped not running "$A--beta"
++check orphan_unique_b_untouched running "$B--x"
++check orphan_unique_ports_released not protected 23985
++# 12. Known limitation, fail closed: "--" in the last label (IDN zone) makes every
++#     orphan name split two ways (xn--e1afmkfd.xn + p1ai--beta); a "--" in an
++#     earlier label (IDN second level) does not.
++for h in xn--e1afmkfd.xn--p1ai xn--e1afmkfd.example; do
++  reset; c1_seed_instance "$h" 18080 18081
++  c1_seed_profile "$h" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++  c1_seed_profile "$h" beta 99999999999999999999999999999999 https 23985 28985
++  start "$h--alpha" "$h--beta"; rm -f "$(pf "$h" beta)"; finish_setup "$h"
++  c1_run repair_instance_cmd "$h" > "$TMP/out" 2>&1; rc=$?
++  if [[ "$h" == *.xn--* ]]; then
++    check orphan_idn_zone_fails_closed test "$rc" -ne 0 -a -e "$(bf "$h--beta")"
++    check orphan_idn_zone_unit_not_touched not touched "$h--beta"
++    check orphan_idn_zone_ports_protected protected 23985
++  else
++    check orphan_idn_label_reconciled test "$rc" -eq 0 -a ! -e "$(bf "$h--beta")"
++  fi
++done
++
++printf 'c12-backend-identity: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec1/c1-scope-invariants.sh b/tests/stagec1/c1-scope-invariants.sh
+index 347774a..7d9f8fb 100644
+--- a/tests/stagec1/c1-scope-invariants.sh
++++ b/tests/stagec1/c1-scope-invariants.sh
+@@ -18,7 +18,9 @@ ADDED=(is_valid_carrier_mode state_read_record profile_record_valid require_inst
+   state_write_file render_instance_record render_profile_record render_backend_env instance_derive_state
+   profile_state_commit profile_state_remove profile_state_restore state_lock_path instance_lock_acquire
+   instance_lock_release port_lock_acquire port_lock_release claim_instance_ports claim_profile_ports
+-  render_profile_json_entry require_profile_file stop_backend_unit orphan_backend_ids reconcile_orphan_backends)
++  render_profile_json_entry require_profile_file stop_backend_unit orphan_backend_ids reconcile_orphan_backends
++  backend_id_owners live_backend_pairs shared_backend_ids require_unshared_backends
++  backend_id_used_by_other overlapping_hosts)
+ NEW_VARS=(STATE_LOCK_WAIT_SECONDS INSTANCE_LOCK_FD INSTANCE_LOCK_HOST INSTANCE_LOCK_DEPTH PORT_LOCK_FD PORT_LOCK_DEPTH)
+ in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
+ 
+diff --git a/tests/stagec1/c11-scope-invariants.sh b/tests/stagec1/c11-scope-invariants.sh
+index 6293f47..8ad2789 100644
+--- a/tests/stagec1/c11-scope-invariants.sh
++++ b/tests/stagec1/c11-scope-invariants.sh
+@@ -9,8 +9,11 @@ BASE="${1:?v0.2.14 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/..
+ TMP="$(mktemp -d /tmp/twebproxy-c11-scope.XXXXXX)"
+ trap 'rm -rf -- "$TMP"' EXIT
+ MODIFIED=(stop_profile_backend profile_state_remove profile_delete_cmd delete_instance_cmd
+-  repair_instance_cmd profile_add_cmd add_instance_cmd ui_localize_legacy)
+-ADDED=(stop_backend_unit orphan_backend_ids reconcile_orphan_backends)
++  repair_instance_cmd profile_add_cmd add_instance_cmd ui_localize_legacy
++  profile_rotate_cmd profile_carrier_cmd)   # C1.2 ownership guard
++ADDED=(stop_backend_unit orphan_backend_ids reconcile_orphan_backends
++  backend_id_owners live_backend_pairs shared_backend_ids require_unshared_backends   # C1.2
++  backend_id_used_by_other overlapping_hosts)
+ NEW_VARS=()
+ in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
+ 
+@@ -64,8 +67,11 @@ echo 'PASS top-level variables unchanged except release identity'
+ for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do
+   cmp "$BASE/$f" "$PROJECT/$f"
+ done
+-for f in "$BASE"/docs/*.md; do cmp "$f" "$PROJECT/docs/${f##*/}"; done
+-echo 'PASS README, pinned nfqws assets and docs unchanged'
++for f in "$BASE"/docs/*.md; do
++  [[ "${f##*/}" == ROADMAP.md ]] && continue   # stage status table, updated by C1.2
++  cmp "$f" "$PROJECT/docs/${f##*/}"
++done
++echo 'PASS README, pinned nfqws assets and docs (except ROADMAP.md status) unchanged'
+ actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
+ [[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
+ echo "$actual"
+diff --git a/tests/stagec1/c12-scope-invariants.sh b/tests/stagec1/c12-scope-invariants.sh
+new file mode 100644
+index 0000000..2714c0f
+--- /dev/null
++++ b/tests/stagec1/c12-scope-invariants.sh
+@@ -0,0 +1,89 @@
++#!/usr/bin/env bash
++# Stage C1.2 scope against the exact v0.2.15 (Stage C1.1, d41e4dd) tree: only
++# backend-id ownership checks in the create, mutate, repair, delete and orphan
++# reconciliation paths may change; ui_localize_legacy may only gain lines;
++# every other file except release metadata, the ROADMAP status table and the
++# C1 test runners/scope allowlists is byte-identical (README, assets, other
++# docs and tests included).
++# Usage: c12-scope-invariants.sh <v0.2.15 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.15 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-c12-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(orphan_backend_ids reconcile_orphan_backends add_instance_cmd profile_add_cmd
++  profile_rotate_cmd profile_carrier_cmd profile_delete_cmd repair_instance_cmd delete_instance_cmd
++  ui_localize_legacy)
++ADDED=(backend_id_owners live_backend_pairs shared_backend_ids require_unshared_backends
++  backend_id_used_by_other overlapping_hosts)
++CHANGED_FILES=(twebproxy-manager.sh VERSION CHANGELOG.md SHA256SUMS docs/ROADMAP.md tests/stagec1/README.md
++  tests/stagec1/run-stage-c1-suite.sh tests/stagec1/c1-scope-invariants.sh tests/stagec1/c11-scope-invariants.sh)
++ADDED_FILES=(tests/stagec1/backend-identity-fixture.sh tests/stagec1/c12-scope-invariants.sh)
++NEW_VARS=()
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars"
++echo 'PASS top-level variables unchanged except release identity'
++
++files() { (cd "$1" && find . -path ./.git -prune -o -type f -printf '%P\n' | LC_ALL=C sort); }
++files "$BASE" > "$TMP/base.files"; files "$PROJECT" > "$TMP/cand.files"
++same=0
++while read -r f; do
++  [[ -f "$PROJECT/$f" ]] || { echo "FAIL removed file: $f"; exit 1; }
++  if cmp -s "$BASE/$f" "$PROJECT/$f"; then same=$((same+1)); continue; fi
++  in_list "$f" "${CHANGED_FILES[@]}" || { echo "FAIL forbidden file change: $f"; exit 1; }
++  echo "allowed changed file: $f"
++done < "$TMP/base.files"
++while read -r f; do
++  grep -Fxq -- "$f" "$TMP/base.files" && continue
++  in_list "$f" "${ADDED_FILES[@]}" || [[ "$f" == evidence/stageC1.2/* ]] ||
++    { echo "FAIL unexpected added file: $f"; exit 1; }
++done < "$TMP/cand.files"
++echo "PASS files: $same byte-identical (README, assets, docs, other tests and evidence included)"
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS c12-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagec1/run-stage-c1-suite.sh b/tests/stagec1/run-stage-c1-suite.sh
+index d3cdbfd..0be477b 100644
+--- a/tests/stagec1/run-stage-c1-suite.sh
++++ b/tests/stagec1/run-stage-c1-suite.sh
+@@ -11,6 +11,7 @@ stage_a_run_case "C1 state persistence F04 (MODEL)" "$ROOT/tests/stagec1/state-p
+ stage_a_run_case "C1 concurrent mutation F05 (MODEL)" "$ROOT/tests/stagec1/concurrency-fixture.sh" 300 "$MGR"
+ stage_a_run_case "C1 port allocation F13 (MODEL)" "$ROOT/tests/stagec1/port-allocation-fixture.sh" 300 "$MGR"
+ stage_a_run_case "C1.1 backend stop / orphan reconciliation (MODEL)" "$ROOT/tests/stagec1/backend-stop-fixture.sh" 600 "$MGR"
++stage_a_run_case "C1.2 backend identity / ownership (MODEL)" "$ROOT/tests/stagec1/backend-identity-fixture.sh" 600 "$MGR"
+ rc=0; stage_a_result || rc=$?
+ case "$rc" in
+   0) echo 'stage-c1-suite: PASS (all mandatory model checks executed)';;
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index b3ccdc4..51abebc 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.15-beta
++# TWebProxy Manager v0.2.16-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.15"
+-MANAGER_RELEASE_VERSION="0.2.15-beta"
++MANAGER_VERSION="0.2.16"
++MANAGER_RELEASE_VERSION="0.2.16-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -494,6 +494,12 @@ ui_localize_legacy() {
+     'Прежнее состояние '*' восстановлено, но backend профиля '*) value="${text#Прежнее состояние }"; value2="${text#*backend профиля }"; printf "The previous state of %s was restored, but the backend of profile %s is not running; run 'twebproxy repair %s'." "${value%% восстановлено*}" "${value2%% не запущен*}" "${value%% восстановлено*}"; return;;
+     'У '*' уже есть backend env '*' без профиля; выполни '*) value="${text#У }"; value2="${text#*backend env }"; printf "%s already has backend env %s without a profile; run 'twebproxy repair %s'." "${value%% уже есть*}" "${value2%% без профиля*}" "${value%% уже есть*}"; return;;
+     'Часть сервисов '*' могла быть остановлена; '*) value="${text#Часть сервисов }"; printf "Some services of %s may have been stopped; 'twebproxy repair %s' starts them again." "${value%% могла*}" "${value%% могла*}"; return;;
++    # Stage C1.2 backend identity / ownership messages.
++    'Backend '*' одновременно принадлежит профилям разных инстансов; '*) value="${text#Backend }"; printf 'Backend %s belongs to profiles of several instances at once; nothing was changed. The name conflict needs manual resolution.' "${value%% одновременно*}"; return;;
++    'Backend env '*' нельзя однозначно отнести к '*) value="${text#Backend env }"; value2="${text#* нельзя однозначно отнести к }"; printf 'Backend env %s cannot be attributed to %s unambiguously: the name may belong to another instance; the file and its firewall protection are kept.' "${value%% нельзя*}" "${value2%%:*}"; return;;
++    'Hostname '*' пересекается с '*' в именах backend'*) value="${text#Hostname }"; value2="${text#* пересекается с }"; printf 'Hostname %s overlaps with %s in backend names (<hostname>--<profile>); the instance was not created and nothing was changed.' "${value%% пересекается*}" "${value2%% в именах*}"; return;;
++    'Имя backend '*' уже использует профиль другого инстанса; '*) value="${text#Имя backend }"; printf 'Backend name %s is already used by a profile of another instance; the profile was not created and nothing was changed.' "${value%% уже*}"; return;;
++    'Для '*' есть backend env, который нельзя однозначно отнести к этому инстансу; ничего не удалено.') value="${text#Для }"; printf '%s has backend env files that cannot be attributed to this instance unambiguously; nothing was deleted.' "${value%% есть backend*}"; return;;
+     'Запусти от root:'*) printf 'Run as root:%s' "${text#*:}"; return;;
+     'Нужен systemd.') printf 'systemd is required.'; return;;
+     'jq нужен для --json output.') printf 'jq is required for --json output.'; return;;
+@@ -4490,32 +4496,98 @@ stop_profile_backend() {
+   stop_backend_unit "$(backend_id "$host" "$profile")"
+ }
+ 
+-# Backend env files of $1 that no profile record of ANY instance owns, by
+-# exact id <host>--<profile> (a hostname may itself contain "--"); prints ids.
+-# Symlinks and names outside the profile-name grammar are never candidates.
+-orphan_backend_ids() { # $1=host
+-  local host="$1" f id h q
+-  local -A live=()
++# A backend id is <host>--<profile> and both parts may contain "--", so one id
++# can name several (hostname, profile) pairs. Prints every split into a valid
++# hostname and a valid profile name, one "host profile" per line.
++backend_id_owners() { # $1=id
++  local rest="$1" pre="" h p
++  while [[ "$rest" == *--* ]]; do
++    h="$pre${rest%%--*}"; p="${rest#*--}"
++    if is_valid_hostname "$h" && is_valid_profile_name "$p"; then printf '%s %s\n' "$h" "$p"; fi
++    pre="$h--"; rest="$p"
++  done
++  return 0
++}
++
++# "id host profile" for every live profile record of every instance.
++live_backend_pairs() {
++  local h q
+   while read -r h; do
+     [[ -n "$h" ]] || continue
+-    while read -r q; do [[ -n "$q" ]] && live["$(backend_id "$h" "$q")"]=1; done < <(list_profiles_array "$h")
++    while read -r q; do
++      [[ -n "$q" ]] && printf '%s %s %s\n' "$(backend_id "$h" "$q")" "$h" "$q"
++    done < <(list_profiles_array "$h")
++  done < <(list_hosts_array)
++  return 0
++}
++
++# Backend ids of $1 that another live pair also produces (state written by an
++# earlier version: one env file and one unit serving two owners).
++shared_backend_ids() { # $1=host
++  live_backend_pairs | awk -v h="$1" '{n[$1]++; if ($2 == h) mine[$1] = 1} END {for (i in mine) if (n[i] > 1) print i}'
++}
++
++# Every mutation of an instance first refuses such shared ownership: rewriting,
++# stopping or removing the backend would also act on the other owner.
++require_unshared_backends() { # $1=host
++  local ids
++  ids="$(shared_backend_ids "$1" | sort | paste -sd' ' -)"
++  [[ -z "$ids" ]] || die "Backend $ids одновременно принадлежит профилям разных инстансов; ничего не изменено. Нужно ручное разрешение конфликта имён."
++}
++
++# A new pair may take its backend id only if no other live pair produces it.
++backend_id_used_by_other() { # $1=host $2=profile
++  local id; id="$(backend_id "$1" "$2")"
++  live_backend_pairs | awk -v id="$id" -v h="$1" -v p="$2" '$1 == id && !($2 == h && $3 == p) {f = 1} END {exit !f}'
++}
++
++# Existing instances whose hostname is a "--" extension of $1 or vice versa:
++# their backend ids could alias, so such a hostname is never created.
++# Live hosts whose backend ids can coincide with those of $1: H and H--X collide
++# exactly when X--<profile> is itself a valid profile name (X has no dot etc.).
++overlapping_hosts() { # $1=host
++  local h
++  while read -r h; do
++    [[ -n "$h" && "$h" != "$1" ]] || continue
++    if { [[ "$h" == "$1--"* ]] && is_valid_profile_name "${h#"$1--"}--x"; } ||
++       { [[ "$1" == "$h--"* ]] && is_valid_profile_name "${1#"$h--"}--x"; }; then printf '%s\n' "$h"; fi
+   done < <(list_hosts_array)
++  return 0
++}
++
++# Backend env files named $1--<profile> that no live profile record owns:
++# "orphan <id>" when the name splits only one way, as this instance, else
++# "ambiguous <id>" (it may belong to another, possibly deleted, instance).
++# Symlinks and names outside the profile-name grammar are never candidates.
++orphan_backend_ids() { # $1=host
++  local host="$1" f id
++  local -A live=()
++  while read -r id _; do [[ -n "$id" ]] && live["$id"]=1; done < <(live_backend_pairs)
+   for f in "$BACKENDS_DIR/$host--"*.env; do
+     [[ -f "$f" && ! -L "$f" ]] || continue
+     id="${f##*/}"; id="${id%.env}"
+     is_valid_profile_name "${id#"$host--"}" || continue
+-    [[ -n "${live[$id]:-}" ]] || printf '%s\n' "$id"
++    [[ -z "${live[$id]:-}" ]] || continue
++    if [[ "$(backend_id_owners "$id")" == "$host ${id#"$host--"}" ]]; then
++      printf 'orphan %s\n' "$id"
++    else
++      printf 'ambiguous %s\n' "$id"
++    fi
+   done
+ }
+ 
+ # Orphans of $1 (left by an interrupted removal) are removed only after their
+ # unit is proven stopped; the caller rebuilds the firewall afterwards. An
+-# orphan that cannot be proven stopped keeps its env file and protection, and
+-# the call fails.
++# orphan that cannot be proven stopped, or whose owner cannot be proven, keeps
++# its env file and protection, and the call fails.
+ reconcile_orphan_backends() { # $1=host
+-  local id rc=0
+-  while read -r id; do
++  local kind id rc=0
++  while read -r kind id; do
+     [[ -n "$id" ]] || continue
++    if [[ "$kind" != orphan ]]; then
++      warn "Backend env $id нельзя однозначно отнести к $1: имя может принадлежать другому инстансу; файл и защита firewall сохранены." >&2
++      rc=1; continue
++    fi
+     if stop_backend_unit "$id"; then
+       rm -f -- "$BACKENDS_DIR/$id.env" || rc=1
+       log "Backend twebproxy-mtproxy@$id.service без профиля остановлен; его env удалён."
+@@ -4996,7 +5068,7 @@ add_instance_cmd() {
+   echo
+   [[ "$UI_LANGUAGE" == en ]] && printf "%bFirst profile for %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET" \
+     || printf "%bПервый профиль для %s%b\n" "$C_BOLD" "$HOSTNAME" "$C_RESET"
+-  local host="$HOSTNAME" profile
++  local host="$HOSTNAME" profile others other bid
+   collect_profile_settings "$host" default
+   profile="$PROFILE_NAME"
+ 
+@@ -5036,10 +5108,18 @@ EOF
+ 
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   instance_exists "$host" && die "Инстанс $host уже существует."
++  # The leaf port lock is shared by every create path: it also serializes the
++  # hostname and backend-id ownership checks below against concurrent creations.
++  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
++  others="$(overlapping_hosts "$host")"
++  [[ -z "$others" ]] || { other="${others%%$'\n'*}"
++    die "Hostname $host пересекается с $other в именах backend (<hostname>--<profile>); инстанс не создан, ничего не изменено."; }
+   # Backend env files of this hostname left by an interrupted earlier deletion.
+   reconcile_orphan_backends "$host" ||
+     die "Backends без профиля у $host не удалось безопасно убрать; их env и защита firewall сохранены."
+-  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
++  bid="$(backend_id "$host" "$profile")"
++  ! backend_id_used_by_other "$host" "$profile" && [[ ! -e "$BACKENDS_DIR/$bid.env" && ! -L "$BACKENDS_DIR/$bid.env" ]] ||
++    die "Имя backend $bid уже использует профиль другого инстанса; профиль не создан, ничего не изменено."
+   claim_instance_ports
+   claim_profile_ports
+   [[ "$(printf '%s\n' "$RELAY_PORT" "$ADMIN_PORT" "$BACKEND_PORT" "$STATS_PORT" | sort -u | wc -l)" == 4 ]] ||
+@@ -5070,6 +5150,7 @@ repair_instance_cmd() {
+   [[ -n "$host" ]] || host="$(select_instance)"
+   require_instance "$host"
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
++  require_unshared_backends "$host"
+ 
+   log "Проверяю и восстанавливаю runtime для $host..."
+   # Recreate generated artifacts from the canonical per-instance/profile state.
+@@ -5115,12 +5196,16 @@ profile_add_cmd() {
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_instance "$host"
+   [[ ! -e "$(profile_env "$host" "$profile")" && ! -L "$(profile_env "$host" "$profile")" ]] || die "Профиль уже существует."
+-  # Never write over a backend env left without a profile: its unit may still run.
++  (( $(count_profiles "$host") < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
++  require_unshared_backends "$host"
+   orphan_id="$(backend_id "$host" "$profile")"
++  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
++  # Under the shared create lock: no other live profile may already produce this
++  # id, and never write over a backend env left without a profile (its unit may run).
++  ! backend_id_used_by_other "$host" "$profile" ||
++    die "Имя backend $orphan_id уже использует профиль другого инстанса; профиль не создан, ничего не изменено."
+   [[ ! -e "$BACKENDS_DIR/$orphan_id.env" && ! -L "$BACKENDS_DIR/$orphan_id.env" ]] ||
+     die "У $host уже есть backend env $orphan_id без профиля; выполни 'twebproxy repair $host'."
+-  (( $(count_profiles "$host") < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
+-  port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
+   claim_profile_ports
+   profile_state_commit "$host" "$profile" ""
+   port_lock_release
+@@ -5145,6 +5230,7 @@ profile_delete_cmd() {
+   yesno "Удалить профиль $profile?" n || exit 0
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_profile_file "$host" "$profile"
++  require_unshared_backends "$host"
+   (( $(count_profiles "$host") > 1 )) || die "Нельзя удалить последний профиль. Удали весь hostname через 'twebproxy delete'."
+   prev="$(cat -- "$(profile_env "$host" "$profile")")"
+   # The backend is proven down first: until then its record, env file and
+@@ -5178,6 +5264,7 @@ profile_rotate_cmd() {
+   # before the prompt: a concurrent change to other fields is kept.
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_profile "$host" "$profile"
++  require_unshared_backends "$host"
+   prev="$(cat -- "$(profile_env "$host" "$profile")")"
+   SECRET="$new_secret"
+   profile_state_commit "$host" "$profile" "$prev"
+@@ -5200,6 +5287,7 @@ profile_carrier_cmd() {
+   is_valid_carrier_mode "$carrier" || return 0
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_profile "$host" "$profile"
++  require_unshared_backends "$host"
+   prev="$(cat -- "$(profile_env "$host" "$profile")")"
+   CARRIER_MODE="$carrier"
+   profile_state_commit "$host" "$profile" "$prev"
+@@ -6245,16 +6333,23 @@ diagnose_cmd() {
+ 
+ delete_instance_cmd() {
+   need_root; banner
+-  local host="${1:-}" p id old_ip=""; local -a ids=()
++  local host="${1:-}" p id kind old_ip="" ambiguous=0; local -a ids=()
+   [[ -n "$host" ]] || host="$(select_instance)"; require_instance "$host"
+   warn "Будет удалён hostname $host, все его secrets/backends и управляемый reverse-proxy block."
+   yesno "Удалить $host?" n || exit 0
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_instance "$host"
++  require_unshared_backends "$host"
+   old_ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
+   load_instance "$host"
+   while read -r p; do [[ -n "$p" ]] && ids+=("$(backend_id "$host" "$p")"); done < <(list_profiles_array "$host")
+-  while read -r id; do [[ -n "$id" ]] && ids+=("$id"); done < <(orphan_backend_ids "$host")
++  while read -r kind id; do
++    [[ -n "$id" ]] || continue
++    if [[ "$kind" == orphan ]]; then ids+=("$id"); continue; fi
++    warn "Backend env $id нельзя однозначно отнести к $host: имя может принадлежать другому инстансу; файл и защита firewall сохранены."
++    ambiguous=1
++  done < <(orphan_backend_ids "$host")
++  (( ambiguous == 0 )) || die "Для $host есть backend env, который нельзя однозначно отнести к этому инстансу; ничего не удалено."
+   systemctl disable --now "twebproxy@$host.service" >/dev/null 2>&1 || true
+   # Every backend of the instance (profiles and orphans) must be proven down
+   # before any record or env file is removed; otherwise nothing is deleted and

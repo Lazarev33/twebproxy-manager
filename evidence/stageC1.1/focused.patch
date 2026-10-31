@@ -1,0 +1,612 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ab8cab8..e6d2e08 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,25 @@
+ # Changelog
+ 
++## 0.2.15-beta — 2026-10-21 — Stage C1.1: проверенная остановка backend и сироты
++
++- C1-AUD-01: удаление профиля сначала останавливает его MTProxy backend и
++  проверяет, что unit действительно `inactive`/`failed`. При неудачной или
++  неоднозначной остановке (сбой `disable --now`, `activating`/`deactivating`/
++  `unknown`, ошибка `is-active`) ничего не удаляется: запись, backend env и
++  защита firewall сохраняются, команда завершается отказом с указанием unit.
++  Firewall пересобирается только после удаления состояния. Если после
++  остановки не прошла запись или проверка нового состояния, прежняя запись
++  восстанавливается и backend запускается снова. Удаление инстанса доказывает
++  остановку всех его backends до удаления любых файлов.
++- C1-AUD-02: backend env без профиля (после прерванного удаления) находится по
++  точному id `<host>--<profile>` с учётом живых профилей всех инстансов.
++  `repair` (и создание инстанса с тем же hostname) удаляет такой env только
++  после доказанной остановки его unit, затем пересобирает firewall; иначе
++  отказ, env и защита сохраняются. Новый профиль не записывается поверх такого
++  env. Посторонние файлы и чужие объекты firewall не затрагиваются.
++- Stage A/A.1, B/B.1, остальная логика C1, DPI, TLS, relay update и protected
++  Stage 4 function set не изменены.
++
+ ## 0.2.14-beta — 2026-10-21 — Stage C1: целостность профилей и состояния
+ 
+ - F03: создание профиля больше не запускает, не показывает и не подтверждает
+diff --git a/VERSION b/VERSION
+index 769ed6a..b005e30 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.14
++0.2.15
+diff --git a/tests/stagec1/backend-stop-fixture.sh b/tests/stagec1/backend-stop-fixture.sh
+new file mode 100644
+index 0000000..067b32a
+--- /dev/null
++++ b/tests/stagec1/backend-stop-fixture.sh
+@@ -0,0 +1,177 @@
++#!/usr/bin/env bash
++# C1.1 regression (C1-AUD-01, C1-AUD-02): deleting a profile or an instance, or
++# reconciling a backend env without a profile, must never take firewall
++# protection away from a backend that is not proven stopped. A failed or
++# ambiguous stop fails closed (non-zero, diagnostic, records/env/firewall kept);
++# a proven stop is followed by state removal and only then the firewall rebuild.
++# The protected port set is computed by the real Stage B backend_fw_collect.
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-c11-stop.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++export C1_INSTANCE_STUBS=1   # repair/delete/add: never reach frontend, users or Stage 4 paths
++source "$ROOT/tests/stagec1/state-harness.sh"
++c1_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++not() { ! "$@"; }
++show() { grep -E '\[(x|!)\]' "$TMP/out" | tail -n 3 | sed 's/^/  | /'; }
++A=alpha.example; B=bravo.example; AB=alpha.example--b
++unit() { printf 'twebproxy-mtproxy@%s.service' "$1"; }
++running() { [[ -e "$TMP/units/$(unit "$1")" ]]; }           # model process alive
++pf() { printf '%s/%s/profiles.d/%s.env' "$INSTANCES_DIR" "$1" "$2"; }
++bf() { printf '%s/%s.env' "$BACKENDS_DIR" "$1"; }
++protected() { # $1 port: in the firewall set last applied
++  [[ -f "$TMP/firewall.applied" ]] && tr ',' '\n' < "$TMP/firewall.applied" | grep -qx "$1"
++}
++before() { # $1 event regex happens before $2 event regex
++  local a b
++  a="$(grep -nE "$1" "$TMP/events" | head -n1 | cut -d: -f1)"
++  b="$(grep -nE "$2" "$TMP/events" | head -n1 | cut -d: -f1)"
++  [[ -n "$a" && -n "$b" && "$a" -lt "$b" ]]
++}
++setup() {
++  rm -rf "$INSTANCES_DIR" "$BACKENDS_DIR" "$TMP"/units/* "$TMP"/fail-* "$TMP"/state-* "$TMP/firewall.applied"
++  install -d -m 0700 "$INSTANCES_DIR" "$BACKENDS_DIR"
++  c1_seed_instance "$A" 18080 18081
++  c1_seed_profile "$A" alpha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https 23980 28980
++  c1_seed_profile "$A" beta bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb https 23981 28981
++  c1_seed_instance "$B" 18082 18083
++  c1_seed_profile "$B" gamma cccccccccccccccccccccccccccccccc https 23982 28982
++  # A live profile of another instance whose id looks like an alpha.example orphan.
++  c1_seed_instance "$AB" 18084 18085
++  c1_seed_profile "$AB" x dddddddddddddddddddddddddddddddd https 24000 29000
++  for h in "$A" "$B" "$AB"; do c1_run rebuild_profiles_json "$h" >/dev/null 2>&1; done
++  for id in "$A--alpha" "$A--beta" "$B--gamma" "$AB--x"; do "$TMP/bin/systemctl" start "$(unit "$id")"; done
++  c1_eval rebuild_firewall >/dev/null 2>&1
++  : > "$TMP/events"
++}
++fault_stop() { : > "$TMP/fail-stop-$(unit "$1")"; }
++
++# ---------- C1-AUD-01: profile deletion ----------
++# 1. disable --now fails, unit stays active.
++setup; fault_stop "$A--beta"; old="$(cat "$(pf "$A" beta)")"
++c1_run profile_delete_cmd "$A" beta > "$TMP/out" 2>&1; rc=$?
++check del_stopfail_nonzero test "$rc" -ne 0
++show
++check del_stopfail_diagnostic_names_unit grep -q "$(unit "$A--beta")" "$TMP/out"
++check del_stopfail_record_kept test "$(cat "$(pf "$A" beta)")" = "$old"
++check del_stopfail_backend_env_kept test -f "$(bf "$A--beta")"
++check del_stopfail_unit_still_running running "$A--beta"
++check del_stopfail_ports_still_protected protected 23981
++check del_stopfail_stats_still_protected protected 28981
++check del_stopfail_relay_profiles_kept test "$(jq -r '.profiles|map(.name)|sort|join(",")' "$INSTANCES_DIR/$A/profiles.json")" = alpha,beta
++
++# 2. stop reported, but is-active is ambiguous (deactivating / unknown).
++for st in deactivating unknown activating; do
++  setup; printf '%s\n' "$st" > "$TMP/state-$(unit "$A--beta")"
++  c1_run profile_delete_cmd "$A" beta > "$TMP/out" 2>&1; rc=$?
++  check "del_ambiguous_${st}_nonzero" test "$rc" -ne 0
++  check "del_ambiguous_${st}_record_kept" test -f "$(pf "$A" beta)"
++  check "del_ambiguous_${st}_ports_protected" protected 23981
++done
++# 2b. systemctl is-active itself fails: state unknown.
++setup; : > "$TMP/fail-is-active"
++c1_run profile_delete_cmd "$A" beta > "$TMP/out" 2>&1; rc=$?
++rm -f "$TMP/fail-is-active"
++check del_isactive_error_nonzero test "$rc" -ne 0
++check del_isactive_error_record_kept test -f "$(pf "$A" beta)" -a -f "$(bf "$A--beta")"
++check del_isactive_error_ports_protected protected 23981
++
++# 3. proven stop: record, env and ports go; order is stop -> firewall rebuild.
++setup
++c1_run profile_delete_cmd "$A" beta > "$TMP/out" 2>&1; rc=$?
++check del_success_zero test "$rc" -eq 0
++check del_success_record_removed test ! -e "$(pf "$A" beta)" -a ! -e "$(bf "$A--beta")"
++check del_success_unit_stopped not running "$A--beta"
++check del_success_ports_released not protected 23981
++check del_success_stop_before_rebuild before "systemctl disable --now $(unit "$A--beta")" '^rebuild '
++check del_success_alpha_untouched running "$A--alpha"
++check del_success_alpha_protected protected 23980
++
++# 4. stop proven, then the state commit fails validation: previous state and
++#    the running backend are restored, ports stay protected, non-zero result.
++setup; old="$(cat "$(pf "$A" beta)")"; : > "$TMP/fail-validate"
++c1_run profile_delete_cmd "$A" beta > "$TMP/out" 2>&1; rc=$?
++rm -f "$TMP/fail-validate"
++check del_postfail_nonzero test "$rc" -ne 0
++show
++check del_postfail_record_restored test "$(cat "$(pf "$A" beta)")" = "$old"
++check del_postfail_env_restored test "$(c1_field "$(bf "$A--beta")" MTPROXY_SECRET)" = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
++check del_postfail_backend_running_again running "$A--beta"
++check del_postfail_ports_protected protected 23981
++check del_postfail_no_temp_files test -z "$(find "$INSTANCES_DIR" "$BACKENDS_DIR" -name '.*' -type f)"
++
++# ---------- instance deletion (same stop helper) ----------
++setup; fault_stop "$A--beta"
++c1_run delete_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check delinst_stopfail_nonzero test "$rc" -ne 0
++show
++check delinst_stopfail_instance_kept test -f "$INSTANCES_DIR/$A/instance.env" -a -f "$(pf "$A" beta)"
++check delinst_stopfail_envs_kept test -f "$(bf "$A--beta")" -a -f "$(bf "$A--alpha")"
++check delinst_stopfail_ports_protected protected 23981
++setup
++c1_run delete_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check delinst_success_zero test "$rc" -eq 0
++check delinst_success_removed test ! -e "$INSTANCES_DIR/$A" -a ! -e "$(bf "$A--beta")" -a ! -e "$(bf "$A--alpha")"
++check delinst_success_ports_released not protected 23981
++check delinst_success_unrelated_kept test -f "$(bf "$B--gamma")" -a -f "$(bf "$AB--x")"
++check delinst_success_unrelated_running running "$AB--x"
++
++# ---------- C1-AUD-02: backend env without a profile (interrupted removal) ----------
++orphan() { setup; rm -f "$(pf "$A" beta)"; c1_run rebuild_profiles_json "$A" >/dev/null 2>&1; }
++# Unrelated objects next to the orphan. They stay valid backend state for the
++# Stage B firewall, which (by design) refuses symlinked or malformed *.env.
++foreign_files() {
++  printf 'MTPROXY_CLIENT_PORT=24900\nMTPROXY_STATS_PORT=29900\n' > "$BACKENDS_DIR/alpha.example--Bad.Name.env"  # not a profile name
++  : > "$BACKENDS_DIR/alpha.example--notes.txt"
++}
++foreign_snapshot() { (cd "$BACKENDS_DIR" && sha256sum alpha.example--Bad.Name.env alpha.example--notes.txt "$B--gamma.env" "$AB--x.env" && stat -c '%n %a %Y' alpha.example--Bad.Name.env alpha.example--notes.txt "$B--gamma.env" "$AB--x.env"); }
++# 5. orphan whose unit cannot be proven stopped: repair fails closed.
++orphan; fault_stop "$A--beta"
++c1_run repair_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_active_repair_nonzero test "$rc" -ne 0
++show
++check orphan_active_diagnostic_names_unit grep -q "$(unit "$A--beta")" "$TMP/out"
++check orphan_active_env_kept test -f "$(bf "$A--beta")"
++check orphan_active_unit_running running "$A--beta"
++check orphan_active_ports_protected protected 23981
++# 6. orphan whose unit stops: reconciled in order stop -> env removal -> rebuild.
++orphan; foreign_files; fsnap="$(foreign_snapshot)"
++c1_run repair_instance_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check orphan_stopped_repair_zero test "$rc" -eq 0
++check orphan_stopped_unit_stopped not running "$A--beta"
++check orphan_stopped_env_removed test ! -e "$(bf "$A--beta")"
++check orphan_stopped_ports_released not protected 23981
++check orphan_stopped_stop_before_rebuild before "systemctl disable --now $(unit "$A--beta")" '^rebuild '
++# 7. unrelated objects survive reconciliation untouched.
++check orphan_unrelated_files_unchanged test "$(foreign_snapshot)" = "$fsnap"
++check orphan_unrelated_foreign_ports_protected protected 24900
++check orphan_unrelated_live_lookalike_running running "$AB--x"
++check orphan_unrelated_live_lookalike_not_stopped not grep -q "disable --now $(unit "$AB--x")" "$TMP/events"
++check orphan_unrelated_other_instance_running running "$B--gamma"
++check orphan_live_profiles_restarted running "$A--alpha"
++# 8. a new profile never overwrites an orphan env of the same id.
++orphan; fault_stop "$A--beta"; oldenv="$(cat "$(bf "$A--beta")")"
++C1_NAME=beta c1_run profile_add_cmd "$A" > "$TMP/out" 2>&1; rc=$?
++check add_over_orphan_refused test "$rc" -ne 0
++show
++check add_over_orphan_env_unchanged test "$(cat "$(bf "$A--beta")")" = "$oldenv"
++check add_over_orphan_no_record test ! -e "$(pf "$A" beta)"
++# 9. a new instance over orphan envs of its hostname: reconciled first, or refused.
++setup; rm -rf "$INSTANCES_DIR/$B"; fault_stop "$B--gamma"; oldenv="$(cat "$(bf "$B--gamma")")"
++C1_HOST="$B" C1_NAME=gamma c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check addinst_over_active_orphan_refused test "$rc" -ne 0
++check addinst_over_active_orphan_env_unchanged test "$(cat "$(bf "$B--gamma")")" = "$oldenv"
++check addinst_over_active_orphan_running running "$B--gamma"
++rm -f "$TMP/fail-stop-$(unit "$B--gamma")"; rm -rf "$INSTANCES_DIR/$B" "$SITES_DIR/$B"
++C1_HOST="$B" C1_NAME=gamma C1_SECRET=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee c1_run add_instance_cmd > "$TMP/out" 2>&1; rc=$?
++check addinst_over_stoppable_orphan_succeeds test "$rc" -eq 0
++check addinst_over_stoppable_orphan_new_secret test "$(c1_field "$(bf "$B--gamma")" MTPROXY_SECRET)" = eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
++check addinst_stop_before_new_env before "systemctl disable --now $(unit "$B--gamma")" "systemctl enable --now $(unit "$B--gamma")"
++
++printf 'c11-backend-stop: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/tests/stagec1/c1-scope-invariants.sh b/tests/stagec1/c1-scope-invariants.sh
+index d62d970..347774a 100644
+--- a/tests/stagec1/c1-scope-invariants.sh
++++ b/tests/stagec1/c1-scope-invariants.sh
+@@ -13,12 +13,12 @@ MODIFIED=(load_instance load_profile save_instance save_profile port_registered
+   port_available next_free_port rebuild_profiles_json write_instance_config wait_profile_backend_ready
+   collect_instance_settings collect_profile_settings add_instance_cmd repair_instance_cmd
+   profile_add_cmd profile_delete_cmd profile_rotate_cmd profile_carrier_cmd delete_instance_cmd
+-  ui_localize_legacy)
++  ui_localize_legacy stop_profile_backend)
+ ADDED=(is_valid_carrier_mode state_read_record profile_record_valid require_instance require_profile
+   state_write_file render_instance_record render_profile_record render_backend_env instance_derive_state
+   profile_state_commit profile_state_remove profile_state_restore state_lock_path instance_lock_acquire
+   instance_lock_release port_lock_acquire port_lock_release claim_instance_ports claim_profile_ports
+-  render_profile_json_entry require_profile_file)
++  render_profile_json_entry require_profile_file stop_backend_unit orphan_backend_ids reconcile_orphan_backends)
+ NEW_VARS=(STATE_LOCK_WAIT_SECONDS INSTANCE_LOCK_FD INSTANCE_LOCK_HOST INSTANCE_LOCK_DEPTH PORT_LOCK_FD PORT_LOCK_DEPTH)
+ in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
+ 
+diff --git a/tests/stagec1/c11-scope-invariants.sh b/tests/stagec1/c11-scope-invariants.sh
+new file mode 100644
+index 0000000..6293f47
+--- /dev/null
++++ b/tests/stagec1/c11-scope-invariants.sh
+@@ -0,0 +1,72 @@
++#!/usr/bin/env bash
++# Stage C1.1 scope against the exact v0.2.14 (Stage C1, 810beac) tree: only the
++# backend stop, profile/instance deletion, repair, add and orphan
++# reconciliation paths may change; ui_localize_legacy may only gain lines;
++# everything else, including README, assets and all docs, is byte-identical.
++# Usage: c11-scope-invariants.sh <v0.2.14 tree> [<candidate tree>]
++set -Eeuo pipefail
++BASE="${1:?v0.2.14 tree}"; PROJECT="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
++TMP="$(mktemp -d /tmp/twebproxy-c11-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++MODIFIED=(stop_profile_backend profile_state_remove profile_delete_cmd delete_instance_cmd
++  repair_instance_cmd profile_add_cmd add_instance_cmd ui_localize_legacy)
++ADDED=(stop_backend_unit orphan_backend_ids reconcile_orphan_backends)
++NEW_VARS=()
++in_list() { local x="$1"; shift; local y; for y; do [[ "$x" == "$y" ]] && return 0; done; return 1; }
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++    declare -f ui_localize_legacy > "$2.l10n"
++  ' _ "$tree/twebproxy-manager.sh" "$TMP/$side" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  in_list "$fn" "${MODIFIED[@]}" || { echo "FAIL forbidden modification: $fn"; exit 1; }
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline" && continue
++  in_list "$fn" "${ADDED[@]}" || { echo "FAIL unexpected added function: $fn"; exit 1; }
++  added=$((added+1))
++done < "$TMP/candidate"
++echo "PASS functions: unchanged=$unchanged modified=$modified added=$added"
++
++# Localization adapter: additions only (new message translations).
++if diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -E '^[<]' >/dev/null; then
++  echo 'FAIL ui_localize_legacy lost or changed existing lines'; exit 1
++fi
++echo "PASS ui_localize_legacy: only $(diff "$TMP/baseline.l10n" "$TMP/candidate.l10n" | grep -c '^>') added lines"
++
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.vars"
++done
++diff -u "$TMP/baseline.vars" "$TMP/candidate.vars"
++echo 'PASS top-level variables unchanged except release identity'
++
++for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do
++  cmp "$BASE/$f" "$PROJECT/$f"
++done
++for f in "$BASE"/docs/*.md; do cmp "$f" "$PROJECT/docs/${f##*/}"; done
++echo 'PASS README, pinned nfqws assets and docs unchanged'
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS c11-scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stagec1/run-stage-c1-suite.sh b/tests/stagec1/run-stage-c1-suite.sh
+index 27d3885..d3cdbfd 100644
+--- a/tests/stagec1/run-stage-c1-suite.sh
++++ b/tests/stagec1/run-stage-c1-suite.sh
+@@ -10,6 +10,7 @@ stage_a_run_case "C1 profile identity F03 (MODEL)" "$ROOT/tests/stagec1/profile-
+ stage_a_run_case "C1 state persistence F04 (MODEL)" "$ROOT/tests/stagec1/state-persistence-fixture.sh" 300 "$MGR"
+ stage_a_run_case "C1 concurrent mutation F05 (MODEL)" "$ROOT/tests/stagec1/concurrency-fixture.sh" 300 "$MGR"
+ stage_a_run_case "C1 port allocation F13 (MODEL)" "$ROOT/tests/stagec1/port-allocation-fixture.sh" 300 "$MGR"
++stage_a_run_case "C1.1 backend stop / orphan reconciliation (MODEL)" "$ROOT/tests/stagec1/backend-stop-fixture.sh" 600 "$MGR"
+ rc=0; stage_a_result || rc=$?
+ case "$rc" in
+   0) echo 'stage-c1-suite: PASS (all mandatory model checks executed)';;
+diff --git a/tests/stagec1/state-harness.sh b/tests/stagec1/state-harness.sh
+index 7ecd22e..5c10967 100644
+--- a/tests/stagec1/state-harness.sh
++++ b/tests/stagec1/state-harness.sh
+@@ -42,7 +42,14 @@ c1_harness() {
+   # Host-only preconditions and the Stage B firewall (covered by its own suite).
+   need_root() { :; }; need_systemd() { :; }; check_platform() { :; }; banner() { :; }
+   ensure_core() { :; }
+-  rebuild_firewall() { builtin printf 'rebuild\n' >> "$TMP/firewall.calls"; }
++  # Stage B firewall stand-in: the protected port set is what the real
++  # backend_fw_collect derives from backends/*.env at rebuild time.
++  rebuild_firewall() {
++    local ports
++    ports="$(BF_BACKENDS="$BACKENDS_DIR" backend_fw_collect)" || return 1
++    builtin printf '%s\n' "$ports" > "$TMP/firewall.applied"
++    builtin printf 'rebuild %s\n' "$ports" | tee -a "$TMP/firewall.calls" >> "$TMP/events"
++  }
+   c1_answers
+   c1_faults
+   [[ "${C1_INSTANCE_STUBS:-}" != 1 ]] || c1_instance_stubs
+@@ -72,7 +79,10 @@ c1_write_models() {
+   cat > "$TMP/bin/systemctl" <<'SH'
+ #!/bin/bash
+ # Unit model: a started twebproxy-mtproxy@ID listens on the port of its env file.
++# Faults: fail-stop-<unit> (stop fails, unit stays active), state-<unit> (is-active
++# prints that state, unit stays up), fail-is-active (is-active errors, no output).
+ printf '%s\n' "$*" >> "$C1_ROOT/systemctl.calls"
++printf 'systemctl %s\n' "$*" >> "$C1_ROOT/events"
+ quiet=0; [[ "${2:-}" == --quiet ]] && quiet=1
+ args=("$@"); unit="${args[-1]}"
+ case "$1" in
+@@ -90,8 +100,13 @@ start_unit() {
+ }
+ case "$1" in
+   enable|restart|start) start_unit "$unit";;
+-  disable|stop) rm -f "$C1_ROOT/units/$unit";;
+-  is-active) [[ -e "$C1_ROOT/units/$unit" ]] || { (( quiet )) || echo inactive; exit 3; }; (( quiet )) || echo active;;
++  disable|stop)
++    [[ ! -e "$C1_ROOT/fail-stop-$unit" ]] || { echo "model: stop of $unit failed" >&2; exit 1; }
++    [[ -e "$C1_ROOT/state-$unit" ]] || rm -f "$C1_ROOT/units/$unit";;
++  is-active)
++    [[ ! -e "$C1_ROOT/fail-is-active" ]] || exit 1
++    if [[ -e "$C1_ROOT/state-$unit" ]]; then (( quiet )) || cat "$C1_ROOT/state-$unit"; exit 3; fi
++    [[ -e "$C1_ROOT/units/$unit" ]] || { (( quiet )) || echo inactive; exit 3; }; (( quiet )) || echo active;;
+   *) exit 0;;
+ esac
+ SH
+@@ -159,10 +174,16 @@ c1_answers() {
+ 
+ # Frontend, TLS, DPI, audit and install steps of add_instance_cmd are other
+ # subsystems; replace them so its state/port/lock path can be exercised.
++# The same holds for repair/delete: these touch production paths that the
++# sandbox does not rebind (/etc/caddy, /etc/nginx, the Stage 4 restore helper
++# path, host users), so they are never reached from a test.
+ c1_instance_stubs() {
+   check_frontend_compatibility() { :; }; configure_tls_for_instance() { :; }; configure_ufw() { :; }
+   dpi_with_mutation_lock() { :; }; audit_instance_impl() { :; }; install_manager_copy() { :; }
+   show_instance_cmd() { printf 'instance %s\n' "$1"; }
++  remove_reverse_proxy_for_instance() { :; }; dpi_resolve_ipv4() { return 1; }
++  prepare_users_and_dirs() { :; }; stage4_install_restore_helper() { :; }
++  write_runner_helpers() { :; }; write_systemd_templates() { :; }
+ }
+ 
+ c1_barrier() {
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 5f98e9c..b3ccdc4 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -2,13 +2,13 @@
+ set -Eeuo pipefail
+ umask 077
+ 
+-# TWebProxy Manager v0.2.14-beta
++# TWebProxy Manager v0.2.15-beta
+ # Multi-instance / multi-secret manager for telegramdesktop/tproxy-server.
+ # Target: Debian 12+ / Ubuntu 22.04+, x86_64, systemd.
+ 
+ APP="twebproxy"
+-MANAGER_VERSION="0.2.14"
+-MANAGER_RELEASE_VERSION="0.2.14-beta"
++MANAGER_VERSION="0.2.15"
++MANAGER_RELEASE_VERSION="0.2.15-beta"
+ TPROXY_REPO="https://github.com/telegramdesktop/tproxy-server.git"
+ TPROXY_BRANCH="master"
+ # First real E2E baseline validated on 2026-08-23. Fresh core installs use this
+@@ -486,6 +486,14 @@ ui_localize_legacy() {
+     'Небезопасный каталог состояния: '*) printf 'Unsafe state directory: %s' "${text#Небезопасный каталог состояния: }"; return;;
+     'Не удалось записать состояние: '*) printf 'Could not write state: %s' "${text#Не удалось записать состояние: }"; return;;
+     'Не удалось получить список TCP listeners (ss); порт не считается свободным.') printf 'Could not list TCP listeners (ss); the port is not treated as free.'; return;;
++    # Stage C1.1 backend stop / orphan reconciliation messages.
++    'Backend '*' без профиля не остановлен или его состояние неизвестно; его env и защита firewall сохранены.') value="${text#Backend }"; printf 'Backend %s without a profile is not stopped or its state is unknown; its env file and firewall protection are kept.' "${value%% без профиля*}"; return;;
++    'Backend '*' без профиля остановлен; его env удалён.') value="${text#Backend }"; printf 'Backend %s without a profile was stopped; its env file was removed.' "${value%% без профиля*}"; return;;
++    'Backend '*' не остановлен или его состояние неизвестно; ничего не удалено'*) value="${text#Backend }"; value="${value%% не остановлен*}"; printf 'Backend %s is not stopped or its state is unknown; nothing was deleted and firewall protection is kept. Check it (systemctl status %s) and retry.' "$value" "$value"; return;;
++    'Backends без профиля у '*) value="${text#Backends без профиля у }"; printf 'Backends without a profile of %s could not be removed safely; their env files and firewall protection are kept.' "${value%% не удалось*}"; return;;
++    'Прежнее состояние '*' восстановлено, но backend профиля '*) value="${text#Прежнее состояние }"; value2="${text#*backend профиля }"; printf "The previous state of %s was restored, but the backend of profile %s is not running; run 'twebproxy repair %s'." "${value%% восстановлено*}" "${value2%% не запущен*}" "${value%% восстановлено*}"; return;;
++    'У '*' уже есть backend env '*' без профиля; выполни '*) value="${text#У }"; value2="${text#*backend env }"; printf "%s already has backend env %s without a profile; run 'twebproxy repair %s'." "${value%% уже есть*}" "${value2%% без профиля*}" "${value%% уже есть*}"; return;;
++    'Часть сервисов '*' могла быть остановлена; '*) value="${text#Часть сервисов }"; printf "Some services of %s may have been stopped; 'twebproxy repair %s' starts them again." "${value%% могла*}" "${value%% могла*}"; return;;
+     'Запусти от root:'*) printf 'Run as root:%s' "${text#*:}"; return;;
+     'Нужен systemd.') printf 'systemd is required.'; return;;
+     'jq нужен для --json output.') printf 'jq is required for --json output.'; return;;
+@@ -1284,14 +1292,16 @@ profile_state_commit() { # $1=host $2=profile $3=previous record
+   die "Не удалось применить новое состояние $1; прежнее состояние восстановлено."
+ }
+ 
+-# Removes a profile record and its backend env, derives, validates; restores on failure.
++# Removes a profile record and its backend env, derives, validates. On failure
++# the previous record is restored and the caller (which stopped the backend)
++# gets a non-zero result to bring the runtime back.
+ profile_state_remove() { # $1=host $2=profile $3=previous record
+   if rm -f -- "$(profile_env "$1" "$2")" "$(backend_env "$1" "$2")" &&
+       instance_derive_state "$1" && validate_instance "$1"; then
+     return 0
+   fi
+   profile_state_restore "$1" "$2" "$3"
+-  die "Не удалось применить новое состояние $1; прежнее состояние восстановлено."
++  return 1
+ }
+ 
+ profile_state_restore() { # $1=host $2=profile $3=previous record ("" = remove)
+@@ -4463,9 +4473,58 @@ start_profile_backend() {
+   wait_profile_backend_ready "$host" "$profile"
+ }
+ 
++# Stops and disables one MTProxy backend unit and proves it is down: the stop
++# must succeed and systemd must then report the unit inactive or failed.
++# Anything else (failed stop, (de)activating, unknown, a systemctl error) is
++# "not proven stopped": callers then keep its env file, and with it the
++# backend firewall protection of its ports.
++stop_backend_unit() { # $1=backend id
++  local unit="twebproxy-mtproxy@$1.service" state=""
++  systemctl disable --now "$unit" >/dev/null 2>&1 || return 1
++  state="$(systemctl is-active "$unit" 2>/dev/null)" || true
++  [[ "$state" == inactive || "$state" == failed ]]
++}
++
+ stop_profile_backend() {
+-  local host="$1" profile="$2" id; id="$(backend_id "$host" "$profile")"
+-  systemctl disable --now "twebproxy-mtproxy@$id.service" >/dev/null 2>&1 || true
++  local host="$1" profile="$2"
++  stop_backend_unit "$(backend_id "$host" "$profile")"
++}
++
++# Backend env files of $1 that no profile record of ANY instance owns, by
++# exact id <host>--<profile> (a hostname may itself contain "--"); prints ids.
++# Symlinks and names outside the profile-name grammar are never candidates.
++orphan_backend_ids() { # $1=host
++  local host="$1" f id h q
++  local -A live=()
++  while read -r h; do
++    [[ -n "$h" ]] || continue
++    while read -r q; do [[ -n "$q" ]] && live["$(backend_id "$h" "$q")"]=1; done < <(list_profiles_array "$h")
++  done < <(list_hosts_array)
++  for f in "$BACKENDS_DIR/$host--"*.env; do
++    [[ -f "$f" && ! -L "$f" ]] || continue
++    id="${f##*/}"; id="${id%.env}"
++    is_valid_profile_name "${id#"$host--"}" || continue
++    [[ -n "${live[$id]:-}" ]] || printf '%s\n' "$id"
++  done
++}
++
++# Orphans of $1 (left by an interrupted removal) are removed only after their
++# unit is proven stopped; the caller rebuilds the firewall afterwards. An
++# orphan that cannot be proven stopped keeps its env file and protection, and
++# the call fails.
++reconcile_orphan_backends() { # $1=host
++  local id rc=0
++  while read -r id; do
++    [[ -n "$id" ]] || continue
++    if stop_backend_unit "$id"; then
++      rm -f -- "$BACKENDS_DIR/$id.env" || rc=1
++      log "Backend twebproxy-mtproxy@$id.service без профиля остановлен; его env удалён."
++    else
++      warn "Backend twebproxy-mtproxy@$id.service без профиля не остановлен или его состояние неизвестно; его env и защита firewall сохранены." >&2
++      rc=1
++    fi
++  done < <(orphan_backend_ids "$1")
++  return "$rc"
+ }
+ 
+ start_all_backends() {
+@@ -4977,6 +5036,9 @@ EOF
+ 
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   instance_exists "$host" && die "Инстанс $host уже существует."
++  # Backend env files of this hostname left by an interrupted earlier deletion.
++  reconcile_orphan_backends "$host" ||
++    die "Backends без профиля у $host не удалось безопасно убрать; их env и защита firewall сохранены."
+   port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
+   claim_instance_ports
+   claim_profile_ports
+@@ -5021,6 +5083,10 @@ repair_instance_cmd() {
+   instance_derive_state "$host" || die "Не удалось записать состояние: $(instance_dir "$host")"
+   write_instance_config "$host"
+   validate_instance "$host"
++  # Backend env files left without a profile: removed once their unit is proven
++  # stopped (then the firewall rebuild below drops their ports), else fail closed.
++  reconcile_orphan_backends "$host" ||
++    die "Backends без профиля у $host не удалось безопасно убрать; их env и защита firewall сохранены."
+   rebuild_firewall
+   systemctl daemon-reload
+   start_all_backends "$host"
+@@ -5040,7 +5106,7 @@ repair_instance_cmd() {
+ 
+ profile_add_cmd() {
+   need_root; ensure_core; banner
+-  local host="${1:-}" profile count; [[ -n "$host" ]] || host="$(select_instance)"
++  local host="${1:-}" profile count orphan_id; [[ -n "$host" ]] || host="$(select_instance)"
+   require_instance "$host"
+   count="$(count_profiles "$host")"; (( count < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
+   collect_profile_settings "$host" "profile$((count+1))"
+@@ -5049,6 +5115,10 @@ profile_add_cmd() {
+   instance_lock_acquire "$host" || die "Другая операция изменяет $host; повтори позже."
+   require_instance "$host"
+   [[ ! -e "$(profile_env "$host" "$profile")" && ! -L "$(profile_env "$host" "$profile")" ]] || die "Профиль уже существует."
++  # Never write over a backend env left without a profile: its unit may still run.
++  orphan_id="$(backend_id "$host" "$profile")"
++  [[ ! -e "$BACKENDS_DIR/$orphan_id.env" && ! -L "$BACKENDS_DIR/$orphan_id.env" ]] ||
++    die "У $host уже есть backend env $orphan_id без профиля; выполни 'twebproxy repair $host'."
+   (( $(count_profiles "$host") < 32 )) || die "Upstream max_profiles по текущему конфигу: 32."
+   port_lock_acquire || die "Другая операция выделяет порты; повтори позже."
+   claim_profile_ports
+@@ -5065,7 +5135,7 @@ profile_add_cmd() {
+ 
+ profile_delete_cmd() {
+   need_root; banner
+-  local host="${1:-}" profile="${2:-}" prev
++  local host="${1:-}" profile="${2:-}" prev unit
+   [[ -n "$host" ]] || host="$(select_instance)"
+   require_instance "$host"
+   [[ -n "$profile" ]] || profile="$(select_profile "$host")"
+@@ -5077,8 +5147,17 @@ profile_delete_cmd() {
+   require_profile_file "$host" "$profile"
+   (( $(count_profiles "$host") > 1 )) || die "Нельзя удалить последний профиль. Удали весь hostname через 'twebproxy delete'."
+   prev="$(cat -- "$(profile_env "$host" "$profile")")"
+-  profile_state_remove "$host" "$profile" "$prev"
+-  stop_profile_backend "$host" "$profile"
++  # The backend is proven down first: until then its record, env file and
++  # firewall protection stay. The firewall is rebuilt only after the removal.
++  unit="twebproxy-mtproxy@$(backend_id "$host" "$profile").service"
++  stop_profile_backend "$host" "$profile" ||
++    die "Backend $unit не остановлен или его состояние неизвестно; ничего не удалено, защита firewall сохранена. Проверь его (systemctl status $unit) и повтори."
++  if ! profile_state_remove "$host" "$profile" "$prev"; then
++    # The previous record and env are back; so must be its running backend.
++    ( start_profile_backend "$host" "$profile" ) >/dev/null ||
++      die "Прежнее состояние $host восстановлено, но backend профиля $profile не запущен; выполни 'twebproxy repair $host'."
++    die "Не удалось применить новое состояние $host; прежнее состояние восстановлено."
++  fi
+   rebuild_firewall; restart_relay_wait_ready "$host"
+   instance_lock_release
+   ok "Профиль $profile удалён."
+@@ -6166,7 +6245,7 @@ diagnose_cmd() {
+ 
+ delete_instance_cmd() {
+   need_root; banner
+-  local host="${1:-}" p old_ip=""
++  local host="${1:-}" p id old_ip=""; local -a ids=()
+   [[ -n "$host" ]] || host="$(select_instance)"; require_instance "$host"
+   warn "Будет удалён hostname $host, все его secrets/backends и управляемый reverse-proxy block."
+   yesno "Удалить $host?" n || exit 0
+@@ -6174,12 +6253,18 @@ delete_instance_cmd() {
+   require_instance "$host"
+   old_ip="$(dpi_resolve_ipv4 "$host" 2>/dev/null || true)"
+   load_instance "$host"
++  while read -r p; do [[ -n "$p" ]] && ids+=("$(backend_id "$host" "$p")"); done < <(list_profiles_array "$host")
++  while read -r id; do [[ -n "$id" ]] && ids+=("$id"); done < <(orphan_backend_ids "$host")
+   systemctl disable --now "twebproxy@$host.service" >/dev/null 2>&1 || true
+-  while read -r p; do
+-    [[ -n "$p" ]] || continue
+-    stop_profile_backend "$host" "$p"
+-    rm -f "$(backend_env "$host" "$p")"
+-  done < <(list_profiles_array "$host")
++  # Every backend of the instance (profiles and orphans) must be proven down
++  # before any record or env file is removed; otherwise nothing is deleted and
++  # the firewall keeps protecting their ports.
++  for id in "${ids[@]}"; do
++    stop_backend_unit "$id" && continue
++    warn "Часть сервисов $host могла быть остановлена; 'twebproxy repair $host' снова запустит их."
++    die "Backend twebproxy-mtproxy@$id.service не остановлен или его состояние неизвестно; ничего не удалено, защита firewall сохранена. Проверь его (systemctl status twebproxy-mtproxy@$id.service) и повтори."
++  done
++  for id in "${ids[@]}"; do rm -f -- "$BACKENDS_DIR/$id.env"; done
+   remove_reverse_proxy_for_instance "$host"
+   rm -rf "$(instance_dir "$host")" "$(site_dir "$host")"
+   rebuild_firewall

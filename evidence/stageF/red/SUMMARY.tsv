@@ -1,0 +1,22 @@
+name	rc	seconds	last_line
+updater-fixture-on-v0.2.19	1	114	updater-fixture: 130 pass, 148 fail
+updater-fixture-on-mutant-branch-fallback	1	142	updater-fixture: 277 pass, 1 fail
+updater-fixture-on-mutant-cache-sourced	1	139	updater-fixture: 277 pass, 1 fail
+updater-fixture-on-mutant-copy-without-lock	1	140	updater-fixture: 277 pass, 1 fail
+updater-fixture-on-mutant-helper-not-refreshed	1	127	updater-fixture: 277 pass, 1 fail
+updater-fixture-on-mutant-lenient-identity	1	141	updater-fixture: 275 pass, 3 fail
+updater-fixture-on-mutant-lenient-manifest	1	141	updater-fixture: 258 pass, 20 fail
+updater-fixture-on-mutant-lock-kept-after-return	1	131	updater-fixture: 275 pass, 3 fail
+updater-fixture-on-mutant-lock-no-wait	1	128	updater-fixture: 276 pass, 2 fail
+updater-fixture-on-mutant-metadata-in-place	1	134	updater-fixture: 276 pass, 2 fail
+updater-fixture-on-mutant-no-interrupt-cleanup	1	131	updater-fixture: 244 pass, 34 fail
+updater-fixture-on-mutant-no-recovery-guidance	1	138	updater-fixture: 276 pass, 2 fail
+updater-fixture-on-mutant-no-signal-deferral	1	134	updater-fixture: 276 pass, 2 fail
+updater-fixture-on-mutant-no-signature-check	1	122	updater-fixture: 269 pass, 9 fail
+updater-fixture-on-mutant-no-staging-cleanup	1	135	updater-fixture: 240 pass, 38 fail
+updater-fixture-on-mutant-probes-inherit-lock	1	136	updater-fixture: 276 pass, 2 fail
+updater-fixture-on-mutant-probe-without-kill	1	178	updater-fixture: 275 pass, 3 fail
+updater-fixture-on-mutant-redirects-followed	1	116	updater-fixture: 269 pass, 9 fail
+updater-fixture-on-mutant-same-source-checksum-trusted	1	115	updater-fixture: 263 pass, 15 fail
+updater-fixture-on-mutant-strict-shared-parent	1	66	updater-fixture: 229 pass, 49 fail
+stage4-fixture-unadapted-on-0.2.20	1	0	stage4-update-backup-fixture: FAIL [A-valid-update]: assertion failed: test 1 -eq 0

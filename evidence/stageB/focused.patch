@@ -1,0 +1,1008 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index fcf13ff..bb4de10 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,0 +3,20 @@
++## 0.2.12-beta — 2026-10-20 — Stage B: транзакционный backend firewall
++
++- Backend firewall собирается из проверенного полного набора backend ports
++  под отдельной operation-local блокировкой. Candidate создаётся на той же
++  файловой системе, проверяется на полноту, права и синтаксис nft.
++- Замена только `inet twebproxy_backend` выполняется одним nft batch
++  (add/delete/recreate); отдельного удаления live table перед загрузкой нет.
++- После семантической проверки live JSON canonical-файл публикуется rename.
++  Ошибки записи, применения, проверки, публикации и systemctl не дают success.
++  При отказе публикации восстанавливается прежняя проверенная таблица; если
++  прежней таблицы не было, новая изоляция сохраняется с возвратом ошибки.
++- Обычный rebuild вызывает reload/start вместо restart. В generated unit
++  отсутствует destructive ExecStop; полный core uninstall сохраняет явное
++  удаление точной manager-owned таблицы.
++- Boot/reload восстанавливает правила из backend state, а не из потенциально
++  устаревшего canonical-файла. Добавлены fault-injection и disposable netns
++  tests. Реальные nft/ENOSPC checks требуют разрешённого изолированного Linux
++  окружения и не заменяются модельными результатами.
++- Stage A/A.1 DPI/TUI и protected Stage 4 function set сохранены.
++
+diff --git a/VERSION b/VERSION
+index d3b5ba4..f2722b1 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-0.2.11
++0.2.12
+diff --git a/tests/fieldgate/tg7-backend-state-isolation.sh b/tests/fieldgate/tg7-backend-state-isolation.sh
+index 5ea22ab..9bac440 100755
+--- a/tests/fieldgate/tg7-backend-state-isolation.sh
++++ b/tests/fieldgate/tg7-backend-state-isolation.sh
+@@ -21,6 +21,2 @@ TMP="$(mktemp -d /tmp/tg7-backend.XXXXXX)"; trap 'rm -rf -- "$TMP"' EXIT
+-source "$MGR"
+-# The manager sets `set -Eeuo pipefail` when sourced. This harness checks return
+-# codes explicitly, so -e must not abort it on a deliberate non-zero result.
+-trap - ERR
+-set +e
+-BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR/firewall.nft"
++source "$ROOT/tests/stageb/backend-harness.sh"
++backend_harness
+@@ -29 +25,2 @@ install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$INSTANCES_DIR"
+-systemctl() { return 0; }          # systemd is not the subject of this test
++# Stage B runs the actual generated helper through a behavioral nft/service
++# model. Every original backend isolation assertion below remains unchanged.
+diff --git a/tests/stageb/README.md b/tests/stageb/README.md
+new file mode 100644
+index 0000000..f1dfaf5
+--- /dev/null
++++ b/tests/stageb/README.md
+@@ -0,0 +1,43 @@
++# Stage B verification
++
++Run the behavioral tests on an ordinary Linux test workstation (Bash, jq,
++coreutils, util-linux). No system nft or systemd state is changed:
++
++```sh
++timeout 90 bash tests/stageb/transaction-fixture.sh
++timeout 90 bash tests/fieldgate/tg7-backend-state-isolation.sh
++```
++
++The nft/service model is explicit. Its PASS proves control flow and file
++postconditions, **not** real kernel atomicity. Partial candidate-write faults
++are injected command failures, not evidence of real ENOSPC.
++
++On a **disposable Debian 12 / Ubuntu 22.04+ VM** with nftables, jq, util-linux
++and CAP_NET_ADMIN/CAP_SYS_ADMIN:
++
++```sh
++sudo timeout 150 bash tests/stageb/real-nft-validation.sh
++sudo timeout 150 bash tests/stagea/sa1-real-nft-validation.sh
++sudo timeout 180 bash tests/stagea/sa3-state-publication.sh
++sudo timeout 270 bash tests/stageb/real-systemd-validation.sh ./twebproxy-manager.sh --disposable-vm
++```
++
++The Stage B script first creates a separate network namespace. It refuses to
++run its inner phase in the parent's namespace. No host ruleset is flushed.
++The namespace vanishes at exit; all filesystem paths are temporary. Do not
++use a production VPS. The Stage A.1 state-publication test attempts a private
++tmpfs mount for genuine ENOSPC; no mock may replace its required result.
++
++Real nft tests include initial absence, atomic add/delete/recreate, a late
++batch error after delete, invalid syntax, idempotence, multiple/one/zero
++backends, real JSON verification, publication-failure rollback and an untouched
++foreign table. Service action selection and generated ExecStart/ExecReload
++execution are covered by the behavioral fixture. A real systemd lifecycle
++check is provided separately and requires the disposable VM; do not call that
++model a systemd test. The real systemd fixture creates a unique temporary unit
++in /run/systemd/system and assigns NetworkNamespacePath to its private netns.
++It checks start/reload, failed reload/restart preservation and non-destructive
++stop. The production service names and host nft namespace are never modified.
++
++Exit 77 / NOT_EXECUTED_ENVIRONMENT_LIMITATION means the required real check
++did not execute. It must never be counted as PASS.
+diff --git a/tests/stageb/backend-harness.sh b/tests/stageb/backend-harness.sh
+new file mode 100644
+index 0000000..6134f24
+--- /dev/null
++++ b/tests/stageb/backend-harness.sh
+@@ -0,0 +1,35 @@
++#!/usr/bin/env bash
++# Behavioral model only. It does not establish nft kernel transaction semantics.
++backend_harness() {
++  export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++  source "$MGR"
++  trap - ERR
++  set +e
++  BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"
++  FIREWALL_FILE="$BASE_DIR/firewall.nft"
++  LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
++  install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR" "$TMP/bin"
++  export BF_TEST_ROOT="$TMP" BF_TEST_CANONICAL="$FIREWALL_FILE"
++  export BF_TEST_HELPER="$LIBEXEC_DIR/apply-firewall"
++  export BF_TEST_UNIT="$SYSTEMD_DIR/twebproxy-firewall.service"
++  cp "$ROOT/tests/stageb/nft-model.sh" "$TMP/bin/nft"
++  cp "$ROOT/tests/stageb/systemctl-model.sh" "$TMP/bin/systemctl"
++  cat > "$TMP/bin/mv" <<'SH'
++#!/bin/bash
++if [[ -f "$BF_TEST_ROOT/interrupt-before-publish" && "${*: -1}" == "$BF_TEST_CANONICAL" ]]; then
++  rm "$BF_TEST_ROOT/interrupt-before-publish"
++  kill -TERM "$PPID"
++  exit 143
++fi
++if [[ -f "$BF_TEST_ROOT/fail-publish" && "${*: -1}" == "$BF_TEST_CANONICAL" ]]; then exit 1; fi
++exec /usr/bin/mv "$@"
++SH
++  chmod 0700 "$TMP/bin/"*
++  export PATH="$TMP/bin:$PATH"
++  # A caller may have sourced a model function earlier; execute these fixtures.
++  unset -f systemctl 2>/dev/null || true
++}
++backend_state() {
++  printf 'MTPROXY_CLIENT_PORT=%s\nMTPROXY_STATS_PORT=%s\n' "$2" "$3" > "$BACKENDS_DIR/$1.env"
++  chmod 0600 "$BACKENDS_DIR/$1.env"
++}
+diff --git a/tests/stageb/json-verifier-fixture.sh b/tests/stageb/json-verifier-fixture.sh
+new file mode 100644
+index 0000000..6404287
+--- /dev/null
++++ b/tests/stageb/json-verifier-fixture.sh
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++# Schema/negative tests; not a substitute for the actual kernel round trip.
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++source "${1:-$ROOT/twebproxy-manager.sh}"
++trap - ERR
++TMP="$(mktemp -d /tmp/twebproxy-backend-json.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++export BF_TEST_ROOT="$TMP"
++backend_fw_render 23980,28980 > "$TMP/live"
++bash "$ROOT/tests/stageb/nft-model.sh" -j -n list table inet twebproxy_backend > "$TMP/good.json"
++[[ "$(backend_fw_ports_json "$TMP/good.json")" == 23980,28980 ]]
++echo 'PASS backend-json-exact-valid'
++reject() {
++  jq "$2" "$TMP/good.json" > "$TMP/bad.json"
++  if backend_fw_ports_json "$TMP/bad.json" > "$TMP/out" 2>&1; then echo "FAIL $1"; exit 1; fi
++  echo "PASS $1"
++}
++reject wrong_port '.nftables[-1].rule.expr[1].match.right.set=[239800,28980]'
++reject accept_instead_of_drop '.nftables[-1].rule.expr[-1]={"accept":null}'
++reject wrong_hook '.nftables[2].chain.hook="output"'
++reject wrong_priority '.nftables[2].chain.prio=0'
++reject dormant_table '.nftables[1].table.flags=["dormant"]'
++reject wrong_loopback_test '.nftables[-1].rule.expr[0].match.op="=="'
++reject missing_port_match '.nftables[-1].rule.expr|=del(.[1])'
++reject extra_effect '.nftables[-1].rule.expr|=([{"counter":null}]+.)'
++reject foreign_chain '.nftables+=[{"chain":{"family":"inet","table":"twebproxy_backend","name":"operator"}}]'
++reject named_set '.nftables+=[{"set":{"family":"inet","table":"twebproxy_backend","name":"operator"}}]'
++jq '.nftables[-1].rule.expr|=([{"match":{"op":"==","left":{"meta":{"key":"l4proto"}},"right":6}}]+.)' "$TMP/good.json" > "$TMP/tcp.json"
++[[ "$(backend_fw_ports_json "$TMP/tcp.json")" == 23980,28980 ]]
++echo 'PASS backend-json-explicit-protocol-dependency'
++backend_fw_render '' > "$TMP/live"
++bash "$ROOT/tests/stageb/nft-model.sh" -j -n list table inet twebproxy_backend > "$TMP/empty.json"
++[[ "$(backend_fw_ports_json "$TMP/empty.json")" == "" ]]
++echo 'PASS backend-json-empty-chain'
+diff --git a/tests/stageb/nft-model.sh b/tests/stageb/nft-model.sh
+new file mode 100644
+index 0000000..7d763c4
+--- /dev/null
++++ b/tests/stageb/nft-model.sh
+@@ -0,0 +1,50 @@
++#!/bin/bash
++# Explicit atomic model. Deliberate faults never touch host nft.
++set -euo pipefail
++root="${BF_TEST_ROOT:?}"
++printf '%s\n' "$*" >> "$root/nft.calls"
++case "$*" in
++  *"list tables inet")
++    [[ ! -e "$root/fail-query" ]] || exit 1
++    if [[ -f "$root/live" ]]; then
++      printf '{"nftables":[{"table":{"family":"inet","name":"twebproxy_backend"}}]}\n'
++    else printf '{"nftables":[]}\n'; fi
++    exit 0;;
++  *"list table inet twebproxy_backend")
++    if [[ -f "$root/fail-query-once" ]]; then rm "$root/fail-query-once"; exit 1; fi
++    [[ ! -e "$root/fail-query" && -f "$root/live" ]] || exit 1
++    if [[ "$*" != *"-j"* ]]; then cat "$root/live"; exit; fi
++    ports="$(sed -n 's/.*dport { \([^}]*\) } drop/\1/p' "$root/live" | tr -d ' ')"
++    jq -n --arg ports "$ports" '
++      {nftables: ([
++        {metainfo:{json_schema_version:1}},
++        {table:{family:"inet",name:"twebproxy_backend",handle:1}},
++        {chain:{family:"inet",table:"twebproxy_backend",name:"input",type:"filter",hook:"input",prio:-5,policy:"accept",handle:2}}
++      ] + (if $ports == "" then [] else [
++        {rule:{family:"inet",table:"twebproxy_backend",chain:"input",handle:3,expr:[
++          {match:{op:"!=",left:{meta:{key:"iifname"}},right:"lo"}},
++          {match:{op:"==",left:{payload:{protocol:"tcp",field:"dport"}},right:{set:($ports|split(",")|map(tonumber))}}},
++          {drop:null}
++        ]}}
++      ] end))}'
++    exit 0;;
++  "delete table inet twebproxy_backend")
++    rm -f "$root/live"; exit 0;;
++esac
++file="${*: -1}"
++[[ -f "$file" ]] || exit 1
++[[ ! -f "$root/fail-check" ]] || exit 1
++grep -q '^table inet twebproxy_backend {' "$file" || exit 1
++grep -q '^add table inet twebproxy_backend$' "$file" || {
++  # Only the old helper's separate load reaches this branch.
++  [[ ! -f "$root/fail-apply" ]] || exit 1
++  cp "$file" "$root/live"; exit 0
++}
++grep -q '^delete table inet twebproxy_backend$' "$file" || exit 1
++[[ "$*" != *"-c"* ]] || exit 0
++if [[ -e "$root/fail-apply" ]]; then rm -f "$root/fail-apply"; exit 1; fi
++sed -n '/^table inet twebproxy_backend {/,$p' "$file" > "$root/live.new"
++mv "$root/live.new" "$root/live"
++if [[ -f "$root/fail-post-verify" ]]; then
++  rm "$root/fail-post-verify"; touch "$root/fail-query-once"
++fi
+diff --git a/tests/stageb/real-nft-validation.sh b/tests/stageb/real-nft-validation.sh
+new file mode 100644
+index 0000000..da76210
+--- /dev/null
++++ b/tests/stageb/real-nft-validation.sh
+@@ -0,0 +1,90 @@
++#!/usr/bin/env bash
++# Real kernel state tests. Never use the host/global namespace.
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++if [[ "${2:-}" != --inside ]]; then
++  command -v nft >/dev/null || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: nft unavailable'; exit 77; }
++  timeout 5 unshare --net true || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: network namespace/CAP_NET_ADMIN unavailable'; exit 77; }
++  export STAGEB_PARENT_NETNS="$(readlink /proc/self/ns/net)"
++  exec timeout 120 unshare --net bash "$0" "$MGR" --inside
++fi
++[[ -n "${STAGEB_PARENT_NETNS:-}" && "$(readlink /proc/self/ns/net)" != "$STAGEB_PARENT_NETNS" ]] ||
++  { echo 'FAIL: refusing host namespace'; exit 1; }
++TMP="$(mktemp -d /tmp/twebproxy-stageb-real.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++source "$MGR"
++trap - ERR
++BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR/firewall.nft"
++LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
++install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR" "$TMP/bin"
++NFT="$(command -v nft)"
++export BF_TEST_ROOT="$TMP" BF_TEST_CANONICAL="$FIREWALL_FILE"
++cat > "$TMP/bin/mv" <<'SH'
++#!/bin/bash
++if [[ -f "$BF_TEST_ROOT/fail-publish" && "${*: -1}" == "$BF_TEST_CANONICAL" ]]; then exit 1; fi
++exec /usr/bin/mv "$@"
++SH
++chmod 0700 "$TMP/bin/mv"; export PATH="$TMP/bin:$PATH"
++write_backend_firewall_helper
++helper="$LIBEXEC_DIR/apply-firewall"
++"$NFT" --version
++# A foreign table/chain/rule must be byte-semantically unchanged.
++"$NFT" -f - <<'NFT'
++table inet stageb_foreign {
++  chain unrelated {
++    type filter hook output priority 50; policy accept;
++    counter
++  }
++}
++NFT
++"$NFT" -j -s list table inet stageb_foreign > "$TMP/foreign.before"
++printf 'MTPROXY_CLIENT_PORT=23980\nMTPROXY_STATS_PORT=28980\n' > "$BACKENDS_DIR/a.env"
++"$helper"
++echo 'PASS real-first-install'
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/before.json"
++before="$(backend_fw_ports_json "$TMP/before.json")"; [[ "$before" == 23980,28980 ]]
++# Later error after delete must abort the entire kernel batch.
++{
++  printf 'add table inet twebproxy_backend\ndelete table inet twebproxy_backend\n'
++  cat "$FIREWALL_FILE"
++  printf 'add rule inet stageb_nonexistent missing drop\n'
++} > "$TMP/late-failure.nft"
++if "$NFT" -f "$TMP/late-failure.nft"; then echo 'FAIL late error accepted'; exit 1; fi
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/after.json"
++cmp "$TMP/before.json" "$TMP/after.json"
++echo 'PASS real-delete-plus-late-error-preserves-table'
++printf 'not valid nft syntax\n' > "$TMP/invalid.nft"
++if "$NFT" -f "$TMP/invalid.nft"; then exit 1; fi
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/after.json"
++cmp "$TMP/before.json" "$TMP/after.json"
++echo 'PASS real-invalid-candidate-preserves-table'
++printf 'MTPROXY_CLIENT_PORT=23981\nMTPROXY_STATS_PORT=28981\n' > "$BACKENDS_DIR/b.env"
++"$helper"
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/multiple.json"
++[[ "$(backend_fw_ports_json "$TMP/multiple.json")" == 23980,23981,28980,28981 ]]
++echo 'PASS real-valid-replacement-multiple-backends'
++cp "$FIREWALL_FILE" "$TMP/file.before"
++"$helper"
++cmp "$TMP/file.before" "$FIREWALL_FILE"
++echo 'PASS real-repeated-apply'
++rm "$BACKENDS_DIR/b.env"
++touch "$TMP/fail-publish"
++if "$helper"; then echo 'FAIL publish failure hidden'; exit 1; fi
++cmp "$TMP/file.before" "$FIREWALL_FILE"
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/restored.json"
++[[ "$(backend_fw_ports_json "$TMP/restored.json")" == 23980,23981,28980,28981 ]]
++rm "$TMP/fail-publish"
++echo 'PASS real-publish-failure-restores-old-kernel-state'
++"$helper"
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/one.json"
++[[ "$(backend_fw_ports_json "$TMP/one.json")" == 23980,28980 ]]
++rm "$BACKENDS_DIR/a.env"
++"$helper"
++"$NFT" -j -n list table inet twebproxy_backend > "$TMP/empty.json"
++[[ "$(backend_fw_ports_json "$TMP/empty.json")" == "" ]]
++echo 'PASS real-empty-backend-set'
++"$NFT" -j -s list table inet stageb_foreign > "$TMP/foreign.after"
++cmp "$TMP/foreign.before" "$TMP/foreign.after"
++echo 'PASS real-foreign-table-untouched'
+diff --git a/tests/stageb/real-systemd-validation.sh b/tests/stageb/real-systemd-validation.sh
+new file mode 100644
+index 0000000..8fc4463
+--- /dev/null
++++ b/tests/stageb/real-systemd-validation.sh
+@@ -0,0 +1,71 @@
++#!/usr/bin/env bash
++# Opt-in: disposable VM ONLY. Creates one temporary /run systemd unit; all nft
++# activity (including the systemd helper) is inside a separate network namespace.
++set -Eeuo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++if [[ "${2:-}" != --inside ]]; then
++  [[ "${2:-}" == --disposable-vm ]] || { echo 'NOT_EXECUTED: requires --disposable-vm'; exit 77; }
++  command -v nft >/dev/null || { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: nft unavailable'; exit 77; }
++  timeout 5 systemctl list-units --no-legend >/dev/null ||
++    { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: running systemd unavailable'; exit 77; }
++  timeout 5 unshare --net true ||
++    { echo 'NOT_EXECUTED_ENVIRONMENT_LIMITATION: isolated namespace unavailable'; exit 77; }
++  export STAGEB_PARENT_NETNS="$(readlink /proc/self/ns/net)"
++  exec timeout 240 unshare --net bash "$0" "$MGR" --inside
++fi
++[[ -n "${STAGEB_PARENT_NETNS:-}" && "$(readlink /proc/self/ns/net)" != "$STAGEB_PARENT_NETNS" ]] ||
++  { echo 'FAIL: refusing host namespace'; exit 1; }
++TMP="$(mktemp -d /tmp/twebproxy-stageb-systemd.XXXXXX)"
++unit="twebproxy-stageb-$BASHPID.service"
++unit_path="/run/systemd/system/$unit"
++[[ ! -e "$unit_path" && ! -L "$unit_path" ]]
++cleanup() {
++  rc=$?; trap - EXIT
++  timeout 15 systemctl stop "$unit" || rc=1
++  rm -f -- "$unit_path" || rc=1
++  timeout 15 systemctl daemon-reload || rc=1
++  systemctl reset-failed "$unit" >/dev/null 2>&1 || true
++  rm -rf -- "$TMP"
++  exit "$rc"
++}
++trap cleanup EXIT
++trap 'exit 143' TERM
++trap 'exit 130' INT
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++source "$MGR"; trap - ERR
++BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR/firewall.nft"
++LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
++install -d -m 0700 "$BASE_DIR" "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR"
++write_backend_firewall_helper
++write_backend_firewall_unit
++# Identical ExecStart/Reload/Stop semantics; only this test unit enters our netns.
++sed "/^Type=oneshot$/a NetworkNamespacePath=/proc/$BASHPID/ns/net" \
++  "$SYSTEMD_DIR/twebproxy-firewall.service" > "$unit_path"
++chmod 0644 "$unit_path"
++timeout 15 systemctl daemon-reload
++printf 'MTPROXY_CLIENT_PORT=23980\nMTPROXY_STATS_PORT=28980\n' > "$BACKENDS_DIR/a.env"
++timeout 45 systemctl start "$unit"
++nft -j -n list table inet twebproxy_backend > "$TMP/initial"
++[[ "$(backend_fw_ports_json "$TMP/initial")" == 23980,28980 ]]
++echo 'PASS real-systemd-start'
++printf 'MTPROXY_CLIENT_PORT=23981\nMTPROXY_STATS_PORT=28981\n' > "$BACKENDS_DIR/b.env"
++timeout 45 systemctl reload "$unit"
++nft -j -n list table inet twebproxy_backend > "$TMP/multiple"
++[[ "$(backend_fw_ports_json "$TMP/multiple")" == 23980,23981,28980,28981 ]]
++echo 'PASS real-systemd-reload'
++printf 'MTPROXY_CLIENT_PORT=23982\n' > "$BACKENDS_DIR/broken.env"
++if timeout 45 systemctl reload "$unit"; then echo 'FAIL invalid reload returned success'; exit 1; fi
++nft -j -n list table inet twebproxy_backend > "$TMP/after"
++cmp "$TMP/multiple" "$TMP/after"
++echo 'PASS real-systemd-invalid-reload-keeps-isolation'
++if timeout 45 systemctl restart "$unit"; then echo 'FAIL invalid restart returned success'; exit 1; fi
++nft -j -n list table inet twebproxy_backend > "$TMP/after"
++cmp "$TMP/multiple" "$TMP/after"
++echo 'PASS real-systemd-no-ExecStop-gap'
++rm "$BACKENDS_DIR/broken.env"
++timeout 45 systemctl start "$unit"
++timeout 15 systemctl stop "$unit"
++nft -j -n list table inet twebproxy_backend > "$TMP/after"
++[[ "$(backend_fw_ports_json "$TMP/after")" == 23980,23981,28980,28981 ]]
++echo 'PASS real-systemd-stop-retains-isolation'
+diff --git a/tests/stageb/reproduce-v0211.sh b/tests/stageb/reproduce-v0211.sh
+new file mode 100644
+index 0000000..1a3521c
+--- /dev/null
++++ b/tests/stageb/reproduce-v0211.sh
+@@ -0,0 +1,40 @@
++#!/usr/bin/env bash
++# This script is intentionally only for the immutable v0.2.11 input.
++set -euo pipefail
++MGR="${1:?v0.2.11 manager}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb-before.XXXXXX)"
++trap 'rm -rf "$TMP"' EXIT
++export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1
++source "$MGR"
++trap - ERR
++BASE_DIR="$TMP/etc"; BACKENDS_DIR="$BASE_DIR/backends"; FIREWALL_FILE="$BASE_DIR/firewall.nft"
++LIBEXEC_DIR="$TMP/libexec"; SYSTEMD_DIR="$TMP/systemd"
++mkdir -p "$BACKENDS_DIR" "$LIBEXEC_DIR" "$SYSTEMD_DIR" "$TMP/bin"
++export BF_TEST_ROOT="$TMP" BF_TEST_CANONICAL="$FIREWALL_FILE"
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++cp "$ROOT/tests/stageb/nft-model.sh" "$TMP/bin/nft"; chmod 0700 "$TMP/bin/nft"
++export PATH="$TMP/bin:$PATH"
++systemctl() { printf '%s\n' "$*" >> "$TMP/systemctl.calls"; return 0; }
++write_runner_helpers
++write_systemd_templates
++# Rebase the legacy fixed path only; run its actual generated delete/load body.
++sed "s|/etc/twebproxy/firewall.nft|$FIREWALL_FILE|g" "$LIBEXEC_DIR/apply-firewall" > "$TMP/old-helper"
++printf 'old isolation\n' > "$TMP/live"
++printf 'table inet twebproxy_backend {\n}\n' > "$FIREWALL_FILE"
++touch "$TMP/fail-apply"
++rc=0; bash "$TMP/old-helper" || rc=$?
++[[ "$rc" != 0 && ! -e "$TMP/live" ]]
++printf 'REPRODUCED old-helper: load rc=%s, previous isolation deleted\n' "$rc"
++rm "$TMP/fail-apply"
++printf 'MTPROXY_CLIENT_PORT=23980\nMTPROXY_STATS_PORT=28980\n' > "$BACKENDS_DIR/a.env"
++(rebuild_firewall)
++grep -q '^restart twebproxy-firewall.service' "$TMP/systemctl.calls"
++grep '^ExecStop=' "$SYSTEMD_DIR/twebproxy-firewall.service"
++printf 'REPRODUCED rebuild: restart invokes destructive ExecStop\n'
++# Faulted canonical write in the exact conditional-errexit context.
++rm "$FIREWALL_FILE"
++ln -s /dev/full "$FIREWALL_FILE"
++if (rebuild_firewall) 2>"$TMP/write.err"; then
++  printf 'REPRODUCED canonical write failure: rebuild rc=0\n'
++else printf 'FAIL write failure did not reproduce\n'; exit 1; fi
++grep 'No space left' "$TMP/write.err"
+diff --git a/tests/stageb/run-stage-b-suite.sh b/tests/stageb/run-stage-b-suite.sh
+new file mode 100644
+index 0000000..6b1ca49
+--- /dev/null
++++ b/tests/stageb/run-stage-b-suite.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++source "$ROOT/tests/lib/stage-a-results.sh"
++stage_a_run_case "B transactional control flow (MODEL)" "$ROOT/tests/stageb/transaction-fixture.sh" 90 "$MGR"
++stage_a_run_case "B semantic JSON verifier (SCHEMA)" "$ROOT/tests/stageb/json-verifier-fixture.sh" 60 "$MGR"
++stage_a_run_case "B backend state isolation TG7" "$ROOT/tests/fieldgate/tg7-backend-state-isolation.sh" 90 "$MGR"
++stage_a_run_case "B actual kernel transactions (REAL)" "$ROOT/tests/stageb/real-nft-validation.sh" 150 "$MGR"
++rc=0; stage_a_result || rc=$?
++case "$rc" in
++  0) echo 'stage-b-suite: PASS (all mandatory checks executed)';;
++  77) echo 'stage-b-suite: INCOMPLETE (mandatory real validation NOT_EXECUTED)';;
++  *) echo 'stage-b-suite: FAIL';;
++esac
++exit "$rc"
+diff --git a/tests/stageb/scope-invariants.sh b/tests/stageb/scope-invariants.sh
+new file mode 100644
+index 0000000..dcfb623
+--- /dev/null
++++ b/tests/stageb/scope-invariants.sh
+@@ -0,0 +1,64 @@
++#!/usr/bin/env bash
++set -Eeuo pipefail
++BASE="${1:?normalized A.1 tree}"; PROJECT="${2:?Stage B tree}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb-scope.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    source "$1"; trap - ERR
++    while read -r fn; do
++      hash="$(declare -f "$fn" | sha256sum)"
++      printf "%s %s\n" "$fn" "${hash%% *}"
++    done < <(compgen -A function | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side"
++done
++unchanged=0; modified=0; added=0
++while read -r fn old; do
++  new="$(awk -v f="$fn" '$1==f{print $2}' "$TMP/candidate")"
++  [[ -n "$new" ]] || { echo "FAIL removed function: $fn"; exit 1; }
++  if [[ "$old" == "$new" ]]; then unchanged=$((unchanged+1)); continue; fi
++  case "$fn" in write_runner_helpers|write_systemd_templates|rebuild_firewall) ;;
++    *) echo "FAIL forbidden modification: $fn"; exit 1;; esac
++  echo "allowed modified: $fn"; modified=$((modified+1))
++done < "$TMP/baseline"
++while read -r fn hash; do
++  if awk -v f="$fn" '$1==f{found=1} END{exit !found}' "$TMP/baseline"; then continue; fi
++  case "$fn" in backend_fw_error|backend_fw_render|backend_fw_collect|backend_fw_ports_json|backend_fw_live_ports|backend_fw_batch|backend_fw_restore|backend_fw_transaction|backend_fw_main|write_backend_firewall_helper|write_backend_firewall_unit) ;;
++    *) echo "FAIL unexpected added function: $fn"; exit 1;; esac
++  added=$((added+1))
++done < "$TMP/candidate"
++# Compare top-level initialized manager variables as well as function bodies.
++# A line-oriented brace parser would misidentify a "}" inside nft heredocs.
++for side in baseline candidate; do
++  tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++  TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 bash -c '
++    before=""; before="$(compgen -v)"
++    source "$1"; trap - ERR
++    while read -r name; do
++      case "$name" in MANAGER_VERSION|MANAGER_RELEASE_VERSION|name) continue;; esac
++      if grep -Fxq -- "$name" <<< "$before"; then continue; fi
++      declare -p "$name"
++    done < <(compgen -v | sort)
++  ' _ "$tree/twebproxy-manager.sh" > "$TMP/$side.outside"
++done
++diff -u "$TMP/baseline.outside" "$TMP/candidate.outside"
++for f in README.md assets/nfqws-linux-x86_64 assets/nfqws-LICENSE.txt assets/NFQWS-PROVENANCE.txt; do cmp "$BASE/$f" "$PROJECT/$f"; done
++for f in "$BASE"/docs/*.md; do cmp "$f" "$PROJECT/docs/${f##*/}"; done
++# The two touched aggregate generators also contain unrelated service/helper
++# payloads. Prove those heredocs stayed byte-identical, not merely their names.
++for token in 'cat > "$LIBEXEC_DIR/run-mtproxy"' 'cat > "$LIBEXEC_DIR/refresh-mtproxy-config"' \
++  'cat > "$SYSTEMD_DIR/twebproxy@.service"' 'cat > "$SYSTEMD_DIR/twebproxy-mtproxy@.service"' \
++  'cat > "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.service"' 'cat > "$SYSTEMD_DIR/twebproxy-refresh-mtproxy.timer"'; do
++  for side in baseline candidate; do
++    tree="$BASE"; [[ "$side" != candidate ]] || tree="$PROJECT"
++    awk -v token="$token" 'index($0,token){p=1;next} p && $0=="EOF"{exit} p{print}' "$tree/twebproxy-manager.sh" > "$TMP/$side.payload"
++    [[ -s "$TMP/$side.payload" ]]
++  done
++  cmp "$TMP/baseline.payload" "$TMP/candidate.payload"
++done
++echo 'PASS six unrelated generated helper/unit payloads unchanged'
++actual="$(bash "$PROJECT/tests/fieldgate/stage4-function-set-hash.sh" "$PROJECT/twebproxy-manager.sh")"
++[[ "${actual%% *}" == fd0e123c516324c23f0a42084f666104db5c35c58e1518a05abee1704b04abcb ]]
++echo "$actual"
++printf 'PASS scope unchanged=%s modified=%s added=%s\n' "$unchanged" "$modified" "$added"
+diff --git a/tests/stageb/systemctl-model.sh b/tests/stageb/systemctl-model.sh
+new file mode 100644
+index 0000000..9788eab
+--- /dev/null
++++ b/tests/stageb/systemctl-model.sh
+@@ -0,0 +1,23 @@
++#!/bin/bash
++set -euo pipefail
++root="${BF_TEST_ROOT:?}"
++printf '%s\n' "$*" >> "$root/systemctl.calls"
++if [[ -e "$root/fail-systemctl" ]]; then
++  action="$(cat "$root/fail-systemctl")"
++  [[ -n "$action" && "$action" != "$1" ]] || exit 1
++fi
++case "$1" in
++  is-active) [[ -f "$root/active" ]] || exit 3;;
++  start|reload)
++    key=ExecStart; [[ "$1" != reload ]] || key=ExecReload
++    executable="$(sed -n "s/^$key=//p" "${BF_TEST_UNIT:?}")"
++    [[ "$executable" == "${BF_TEST_HELPER:?}" ]]
++    "$executable"
++    touch "$root/active";;
++  restart)
++    # Model the legacy ExecStop gap explicitly.
++    nft delete table inet twebproxy_backend
++    "${BF_TEST_HELPER:?}"; touch "$root/active";;
++  daemon-reload|enable) exit 0;;
++  *) exit 1;;
++esac
+diff --git a/tests/stageb/transaction-fixture.sh b/tests/stageb/transaction-fixture.sh
+new file mode 100644
+index 0000000..4162897
+--- /dev/null
++++ b/tests/stageb/transaction-fixture.sh
+@@ -0,0 +1,100 @@
++#!/usr/bin/env bash
++set -uo pipefail
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
++MGR="${1:-$ROOT/twebproxy-manager.sh}"
++TMP="$(mktemp -d /tmp/twebproxy-stageb.XXXXXX)"
++trap 'rm -rf -- "$TMP"' EXIT
++source "$ROOT/tests/stageb/backend-harness.sh"
++backend_harness
++pass=0; fail=0
++ok() { printf 'PASS %s\n' "$*"; pass=$((pass+1)); }
++bad() { printf 'FAIL %s\n' "$*" >&2; fail=$((fail+1)); }
++check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
++run() { (rebuild_firewall) > "$TMP/output" 2>&1; }
++unchanged() { cmp -s "$TMP/old.file" "$FIREWALL_FILE" && cmp -s "$TMP/old.live" "$TMP/live"; }
++save() { cp "$FIREWALL_FILE" "$TMP/old.file"; cp "$TMP/live" "$TMP/old.live"; }
++negative() { if run; then bad "$1"; else ok "$1"; fi; }
++backend_state a 23980 28980
++printf 'ExecStop=-/usr/sbin/nft delete table inet twebproxy_backend\n' > "$SYSTEMD_DIR/twebproxy-firewall.service"
++check first_install run
++if [[ ! -f "$TMP/live" ]]; then cat "$TMP/output"; exit 1; fi
++check candidate_complete cmp -s "$TMP/live" "$FIREWALL_FILE"
++check canonical_permissions test "$(stat -c '%a:%u:%g' "$FIREWALL_FILE")" = 600:0:0
++save
++backend_state b 23981 28981
++touch "$TMP/fail-check"
++negative invalid_candidate_failure
++check invalid_preserves_file_and_live unchanged
++rm "$TMP/fail-check"
++touch "$TMP/fail-apply"
++negative atomic_apply_failure
++check failed_apply_preserves_isolation unchanged
++touch "$TMP/fail-publish"
++negative failed_publish_failure
++check failed_publish_restores_live_and_keeps_file unchanged
++rm "$TMP/fail-publish"
++touch "$TMP/fail-post-verify"
++negative failed_live_verification
++check failed_verification_restores_previous unchanged
++# A partial write + failed renderer must be checked even with errexit suppressed.
++printf() {
++  if [[ -f "$BF_TEST_ROOT/fail-write" &&
++       ( "${1:-}" == 'table inet twebproxy_backend {'* || "${2:-}" == 'table inet twebproxy_backend {'* ) ]]; then
++    builtin printf 'table inet twebproxy_backend {\n'; return 1
++  fi
++  builtin printf "$@"
++}
++export -f printf
++touch "$TMP/fail-write"
++negative failed_partial_candidate_write
++check partial_write_not_published unchanged
++rm "$TMP/fail-write"
++unset -f printf
++check multiple_backends run
++check all_backend_ports grep -q '23980,23981,28980,28981' "$FIREWALL_FILE"
++save
++check idempotent_rebuild run
++check idempotent_state unchanged
++check reload_without_restart bash -c '! grep -q "^restart " "$1"' _ "$TMP/systemctl.calls"
++check no_separate_live_delete bash -c '! grep -q "^delete table " "$1"' _ "$TMP/nft.calls"
++check unit_has_no_destructive_stop bash -c '! grep -q "^ExecStop=" "$1"' _ "$SYSTEMD_DIR/twebproxy-firewall.service"
++touch "$TMP/fail-systemctl"
++negative service_failure_propagated
++check failed_service_keeps_state unchanged
++rm "$TMP/fail-systemctl"
++for action in daemon-reload enable reload is-active start; do
++  [[ "$action" != start ]] || rm -f "$TMP/active"
++  printf '%s\n' "$action" > "$TMP/fail-systemctl"
++  negative "service_${action}_failure_propagated"
++  check "service_${action}_failure_preserves_state" unchanged
++  rm "$TMP/fail-systemctl"
++done
++printf 'MTPROXY_CLIENT_PORT=23982\n' > "$BACKENDS_DIR/broken.env"
++negative damaged_backend_fails_closed
++check damaged_backend_preserves_old unchanged
++rm "$BACKENDS_DIR/broken.env" "$BACKENDS_DIR/b.env"
++check removing_one_backend run
++check other_backend_retained grep -q '23980,28980' "$FIREWALL_FILE"
++rm "$BACKENDS_DIR/a.env"
++check removing_last_backend run
++check empty_has_input_chain grep -q 'type filter hook input priority -5; policy accept;' "$FIREWALL_FILE"
++check empty_has_no_drop bash -c 'test -f "$1" && ! grep -q "dport" "$1"' _ "$FIREWALL_FILE"
++# Reboot does not replay a stale canonical file: the installed helper reads state.
++backend_state c 24000 29000
++check installed_helper_reconstructs "$BF_TEST_HELPER"
++check installed_helper_new_ports grep -q '24000,29000' "$FIREWALL_FILE"
++save
++backend_state d 24001 29001
++touch "$TMP/interrupt-before-publish"
++if "$BF_TEST_HELPER" >"$TMP/interrupted" 2>&1; then bad interrupted_operation_not_success; else ok interrupted_operation_not_success; fi
++check interrupted_file_unchanged cmp -s "$TMP/old.file" "$FIREWALL_FILE"
++check next_invocation_converges "$BF_TEST_HELPER"
++check convergence_full_state grep -q '24000,24001,29000,29001' "$FIREWALL_FILE"
++# Absent old table + publication failure retains new isolation, reports failure.
++rm "$TMP/live"
++touch "$TMP/fail-publish"
++if "$BF_TEST_HELPER" >"$TMP/output" 2>&1; then bad absent_publish_not_success; else ok absent_publish_not_success; fi
++check absent_publish_retains_new_isolation test -s "$TMP/live"
++rm "$TMP/fail-publish"
++printf 'stageb-model: pass=%s fail=%s\n' "$pass" "$fail"
++(( fail == 0 ))
+diff --git a/twebproxy-manager.sh b/twebproxy-manager.sh
+index 1b36386..623a5ad 100755
+--- a/twebproxy-manager.sh
++++ b/twebproxy-manager.sh
+@@ -5 +5 @@ umask 077
+-# TWebProxy Manager v0.2.11-dpi-beta
++# TWebProxy Manager v0.2.12-beta
+@@ -10,2 +10,2 @@ APP="twebproxy"
+-MANAGER_VERSION="0.2.11"
+-MANAGER_RELEASE_VERSION="0.2.11-dpi-beta"
++MANAGER_VERSION="0.2.12"
++MANAGER_RELEASE_VERSION="0.2.12-beta"
+@@ -2740,0 +2741,220 @@ write_global_env() {
++backend_fw_error() { printf 'backend firewall: %s\n' "$*" >&2; }
++
++backend_fw_render() {
++  printf 'table inet twebproxy_backend {\n  chain input {\n    type filter hook input priority -5; policy accept;\n' || return 1
++  if [[ -n "$1" ]]; then
++    printf '    iifname != "lo" tcp dport { %s } drop\n' "$1" || return 1
++  fi
++  printf '  }\n}\n'
++}
++
++backend_fw_collect() {
++  local f pair client stats ports=()
++  # Import each backend in its own subshell. No inheritance from the preceding
++  # backend, and no change to the manager's glob options.
++  for f in "$BF_BACKENDS"/*.env; do
++    [[ -e "$f" || -L "$f" ]] || continue
++    [[ -f "$f" && ! -L "$f" ]] || { backend_fw_error "unsafe backend state: $f"; return 1; }
++    pair="$(
++      unset MTPROXY_CLIENT_PORT MTPROXY_STATS_PORT
++      source "$f" >/dev/null 2>&1 || exit 1
++      [[ -n "${MTPROXY_CLIENT_PORT:-}" && -n "${MTPROXY_STATS_PORT:-}" ]] || exit 1
++      printf '%s %s' "$MTPROXY_CLIENT_PORT" "$MTPROXY_STATS_PORT"
++    )" || { backend_fw_error "invalid backend state: $f"; return 1; }
++    client="${pair%% *}"; stats="${pair##* }"
++    if ! is_valid_port "$client" || ! is_valid_port "$stats"; then
++      backend_fw_error "invalid backend state: $f"; return 1
++    fi
++    ports+=("$((10#$client))" "$((10#$stats))")
++  done
++  if (( ${#ports[@]} )); then
++    printf '%s\n' "${ports[@]}" | sort -nu | paste -sd, - || return 1
++  fi
++  return 0
++}
++
++# Accept only the finite manager-owned table shape, not substring matches or
++# arbitrary nft objects. Numeric JSON avoids service/priority name ambiguity.
++# libnftables may include an explicit TCP protocol dependency; accept exactly it.
++backend_fw_ports_json() {
++  jq -er '
++    def must($p): if $p then . else error("unexpected backend table shape") end;
++    def port: type == "number" and floor == . and . >= 1 and . <= 65535;
++    def portlist:
++      if type == "number" then [.] else
++        if type == "object" and keys == ["set"] and (.set|type) == "array"
++        then .set else error("invalid port set") end
++      end
++      | must(length > 0 and all(.[]; port)) | sort | unique;
++    .nftables | must(type == "array")
++    | map(select(has("metainfo")|not))
++    | must(all(.[]; keys == ["table"] or keys == ["chain"] or keys == ["rule"]))
++    | . as $all
++    | [.[]|.table? // empty] as $t
++    | [$all[]|.chain? // empty] as $c
++    | [$all[]|.rule? // empty] as $r
++    | must(($t|length)==1 and ($c|length)==1 and ($r|length)<=1)
++    | must($t[0].family=="inet" and $t[0].name=="twebproxy_backend"
++        and (($t[0].flags // [])|length)==0)
++    | must($c[0].family=="inet" and $c[0].table=="twebproxy_backend"
++        and $c[0].name=="input" and $c[0].type=="filter"
++        and $c[0].hook=="input" and $c[0].prio == -5
++        and $c[0].policy=="accept")
++    | if ($r|length)==0 then "" else
++        $r[0] | must(.family=="inet" and .table=="twebproxy_backend" and .chain=="input")
++        | .expr | must(type=="array" and (length==3 or length==4))
++        | must(.[-1]=={"drop":null})
++        | .[0:-1] as $matches
++        | must(all($matches[]; keys==["match"]))
++        | [$matches[]|.match|select(.op=="!=" and .left=={"meta":{"key":"iifname"}} and .right=="lo")] as $if
++        | [$matches[]|.match|select(.op=="==" and .left=={"payload":{"protocol":"tcp","field":"dport"}})] as $dp
++        | [$matches[]|.match|select(.op=="==" and .left=={"meta":{"key":"l4proto"}} and (.right=="tcp" or .right==6))] as $tcp
++        | must(($if|length)==1 and ($dp|length)==1 and ($tcp|length)==($matches|length)-2)
++        | $dp[0].right | portlist | map(tostring) | join(",")
++      end
++  ' "$1"
++}
++
++backend_fw_live_ports() {
++  timeout 30 "$BF_NFT" -j -n list table inet twebproxy_backend > "$1" || return 1
++  backend_fw_ports_json "$1"
++}
++
++backend_fw_batch() {
++  # "add", unlike "create", is idempotent on existing tables. In ONE batch,
++  # add/delete/recreate handles both initial absence and replacement. No live
++  # mutation precedes the final nft -f. Requires nft transaction semantics.
++  {
++    printf 'add table inet twebproxy_backend\ndelete table inet twebproxy_backend\n' &&
++      cat -- "$1"
++  } > "$2"
++}
++
++backend_fw_restore() {
++  local actual
++  if [[ "$1" == yes ]]; then
++    if timeout 30 "$BF_NFT" -f "$2" &&
++        actual="$(backend_fw_live_ports "$3")" && [[ "$actual" == "$4" ]]; then
++      backend_fw_error 'operation failed; previous live isolation restored'
++    else
++      backend_fw_error 'RESTORE FAILED: inspect live twebproxy_backend; canonical file was not published'
++    fi
++  else
++    # Restoring absence would open the ports. Retain the new isolation instead.
++    backend_fw_error 'operation failed; retaining applied isolation (no previous table); retry rebuild'
++  fi
++  return 1
++}
++
++backend_fw_transaction() {
++  local work="$1" ports old_ports='' present=no actual content bytes
++  [[ ! -L "$BF_FILE" && ( ! -e "$BF_FILE" || -f "$BF_FILE" ) ]] ||
++    { backend_fw_error "unsafe canonical path: $BF_FILE"; return 1; }
++  [[ -d "$BF_BACKENDS" && ! -L "$BF_BACKENDS" ]] ||
++    { backend_fw_error "backend directory unavailable: $BF_BACKENDS"; return 1; }
++  ports="$(backend_fw_collect)" || return 1
++  content="$(backend_fw_render "$ports")" || return 1
++  printf '%s\n' "$content" > "$work/candidate" || return 1
++  chmod 0600 "$work/candidate" || return 1
++  [[ "$(stat -c '%u:%g:%a' "$work/candidate")" == 0:0:600 ]] || return 1
++  actual="$(cat -- "$work/candidate")" || return 1
++  bytes="$(wc -c < "$work/candidate")" || return 1
++  [[ "$actual" == "$content" && "$bytes" -eq ${#content}+1 ]] || return 1
++  backend_fw_batch "$work/candidate" "$work/batch" || return 1
++  timeout 30 "$BF_NFT" -j list tables inet > "$work/tables.json" || return 1
++  jq -e '.nftables|type=="array"' "$work/tables.json" >/dev/null || return 1
++  if jq -e 'any(.nftables[]; .table.family=="inet" and .table.name=="twebproxy_backend")' "$work/tables.json" >/dev/null; then
++    present=yes
++    old_ports="$(backend_fw_live_ports "$work/old.json")" ||
++      { backend_fw_error 'existing reserved table has unexpected contents; refusing replacement'; return 1; }
++    backend_fw_render "$old_ports" > "$work/previous" || return 1
++    backend_fw_batch "$work/previous" "$work/rollback" || return 1
++  fi
++  timeout 30 "$BF_NFT" -c -f "$work/batch" || return 1
++  timeout 30 "$BF_NFT" -f "$work/batch" || return 1
++  if ! actual="$(backend_fw_live_ports "$work/live.json")" || [[ "$actual" != "$ports" ]]; then
++    backend_fw_error 'live verification failed'
++    backend_fw_restore "$present" "$work/rollback" "$work/restored.json" "$old_ports"
++    return 1
++  fi
++  # Kernel and filesystem cannot commit atomically. Kernel first: no publication
++  # can claim success for unapplied rules. On a rename error restore old live
++  # rules if available, otherwise retain new protection and report failure.
++  if ! mv -fT -- "$work/candidate" "$BF_FILE"; then
++    backend_fw_error "canonical publication failed: $BF_FILE"
++    backend_fw_restore "$present" "$work/rollback" "$work/restored.json" "$old_ports"
++    return 1
++  fi
++  return 0
++}
++
++backend_fw_main() (
++  set -Eeuo pipefail
++  export LC_ALL=C
++  umask 077
++  (( $# == 0 )) || { backend_fw_error 'no arguments supported'; exit 1; }
++  [[ -d "$BF_BASE" && ! -L "$BF_BASE" && "$(stat -c '%u:%g:%a' "$BF_BASE")" == 0:0:700 ]] ||
++    { backend_fw_error 'unsafe backend state directory'; exit 1; }
++  [[ ! -L "$BF_BASE/.backend-firewall.lock" &&
++      ( ! -e "$BF_BASE/.backend-firewall.lock" || -f "$BF_BASE/.backend-firewall.lock" ) ]] || exit 1
++  exec 7>"$BF_BASE/.backend-firewall.lock" || exit 1
++  flock -x -w 20 7 || { backend_fw_error 'lock timeout'; exit 1; }
++  local work
++  work="$(mktemp -d "$BF_BASE/.firewall.XXXXXXXX")" || exit 1
++  trap 'rc=$?; trap - EXIT; rm -rf -- "$work" || rc=1; exit "$rc"' EXIT
++  trap 'exit 130' INT
++  trap 'exit 143' TERM
++  # Boot/reload always regenerates from backend state, including after a signal
++  # between kernel commit and file rename. No recovery journal or stale replay.
++  backend_fw_transaction "$work"
++)
++
++write_backend_firewall_helper() {
++  local tmp nft_bin
++  nft_bin="$(command -v nft)" || return 1
++  [[ -d "$LIBEXEC_DIR" && ! -L "$LIBEXEC_DIR" ]] || return 1
++  [[ ! -L "$LIBEXEC_DIR/apply-firewall" ]] || return 1
++  tmp="$(mktemp "$LIBEXEC_DIR/.apply-firewall.XXXXXXXX")" || return 1
++  if ! (
++    printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n' || exit 1
++    printf 'BF_BASE=%q\nBF_BACKENDS=%q\nBF_FILE=%q\nBF_NFT=%q\n' "$BASE_DIR" "$BACKENDS_DIR" "$FIREWALL_FILE" "$nft_bin" || exit 1
++    declare -f is_valid_port backend_fw_error backend_fw_render backend_fw_collect \
++      backend_fw_ports_json backend_fw_live_ports backend_fw_batch \
++      backend_fw_restore backend_fw_transaction backend_fw_main || exit 1
++    printf 'backend_fw_main "$@"\n' || exit 1
++  ) > "$tmp" || ! chmod 0755 "$tmp" || ! bash -n "$tmp" ||
++      ! mv -fT -- "$tmp" "$LIBEXEC_DIR/apply-firewall"; then
++    rm -f -- "$tmp"; return 1
++  fi
++}
++
++write_backend_firewall_unit() {
++  local tmp
++  [[ -d "$SYSTEMD_DIR" && ! -L "$SYSTEMD_DIR" &&
++     ! -L "$SYSTEMD_DIR/twebproxy-firewall.service" ]] || return 1
++  tmp="$(mktemp "$SYSTEMD_DIR/.twebproxy-firewall.XXXXXXXX")" || return 1
++  if ! cat > "$tmp" <<EOF
++[Unit]
++Description=Firewall for TWebProxy backend-only ports
++# Reapply after nftables restart, including an external ruleset flush.
++After=nftables.service
++PartOf=nftables.service
++
++[Service]
++Type=oneshot
++ExecStart=$LIBEXEC_DIR/apply-firewall
++ExecReload=$LIBEXEC_DIR/apply-firewall
++# A normal stop/restart retains isolation. Core uninstall explicitly tears down.
++RemainAfterExit=yes
++UMask=0077
++TimeoutStartSec=240
++
++[Install]
++WantedBy=multi-user.target
++EOF
++  then rm -f -- "$tmp"; return 1; fi
++  if ! chmod 0644 "$tmp" || ! mv -fT -- "$tmp" "$SYSTEMD_DIR/twebproxy-firewall.service"; then
++    rm -f -- "$tmp"; return 1
++  fi
++}
++
+@@ -2763,11 +2983 @@ EOF
+-  cat > "$LIBEXEC_DIR/apply-firewall" <<'EOF'
+-#!/usr/bin/env bash
+-set -Eeuo pipefail
+-if nft list table inet twebproxy_backend >/dev/null 2>&1; then
+-  nft delete table inet twebproxy_backend
+-fi
+-if [[ -s /etc/twebproxy/firewall.nft ]]; then
+-  nft -f /etc/twebproxy/firewall.nft
+-fi
+-EOF
+-  chmod 0755 "$LIBEXEC_DIR/apply-firewall"
++  write_backend_firewall_helper || return 1
+@@ -2888,18 +3098 @@ EOF
+-  cat > "$SYSTEMD_DIR/twebproxy-firewall.service" <<'EOF'
+-[Unit]
+-Description=Firewall for TWebProxy backend-only ports
+-# Debian/Ubuntu nftables.service may reload a ruleset that starts with "flush ruleset".
+-# PartOf + ordering makes our backend-only table get reapplied on nftables restart.
+-After=nftables.service
+-PartOf=nftables.service
+-
+-[Service]
+-Type=oneshot
+-ExecStart=/usr/local/libexec/twebproxy/apply-firewall
+-ExecReload=/usr/local/libexec/twebproxy/apply-firewall
+-ExecStop=-/usr/sbin/nft delete table inet twebproxy_backend
+-RemainAfterExit=yes
+-
+-[Install]
+-WantedBy=multi-user.target
+-EOF
++  write_backend_firewall_unit || return 1
+@@ -2943,45 +3136,13 @@ rebuild_firewall() {
+-  install -d -m 0700 "$BASE_DIR"
+-  local ports=() f pair client stats
+-  shopt -s nullglob
+-  for f in "$BACKENDS_DIR"/*.env; do
+-    # Each backend is parsed in its own subshell with the fields unset first, so
+-    # a truncated file can never inherit the previous backend's ports and leave
+-    # a real port out of the isolation set. Same discipline as port_registered.
+-    pair="$(
+-      unset MTPROXY_CLIENT_PORT MTPROXY_STATS_PORT
+-      # shellcheck disable=SC1090
+-      source "$f" >/dev/null 2>&1 || exit 1
+-      [[ -n "${MTPROXY_CLIENT_PORT:-}" && -n "${MTPROXY_STATS_PORT:-}" ]] || exit 1
+-      printf '%s %s' "$MTPROXY_CLIENT_PORT" "$MTPROXY_STATS_PORT"
+-    )" || { shopt -u nullglob; die "$(ui_msgf firewall_backend_state_invalid "$f")"; }
+-    client="${pair%% *}"; stats="${pair##* }"
+-    if ! is_valid_port "$client" || ! is_valid_port "$stats"; then
+-      shopt -u nullglob; die "$(ui_msgf firewall_backend_state_invalid "$f")"
+-    fi
+-    ports+=("$client" "$stats")
+-  done
+-  shopt -u nullglob
+-
+-  if ((${#ports[@]} == 0)); then
+-    cat > "$FIREWALL_FILE" <<'EOF'
+-table inet twebproxy_backend {
+-  chain input {
+-    type filter hook input priority -5; policy accept;
+-  }
+-}
+-EOF
+-  else
+-    local joined
+-    joined="$(printf '%s\n' "${ports[@]}" | sort -n -u | paste -sd, -)"
+-    cat > "$FIREWALL_FILE" <<EOF
+-table inet twebproxy_backend {
+-  chain input {
+-    type filter hook input priority -5; policy accept;
+-    iifname != "lo" tcp dport { $joined } drop
+-  }
+-}
+-EOF
+-  fi
+-  systemctl daemon-reload
+-  systemctl enable --now twebproxy-firewall.service >/dev/null
+-  systemctl restart twebproxy-firewall.service
++  local active_rc=0
++  install -d -m 0700 "$BASE_DIR" "$LIBEXEC_DIR" || return 1
++  # Also upgrade an already installed helper/unit after a script-only update.
++  write_backend_firewall_helper || return 1
++  write_backend_firewall_unit || return 1
++  systemctl daemon-reload || return 1
++  systemctl enable twebproxy-firewall.service >/dev/null || return 1
++  systemctl is-active --quiet twebproxy-firewall.service || active_rc=$?
++  case "$active_rc" in
++    0) systemctl reload twebproxy-firewall.service || return 1;;
++    3) systemctl start twebproxy-firewall.service || return 1;;
++    *) return 1;;
++  esac
