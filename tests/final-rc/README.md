@@ -67,3 +67,31 @@ Sanitize before export; do not archive private directories or raw Manager setup/
 show output. Verify original profile/site/TLS, remaining owned resources, SSH and
 unrelated Nginx before powering off only the disposable units created by this run.
 The delivered REPORT/RESULTS contain actual commands, returns and honest gaps.
+
+## Public-host continuation
+
+`live_transport_probe.py` exercises each existing carrier using public trusted
+TLS and a nonce-matched resPQ. It is a synthetic protocol probe, never Telegram
+application acceptance. Only run against an authorized endpoint. Install its
+cryptography dependency in an isolated environment from the hash-verified
+vendored wheels (Python3.12 example; use the matching ABI wheel):
+
+```sh
+sha256sum -c SHA256SUMS
+python3 -m venv /tmp/twp-probe-venv
+/tmp/twp-probe-venv/bin/pip install --no-index --no-deps \
+  bridge/vendor/pycparser-3.12-py3-none-any.whl \
+  bridge/vendor/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl \
+  bridge/vendor/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl
+/tmp/twp-probe-venv/bin/python tests/final-rc/live_transport_probe.py \
+  --hostname YOUR_AUTHORIZED_DOMAIN --mode https \
+  --secret-file /root/private-probe/client-secret
+```
+
+Provision the canonical secret file privately with mode0600; never paste it into
+command arguments or captured logs. Select the corresponding carrier through
+the normal installed Manager workflow before testing https-lanes, websocket or
+websocket-lanes. Carrier selection intentionally restarts the owned relay; save
+and restore the original selection. Do not run during operator application tests.
+All returned tokens/headers/query capabilities stay in memory. Pair negative
+authentication tests with successful correct-secret controls.

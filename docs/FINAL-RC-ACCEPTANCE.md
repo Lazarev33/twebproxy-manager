@@ -2,8 +2,9 @@
 
 Baseline: `446032d14917de234c14e39cf8034f428d6e6eec`, accepted UPDATE01 handoff
 SHA256 `435a9187aecc2c9b3fd0865c045d97f22eba5d676ab119caa613fc839c1c377a`.
-Branch remains `release-prep/v0.2.26-beta`; PR1 stays draft. No merge, tag,
-Release or live deployment. This checkpoint does **not** accept a stable release.
+Branch remains `release-prep/v0.2.26-beta`; PR1 stays draft. No merge, tag
+or Release. The subsequent explicitly authorized live-host continuation below
+supersedes the original access limitations. This is not stable acceptance.
 The handoff's PROVENANCE.json records the resulting source commit and tree.
 
 ## Changes
@@ -65,7 +66,7 @@ local regressions and the final installed full-distribution reinstall are
 reported separately. All evidence is sanitized; raw outputs, private keys and
 session data stay root-only outside the distribution.
 
-## Remaining RC/stable gates
+## Original checkpoint (before restored root access)
 
 | Check | Status / exact limitation |
 | --- | --- |
@@ -80,5 +81,74 @@ session data stay root-only outside the distribution.
 
 ROADMAP.md remains authoritative. roadmap-test.md is byte-preserved and deferred.
 No new carriers, anti-DPI methods, backend relocation, routing/NAT gateways or
-multi-node features are introduced. Full Gate3/RC acceptance remains blocked by
-the unresolved protocol result and unavailable real-host prerequisites.
+multi-node features are introduced. The table above is retained historical
+evidence, not the current live-host result.
+
+## Authorized live-host continuation — 2026-11-01 UTC
+
+Both ED25519 identities match independently retained trusted fingerprints before
+strict root public-key authentication. Entry179.66.186.143 is Ubuntu26.04.1;
+Exit95.85.251.163 is Ubuntu24.04.5. Existing Bridge identity, canonical secrets,
+profile, website, TLS keys, WireGuard configuration and unrelated foreign services
+are preserved. Credential-bearing recovery archives remain root-only on their
+original hosts and are never delivered. Production144.31.169.255 is excluded.
+
+The exact full RC runtime `f222082d4f0f6278522c1f5afc665c8f9ad7b1c9044548b5dbc9122d5e102e77`
+was independently verified and installed using the accepted distribution engine
+on Entry. UPDATE_SUCCESS0, version0.9.0-rc1, both installed Manager copies and
+all required component digests match. No services restarted during the update;
+162 Entry and180 Exit canonical files retained byte/mode/ownership identity.
+The existing compatible per-node foreign agent is unchanged; the unrelated
+foreign Manager and local profiles were not upgraded.
+
+All four existing carriers passed public, CA/hostname-verified, nonce-matched
+MTProto resPQ through the actual two-VPS Bridge. WebSocket carriers additionally
+verified HTTP101, accept digest and selected subprotocol. Original HTTPS mode
+was restored through the normal installed CLI. These are synthetic protocol
+results, not Telegram application results. Historical KVM protocol timeouts
+remain FAIL with unresolved fixture/network cause; public success does not
+establish their precise cause or erase the original evidence.
+
+Real interface down/up and owned MTProxy SIGKILL recover automatically. During
+fault tests79 public samples recorded zero backend/stats opens;76 had successful
+443 controls and3 had control gaps. The original strict driver returned1 because
+of those gaps. Claim only the observed recovery postconditions and finite
+controlled samples, not continuous universal isolation. Unprivileged nobody
+actually failed to read live process command lines, foreign client secret,
+Entry canonical profile and managed SSH private key. Existing systemd deny
+policy and exact tunnel allowance remain effective.
+
+Installed live repair succeeded once and returned all required health checksOK.
+Two subsequent attempts failed before remote job dispatch with SSHException.
+An independent unauthenticated handshake control also observed intermittent
+EOF between successful pinned key exchanges. Cause is unresolved; no host-key
+failure, product state corruption or proxy outage was observed. Failures are
+retained, not reclassified as successful repair. One repair scan also had a
+positive-control gap. Final ordinary status and fresh public resPQ pass.
+
+Installed RU TUI status/back/exit passes; duplicate Add returns1 on CLI without
+changing state or restarting the relay. Public HTTP308, HTTPS200 cultural site,
+valid Let's Encrypt certificate and requested account contact are confirmed.
+Caddy automatic renewal configuration validates; no future renewal event or
+fresh public ACME issuance is claimed. Access logging uses the discard writer.
+
+The delivered test-only `live_transport_probe.py` reproduces all four protocol
+checks without exporting capabilities, session tokens or private links. This
+continuation changes tests/documentation only; deployed runtime stays byte-exact.
+
+## Current remaining acceptance
+
+* Current-RC real Telegram application checks await an operator result. Earlier
+  iOS13.1.2 messages/media/417MB/LTE MegaFon/LTE T2/Wi-Fi are retained historical
+  Gate3 acceptance, not silently promoted to new RC application tests.
+* Application tests of all four carriers, Desktop/Android, fresh public Quick
+  installation/ACME, actual renewal event, clean Ubuntu26.04, Debian12,
+  Ubuntu22.04, ARM and formal two-host cold boot remain NOT_EXECUTED.
+* Clean Ubuntu24.04 KVM install/Add/removal and accepted UPDATE01 failure/rollback
+  campaigns are reused; no destructive removal of the live Bridge is needed.
+* Intermittent pre-auth SSH loss remains an operational limitation. The two
+  failed live repair attempts and original KVM protocol failure remain visible
+  in RESULTS, separately from confirmed product release blockers.
+
+Current deployment is ready for operator application validation. Gate3 current
+application acceptance is conditional; stable publication remains unaccepted.
