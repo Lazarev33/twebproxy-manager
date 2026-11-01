@@ -1,6 +1,6 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-31. Restored to the pre-Gemini release roadmap; nonessential architectural experiments are parked.
+Updated: 2026-11-01. Stable-first roadmap retained; nonessential architectural experiments are parked.
 
 ## Repository publication and evidence
 
@@ -61,12 +61,18 @@ Do not conflate a GitHub development source commit with a stable signed Release 
 ## v0.2.26 bounded integration result
 
 The corrected Smart Defaults candidate is integrated for review; it is not in
-main or a stable Release. Actual isolated Linux validation reproduced open
-PRERC-UPDATE-01: script-only self-update leaves the newly pinned Bridge bundle
-absent. Complete-distribution repair recovers it but does not close the updater
-compatibility blocker. No runtime/update redesign is introduced; merge/release
-readiness is withheld. See [pre-RC evidence scope](PRERC-v0.2.26.md). The release-first
-network/security freeze and deferred roadmap-test remain unchanged.
+main or a stable Release. The original pre-RC reproduced PRERC-UPDATE-01:
+script-only self-update left the newly pinned Bridge bundle absent. A subsequent
+explicitly authorized distribution/updater correction implements authenticated
+complete runtime delivery, versioned components, transaction-local crash undo
+and verified offline rollback. Genuine Ubuntu24.04 KVM upgrade/failure tests are
+recorded separately from models. Legacy v025 requires a verified full-distribution
+bootstrap; passing a new bare script fails health and rolls back. See
+[current update acceptance](PRERC-UPDATE01-RESULT.md) and the retained
+[initial pre-RC scope](PRERC-v0.2.26.md). PR1 remains draft. Stable readiness still
+requires the external/platform/client/cold-boot matrix. Release-first network/
+security freeze and the deferred roadmap-test remain unchanged; this is not a
+general Stage3 recovery system or a new topology.
 
 ## Immediate low-risk corrections — no network architecture changes
 

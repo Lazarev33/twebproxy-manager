@@ -1,5 +1,10 @@
 # PRERC-UPDATE-01 — focused legacy-transition stop
 
+**Historical stop record, superseded by full owner engineering authorization.**
+Executable correction and real KVM evidence are described in
+[PRERC-UPDATE01-RESULT.md](PRERC-UPDATE01-RESULT.md). The old blocked conclusion
+below is retained for provenance, not the current task status.
+
 **OPEN / BLOCKED. No runtime correction has been applied.** Version remains the
 unpublished v0.2.26-beta candidate. The draft PR must not be merged or released.
 

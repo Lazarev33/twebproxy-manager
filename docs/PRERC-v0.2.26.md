@@ -1,5 +1,10 @@
 # v0.2.26-beta — integration and bounded pre-RC
 
+**Historical initial integration report.** Its OPEN updater finding was addressed
+in the later [authorized PRERC-UPDATE-01 correction](PRERC-UPDATE01-RESULT.md).
+The original reproduction and limitations below are retained as evidence; they
+do not describe the current complete-distribution implementation.
+
 Unpublished development candidate integrated on a dedicated branch from
 main4049dee7d0f9a0cc19da896d1ca9ccf4bb4abc9c. The accepted archive SHA256 is
 c778aac536c1e5aae334880d6d795ef5681b3c6245fbc07585bfa72fa99cf733.

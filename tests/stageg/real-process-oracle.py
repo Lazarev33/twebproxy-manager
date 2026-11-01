@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Stage G real-process oracle for the two P1 defects found on real Linux in Stage F.
 
+Full-distribution builds deliberately select the retained legacy transaction in
+the sandbox driver below. New-distribution installed acceptance is separate KVM
+evidence under tests/distribution; these checks are not a substitute for it.
+
 Everything that decides the outcome is real: the manager under test runs as its
 own CLI (`twebproxy manager-update --sha256 …`, real main/logging/dispatch), its
 health probes run a candidate built from the real manager, downloads use the
@@ -128,6 +132,27 @@ class Sandbox:
         for c in CONSTANTS:
             text, n = re.subn(rf'^{c}="/', f'{c}="{self.root}/', text, count=1, flags=re.M)
             assert n == 1, c
+        # This historical oracle targets the retained script-only transaction,
+        # not full-distribution acceptance. Provide genuine verified components
+        # inside the sandbox for its read-only installed startup guard.
+        if 'stage4_script_update_cmd()' in text:
+            original = 'manager-update) update_rc=0; manager_update_cmd "$@" || update_rc=$?; exit "$update_rc" ;;'
+            assert original in text
+            text = text.replace(original, 'manager-update) stage4_script_update_cmd "$@" ;;')
+            records = json.loads((MGR.parent / 'COMPONENTS.json').read_text())
+            version_bytes = ((version or re.search(r'^MANAGER_VERSION="([^"]+)"$', text, re.M).group(1)) + '\n').encode()
+            records['VERSION']['sha256'] = hashlib.sha256(version_bytes).hexdigest()
+            records['VERSION']['size'] = len(version_bytes)
+            raw = (json.dumps(records, sort_keys=True, indent=2) + '\n').encode()
+            pin = hashlib.sha256(raw).hexdigest()
+            target = self.root / 'opt/twebproxy-manager/distributions' / pin
+            target.mkdir(parents=True, exist_ok=True)
+            for name in records:
+                dst = target / name; dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(MGR.parent / name, dst)
+            (target / 'VERSION').write_bytes(version_bytes)
+            (target / 'COMPONENTS.json').write_bytes(raw)
+            text = re.sub(r'^COMPONENTS_MANIFEST_SHA256="[^"]+"$', 'COMPONENTS_MANIFEST_SHA256="' + pin + '"', text, flags=re.M)
         port = self.server.port
         text, n = re.subn(r'^MANAGER_API_URL=.*$', f'MANAGER_API_URL="https://127.0.0.1:{port}/api/repos/$MANAGER_REPO_SLUG"', text, count=1, flags=re.M); assert n == 1
         text, n = re.subn(r'^MANAGER_RAW_URL=.*$', f'MANAGER_RAW_URL="https://127.0.0.1:{port}/raw"', text, count=1, flags=re.M); assert n == 1

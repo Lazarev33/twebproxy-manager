@@ -1,4 +1,10 @@
-# Manager self-update: trust policy and release publishing
+# Manager self-update: current and legacy protocols
+
+**v0.2.26 uses the [complete-distribution protocol](DISTRIBUTION-UPDATES.md).**
+The following retained text documents the v0.2.25 script-only transaction and old
+backup format. Its artifact/health/rollback instructions are historical; do not
+use a bare script to install v0.2.26. See the new protocol for authenticated
+bootstrap, coherent updates, current result codes and offline recovery.
 
 This describes `twebproxy check-update` / `twebproxy manager-update` from
 v0.2.20 (Stage F) on. The relay update (`twebproxy update`) is unrelated.
