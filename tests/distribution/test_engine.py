@@ -95,7 +95,8 @@ class Distribution(unittest.TestCase):
         self.paths.node.write_text(json.dumps(node));self.paths.node.chmod(0o600)
         import shutil
         pin=mod.sha((ROOT/'bridge/MANIFEST.json').read_bytes())
-        shutil.copytree(ROOT/'bridge',self.paths.project/('bridge-'+pin))
+        shutil.copytree(ROOT/'bridge',self.paths.project/('bridge-'+pin),
+                        ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
         return self.paths.node.read_bytes()
 
     def test_complete_install_publishes_all_components_and_preserves_data(self):
@@ -103,7 +104,8 @@ class Distribution(unittest.TestCase):
         candidate=(ROOT/'twebproxy-manager.sh').read_bytes()
         self.assertEqual(self.paths.primary.read_bytes(),candidate)
         self.assertEqual(self.paths.secondary.read_bytes(),candidate)
-        self.assertEqual(self.paths.global_env.read_bytes(),self.global_data.replace(b'0.2.25',b'0.2.26'))
+        version=json.loads((ROOT/'DISTRIBUTION.json').read_text())['version'].encode()
+        self.assertEqual(self.paths.global_env.read_bytes(),self.global_data.replace(b'0.2.25',version))
         pin=json.loads((ROOT/'DISTRIBUTION.json').read_text())['components_sha256']
         records=mod.verify_components(self.paths.project/'distributions'/pin,pin,True)
         self.assertIn('bridge/controller.py',records)

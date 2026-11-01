@@ -31,7 +31,7 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | Gate 3 / v0.2.25 | DEVELOPMENT SOURCE IN MAIN | Default site, Bridge and operator-reported iOS test |
 | Bridge menu fix | LOCAL REGRESSION PASS | Not confirmed deployed on RU Entry |
 | Smart Defaults / TUI | UNPUBLISHED v0.2.26-beta CANDIDATE | Safe defaults/presets implemented; focused confirmation/localization/ERR corrections; no live deployment |
-| RC / stable Release | NOT AUTHORIZED | Platform/client matrix, cold boot, security, verified distribution |
+| First RC / stable Release | UNPUBLISHED 0.9.0-rc1 PREPARATION / STABLE NOT ACCEPTED | Remaining platform/client/cold-boot matrix; see FINAL-RC-ACCEPTANCE.md |
 
 Current tasks: finish focused CLI/TUI fixes, Smart Defaults and Gate 3 acceptance on the **existing** data path; then validate and publish a stable release. Defer structural changes to [roadmap-test.md](../roadmap-test.md). See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
 
@@ -147,3 +147,12 @@ The earlier v0.2.6–v0.2.9 baseline delivered Caddy + HTTPS + stock MTProxy, sy
 Earlier planned field tests remain relevant: `https-lanes`, `websocket`, `websocket-lanes`, Nginx + Let's Encrypt, large transfers, sleep/network switch, backend/relay crash, and external backend-port scans. These are incorporated into the client/lab matrix above.
 
 The earlier `0.3 experiment branch` idea (`stock-mtproxy`, `telemt-direct`, `telemt-middle-end`) is **deferred research**, not an approved additional backend for the current 1.0 path. Only evaluate after the stock baseline and WEB/decoy roadmap are proven.
+
+## Current owner-authorized RC checkpoint
+
+The immediate target is **0.9.0-rc1**, not publication of1.0.0. Continue from
+446032d and reuse accepted UPDATE01/Gate1–3 evidence. The clean Foreign bootstrap
+permissions correction and bounded real KVM checks are recorded in
+[FINAL-RC-ACCEPTANCE.md](FINAL-RC-ACCEPTANCE.md). This does not authorize a merge,
+stable release or experiments from roadmap-test.md. Unavailable application,
+public deployment and platform checks remain explicit in the acceptance matrix.

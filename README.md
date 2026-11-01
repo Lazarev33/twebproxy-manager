@@ -1,6 +1,6 @@
 # TWebProxy Manager
 
-Telegram WEB Proxy Manager for Debian/Ubuntu: HTTPS, обычный сайт и управляемый прокси на одном домене. **GitHub `main` — v0.2.25-beta. Этот пакет — неопубликованный кандидат v0.2.26-beta, не stable Release и не production.**
+Telegram WEB Proxy Manager for Debian/Ubuntu: HTTPS, обычный сайт и управляемый прокси на одном домене. **GitHub `main` — v0.2.25-beta. Этот пакет — неопубликованный кандидат **v0.9.0-rc1** на основе принятой разработки v0.2.26-beta, не stable Release и не production.**
 
 [Архитектура](#как-это-работает) · [Установка](#начало-работы) · [Команды](#управление) · [Bridge](docs/bridge-gate3/OPERATIONS.md) · [Статус](#статус-и-известные-риски)
 
@@ -14,6 +14,8 @@ Manager, Bridge, автономные зависимости и встроенн
 См. [обновление и откат](docs/DISTRIBUTION-UPDATES.md) и
 [границы приёмки](docs/PRERC-UPDATE01-RESULT.md). PR остаётся draft;
 стабильная готовность и развёртывание не заявляются.
+
+Проверка RC и её границы: [FINAL-RC-ACCEPTANCE.md](docs/FINAL-RC-ACCEPTANCE.md). Изменение номера не означает прохождение недоступных клиентских или платформенных тестов.
 
 ## Зачем нужен
 

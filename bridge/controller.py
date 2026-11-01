@@ -73,6 +73,7 @@ TEXT={
 'forwarder socket policy not enforced':'Сетевая политика сокета перенаправления не применяется.',
 'restricted credential accepted forbidden verb':'Ограниченные учётные данные позволили запрещённую операцию.',
 'remote output limit exceeded':'Превышен предел вывода удалённой команды.',
+'Bridge executable directories are unsafe; inspect /usr, /usr/local and /usr/local/libexec before retry.':'Небезопасные каталоги исполняемых файлов Bridge. Проверьте владельца, права и отсутствие симлинков у /usr, /usr/local и /usr/local/libexec перед повтором.',
 'REMOTE_TIMEOUT; operation outcome may be unknown':'Истекло время удалённой операции; её результат может быть неизвестен.'
 }
 def tr(s):return TEXT.get(s,s) if LANG=='ru' else s
@@ -261,6 +262,37 @@ def choose_instance(a):
  if len(info['profiles'])!=1:raise Fault('Gate2 MVP requires an instance with exactly one profile; other instances are preserved')
  return name,info
 
+def bootstrap_program(path,user,size,digest):
+ # Prepare only the public executable prefix, after authenticating the staged
+ # bytes and before the agent switches to its private umask. Existing operator
+ # permissions/symlinks are never silently rewritten. Keep the agent's digest
+ # and restricted-RPC protocol compatible with already enrolled nodes.
+ return f'''import os,stat,hashlib,pwd,json
+p={path!r}
+fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+st=os.fstat(fd)
+assert stat.S_ISREG(st.st_mode) and st.st_size=={size}
+assert st.st_uid==pwd.getpwnam({user!r}).pw_uid and st.st_mode & 0o077==0
+b=os.read(fd,262144);os.close(fd)
+assert hashlib.sha256(b).hexdigest()=={digest!r}
+try:
+ for directory in ('/usr','/usr/local','/usr/local/libexec','/usr/local/libexec/twebproxy-bridge'):
+  created=False
+  try:os.mkdir(directory,0o755);created=True
+  except FileExistsError:pass
+  fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+  try:
+   st=os.fstat(fd)
+   if st.st_uid!=0 or st.st_mode & 0o022:raise PermissionError(directory)
+   if created:os.fchmod(fd,0o755)
+   elif not st.st_mode & 0o001:raise PermissionError(directory)
+  finally:os.close(fd)
+except OSError:
+ print(json.dumps({{'ok':False,'error':'Bridge executable directories are unsafe; inspect /usr, /usr/local and /usr/local/libexec before retry.'}}))
+ raise SystemExit(1)
+exec(compile(b,p,'exec'),{{'__name__':'__main__','__file__':p,'_VERIFIED_PAYLOAD_SHA256':{digest!r}}})
+'''
+
 def stage_bootstrap(t,c,key,user,sudo=False):
  source=(HERE/'agent.py').read_bytes();digest=hashlib.sha256(source).hexdigest();staging='.twebproxy-stage-'+c['id'];sftp=paramiko.SFTPClient.from_transport(t.t)
  home=sftp.normalize('.');path=home+'/'+staging;sftp.mkdir(path,0o700)
@@ -268,7 +300,7 @@ def stage_bootstrap(t,c,key,user,sudo=False):
   with sftp.file(path+'/agent.py','wb') as f:f.write(source)
   sftp.chmod(path+'/agent.py',0o600)
   # Root reads regular staged file once, hashes exact bytes, then executes bytes.
-  code='import os,stat,hashlib,pwd; p='+repr(path+'/agent.py')+'; fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW); st=os.fstat(fd); assert stat.S_ISREG(st.st_mode) and st.st_size=='+str(len(source))+'; assert st.st_uid==pwd.getpwnam('+repr(user)+').pw_uid and st.st_mode & 0o077==0; b=os.read(fd,262144); os.close(fd); assert hashlib.sha256(b).hexdigest()=='+repr(digest)+'; exec(compile(b,p,"exec"),{"__name__":"__main__","__file__":p,"_VERIFIED_PAYLOAD_SHA256":'+repr(digest)+'})'
+  code=bootstrap_program(path+'/agent.py',user,len(source),digest)
   command=('sudo -n ' if sudo else '')+'/usr/bin/python3 -c '+shlex.quote(code)
   return t.command(command,{'op':'bootstrap','config':c,'source':base64.b64encode(source).decode(),'public_key':key,'user':user},timeout=600)
  finally:

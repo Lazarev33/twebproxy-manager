@@ -1,8 +1,8 @@
 {
   "bridge_state_schema": 1,
-  "components_sha256": "ea8f911c6dbfb24ba1a54531b5fc0e0ffce6b9a26f93de6b0afaa735d1401b7c",
+  "components_sha256": "bce5495ae5259112f17731b36193a8694db0648744e7a8905a3d77cacbe9b949",
   "format": "twebproxy.distribution.v1",
-  "manager_sha256": "66ffc3265b409ebb3b907c8b2a542c5cf9d35b57ae0a05979c7a5b0b95c6daa7",
-  "release_version": "0.2.26-beta",
-  "version": "0.2.26"
+  "manager_sha256": "9f784d3f700c4f301a5bc6571c5f811433cf50ab39ac515f2f588d0bf1ebe970",
+  "release_version": "0.9.0-rc1",
+  "version": "0.9.0"
 }

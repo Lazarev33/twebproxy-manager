@@ -31,6 +31,8 @@ class Download(unittest.TestCase):
         cls.package=cls.root/mod.ARTIFACT
         subprocess.run([sys.executable,str(ROOT/'tools/build-distribution.py'),'--root',str(cls.source),'--output',str(cls.package)],check=True,capture_output=True)
         cls.body=cls.package.read_bytes();cls.digest=mod.sha(cls.body)
+        identity=json.loads((cls.source/'DISTRIBUTION.json').read_text())
+        cls.version=identity['version'];cls.label=identity['release_version'];cls.tag='v'+cls.version
         cls.cert=cls.root/'cert.pem';cls.key=cls.root/'tls-key.pem'
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1','-keyout',str(cls.key),'-out',str(cls.cert)],check=True,capture_output=True)
         cls.signing=cls.root/'signing.pem'
@@ -72,13 +74,13 @@ class Download(unittest.TestCase):
 
     def setUp(self):
         cls=type(self);cls.requests=[];cls.mode='normal'
-        cls.api={'tag_name':'v0.2.26','draft':False,'prerelease':False}
+        cls.api={'tag_name':self.tag,'draft':False,'prerelease':False}
         self.work=tempfile.TemporaryDirectory(prefix='case-',dir=self.root)
         self.args=argparse.Namespace(api_url=self.base+'/api',release_url=self.base,
                                      sha256=self.digest,trusted_key=[])
         self.manifest_obj={'format':'twebproxy.manager-distribution-release.v1',
-            'repository':mod.REPOSITORY,'channel':'stable','version':'0.2.26',
-            'release_version':'0.2.26-beta','tag':'v0.2.26','commit':'a'*40,
+            'repository':mod.REPOSITORY,'channel':'stable','version':self.version,
+            'release_version':self.label,'tag':self.tag,'commit':'a'*40,
             'artifact':{'name':mod.ARTIFACT,'size':len(self.body),'sha256':self.digest}}
         self.sign()
 
@@ -149,7 +151,7 @@ class Download(unittest.TestCase):
 
     def test_transfer_size_limit(self):
         with self.assertRaises(mod.Fault) as e:
-            mod.download(self.base+'/releases/download/v0.2.26/'+mod.ARTIFACT,Path(self.work.name)/'bounded',128)
+            mod.download(self.base+'/releases/download/'+self.tag+'/'+mod.ARTIFACT,Path(self.work.name)/'bounded',128)
         self.assertEqual(e.exception.code,'download')
 
 

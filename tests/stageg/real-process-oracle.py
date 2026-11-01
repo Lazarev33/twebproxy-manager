@@ -16,7 +16,7 @@ the manager under test whose path constants (BASE_DIR, MANAGER_BIN, …, the loc
 file) and release URLs are rewritten into a private sandbox, so nothing outside
 it is read or written; the TLS server listens on 127.0.0.1 only. The candidate
 artifact differs from the manager under test only in those constants, its
-version markers (0.2.90) and, for scenario A, one injected line.
+future-version markers and, for scenario A, one injected line.
 
   A  The candidate's first `--help` leaves a background child holding stdout.
      Expected: the update ends within the probe bound, the child does not
@@ -39,7 +39,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 MGR = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 and not re.fullmatch(r'[ABC]', sys.argv[1]) else ROOT / 'twebproxy-manager.sh').resolve()
 WANT = [a for a in sys.argv[1:] if re.fullmatch(r'[ABC]', a)] or ['A', 'B', 'C']
 SLUG = 'Lazarev33/twebproxy-manager'
-NEW = '0.2.90'
+_version = re.search(r'^MANAGER_VERSION="([0-9.]+)"', MGR.read_text(), re.M).group(1).split('.')
+NEW = '.'.join([*_version[:2], str(int(_version[2])+1)])
 CONSTANTS = ('BASE_DIR SITES_DIR TPROXY_SRC MTPROXY_SRC TPROXY_BIN MANAGER_BIN LIBEXEC_DIR SYSTEMD_DIR CADDY_DIR '
              'NGINX_DIR LE_DIR ACME_WEBROOT DPI_NFT_BIN DPI_DOC_DIR PROJECT_DIR UPDATE_BACKUP_PARENT UPDATE_LOCK_FILE').split()
 RESULTS = {'manager': str(MGR), 'scenarios': {}}
