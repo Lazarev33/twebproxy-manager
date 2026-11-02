@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavioral sandbox for the Stage F updater and supply-chain regressions.
 #
-# Each command runs the unmodified manager under test in a separate bash process
+# Each command runs the retained legacy transaction functions in a separate bash process
 # with production `set -Eeuo pipefail` and its ERR trap (f_run / f_eval). Only
 # paths are rebound, all under the case directory: the real lock, staging,
 # backup, install, health gate, rollback, offline restore helper, flock, jq and
@@ -79,6 +79,18 @@ f_bind() {
   UPDATE_CACHE_FILE="$PROJECT_DIR/update-check.env"
   UPDATE_BACKUP_RETENTION=4
   STAGE4_UPDATE_LOCK_FD=""
+  # Historical script-only transaction regressions. Full distribution delivery
+  # is tested by tests/distribution and actual KVM; never publish to host paths.
+  if declare -F stage4_script_update_cmd >/dev/null; then
+    manager_update_cmd() { stage4_script_update_cmd "$@"; }
+    distribution_engine_cmd() {
+      case "${1:-}" in
+        publish) return 0;;
+        list) printf 'format=twebproxy.distribution-backup.v1\nvalid=0 invalid=0\n';;
+        *) return 97;;
+      esac
+    }
+  fi
   # Release-signing trust: key A is pinned unless the case says otherwise.
   case "${F_PIN_KEY:-A}" in
     none) MANAGER_UPDATE_TRUSTED_KEYS=();;

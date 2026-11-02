@@ -17,8 +17,10 @@ from unittest import mock
 ROOT = Path(os.environ.get('TWEBPROXY_TEST_SOURCE_ROOT', Path(__file__).resolve().parents[2]))
 
 CONTROLLER = r'''
-import os, sys
+import os, sys, types
 from pathlib import Path
+# Inert import double: this fixture tests Add's pre-network state guard only.
+sys.modules['paramiko'] = types.ModuleType('paramiko')
 sys.path.insert(0, sys.argv[1])
 import controller as c
 c.ROOT = Path(sys.argv[2]); c.STATE = c.ROOT / 'node.json'
@@ -45,6 +47,13 @@ core_installed(){ return 0; }
 collect_overview(){ :; }
 tui_render_dashboard(){ :; }
 clear(){ :; }
+tui_run(){ [[ "$1" == view-overview ]] || return 97; }
+bridge_menu_state(){
+  if [[ "$MENU_STATE" != race ]]; then printf '%s' "$MENU_STATE"
+  elif [[ -e "$FIXTURE/menu-read" ]]; then
+    [[ "$FIXTURE_PHASE" == active ]] && printf active || printf pending
+  else touch "$FIXTURE/menu-read"; printf none; fi
+}
 bridge_launcher(){
   printf '%s\n' "$*" >> "$FIXTURE/calls"
   if [[ "${FAULT_RC:-0}" != 0 ]]; then
@@ -65,7 +74,7 @@ main "$@"
 
 class BridgeMenu(unittest.TestCase):
     def run_case(self, phase='active', command='menu', language='ru', fault=0, explicit_exit=False,
-                 choices='9\n1\n\n2\n\n3\n\n0\n0\n'):
+                 menu_state='race', choices='9\n1\n\n1\n\n2\n\n0\n0\n'):
         with tempfile.TemporaryDirectory() as temp:
             fixture = Path(temp)
             state = fixture / 'node.json'
@@ -90,6 +99,7 @@ class BridgeMenu(unittest.TestCase):
                    'MANAGER_SOURCE': str(ROOT / 'twebproxy-manager.sh'),
                    'BRIDGE_SOURCE': str(ROOT / 'bridge'), 'FAULT_RC': str(fault),
                    'FAULT_EXIT': str(int(explicit_exit)),
+                   'MENU_STATE': menu_state, 'FIXTURE_PHASE': phase,
                    'TWEBPROXY_NO_LOG': '1', 'TWEBPROXY_ERROR_SNAPSHOT': '1',
                    'TWEBPROXY_UI_LANGUAGE': language, 'PYTHONDONTWRITEBYTECODE': '1',
                    'PATH': str(bindir) + os.pathsep + os.environ['PATH']}
@@ -109,7 +119,7 @@ class BridgeMenu(unittest.TestCase):
         p, output, calls = self.run_case()
         self.assertEqual(p.returncode, 0, output)
         self.assertEqual(calls, ['add', 'status', 'diagnose'])
-        self.assertGreaterEqual(output.count('Добавить зарубежный узел'), 4)
+        self.assertEqual(output.count('Добавить зарубежный узел'), 1)
         self.assertIn('Зарубежный узел уже существует', output)
         self.assertNotIn('Ошибка на строке', output)
 
@@ -126,6 +136,7 @@ class BridgeMenu(unittest.TestCase):
                 self.assertEqual(p.returncode, 1, output)
                 self.assertEqual(calls, ['add'])
                 self.assertIn('Зарубежный узел уже существует', output)
+                self.assertNotIn('pop_var_context', output)
 
     def test_english_refusal_and_menu_remain_english(self):
         p, output, calls = self.run_case(language='en')
@@ -145,6 +156,7 @@ class BridgeMenu(unittest.TestCase):
         p, output, calls = self.run_case(command='foreign-node add', fault=7)
         self.assertEqual(p.returncode, 7, output)
         self.assertIn('INJECTED_OPERATION_FAILURE', output)
+        self.assertNotIn('pop_var_context', output)
 
     def test_explicit_launcher_exit_cannot_exit_manager(self):
         p, output, _ = self.run_case(fault=23, explicit_exit=True,
@@ -164,9 +176,10 @@ class BridgeMenu(unittest.TestCase):
         self.assertGreaterEqual(output.count('Главное меню'), 2)
 
     def test_each_bridge_action_handles_failure(self):
-        for choice in range(1, 6):
-            with self.subTest(choice=choice):
-                p, output, calls = self.run_case(fault=9, choices=f'9\n{choice}\n\n0\n0\n')
+        for state, choice in [('none',1),('active',1),('active',2),('active',3),('active',4)]:
+            with self.subTest(state=state,choice=choice):
+                approval = 'y\n' if state == 'active' and choice == 3 else ''
+                p, output, calls = self.run_case(fault=9, menu_state=state, choices=f'9\n{choice}\n{approval}\n0\n0\n')
                 self.assertEqual(p.returncode, 0, output)
                 self.assertIn('код 9', output)
                 self.assertEqual(len(calls), 1)
@@ -185,13 +198,14 @@ class BridgeLanguage(unittest.TestCase):
         sys.path.insert(0, str(ROOT / 'bridge'))
         spec = importlib.util.spec_from_file_location('menu_controller_test', ROOT / 'bridge/controller.py')
         cls.controller = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.controller)
+        with mock.patch.dict(sys.modules, {'paramiko': mock.Mock(name='inert_paramiko')}):
+            spec.loader.exec_module(cls.controller)
 
     def test_confirmation_is_explicit_in_both_languages(self):
         c = self.controller
-        for value in ['yes', 'YES', ' да ', 'ДА']:
+        for value in ['y', 'Y', 'yes', 'YES', 'д', 'Д', ' да ', 'ДА']:
             self.assertTrue(c.confirmed(value), value)
-        for value in ['', 'no', 'нет', 'y', 'д', 'maybe']:
+        for value in ['', 'no', 'нет', 'maybe']:
             self.assertFalse(c.confirmed(value), value)
 
     def test_expected_refusals_are_localized_without_changing_json(self):

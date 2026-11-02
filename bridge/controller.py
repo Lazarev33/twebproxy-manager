@@ -5,7 +5,26 @@ from pathlib import Path
 import paramiko
 import builtins
 LANG=os.environ.get('TWEBPROXY_BRIDGE_LANG','en')
+INTERACTIVE=os.environ.get('TWEBPROXY_BRIDGE_INTERACTIVE')=='1'
 TEXT={
+'Installation plan:':'План установки:',
+'Entry OS / foreign OS:':'ОС входного / зарубежного узла:',
+'Running foreign service count:':'Запущенных служб зарубежного узла:',
+'Managed hostname / profile:':'Управляемое имя / профиль:',
+'Automatic: WireGuard keys/private addresses, checked internal ports, private MTProxy and loopback forwarding. The existing client key/link is retained.':'Автоматически: ключи/внутренние адреса WireGuard, проверенные внутренние порты, закрытый MTProxy и перенаправление через loopback. Текущий клиентский ключ/ссылка сохраняются.',
+'Affected: owned units/account/restricted SSH, WireGuard/routes/firewall and the selected relay. Connections may be interrupted; unrelated services are retained.':'Затронуты: собственные службы/учётная запись/ограниченный SSH, WireGuard/маршруты/firewall и выбранный relay. Соединения могут прерваться; сторонние службы сохраняются.',
+'Security: foreign root can read the client key. Host-wide procfs protection affects process visibility/monitoring. Enroll only a trusted server.':'Безопасность: root зарубежного сервера может читать клиентский ключ. Защита procfs меняет видимость процессов/мониторинг на хосте. Добавляйте только доверенный сервер.',
+'Recovery: partial setup is compensated; incomplete cleanup keeps its identity for Repair. Installed shared packages remain. No SSH password is saved.':'Восстановление: частичная установка компенсируется; незавершённая очистка сохраняет идентичность для восстановления. Общие установленные пакеты остаются. Пароль SSH не сохраняется.',
+'Cancel / Back':'Отмена / Назад',
+'Choose a managed hostname:':'Выберите управляемое имя:',
+'SSH connection settings:':'Параметры подключения SSH:',
+'Use root on port 22 (standard)':'root, порт 22 (стандартно)',
+'Custom SSH user/port':'Другой пользователь/порт SSH',
+'Authentication method:':'Способ аутентификации:',
+'SSH password (memory only)':'Пароль SSH (только в памяти)',
+'Existing SSH key':'Существующий ключ SSH',
+'Invalid selection; enter a number.':'Неверный выбор; введите номер.',
+'Empty SSH password refused':'Пустой пароль SSH не принимается',
 'Foreign IPv4/hostname: ':'IP/имя зарубежного узла: ',
 'SSH username [root]: ':'Пользователь SSH [root]: ',
 'SSH port [22]: ':'Порт SSH [22]: ',
@@ -54,10 +73,26 @@ TEXT={
 'forwarder socket policy not enforced':'Сетевая политика сокета перенаправления не применяется.',
 'restricted credential accepted forbidden verb':'Ограниченные учётные данные позволили запрещённую операцию.',
 'remote output limit exceeded':'Превышен предел вывода удалённой команды.',
+'Bridge executable directories are unsafe; inspect /usr, /usr/local and /usr/local/libexec before retry.':'Небезопасные каталоги исполняемых файлов Bridge. Проверьте владельца, права и отсутствие симлинков у /usr, /usr/local и /usr/local/libexec перед повтором.',
 'REMOTE_TIMEOUT; operation outcome may be unknown':'Истекло время удалённой операции; её результат может быть неизвестен.'
 }
 def tr(s):return TEXT.get(s,s) if LANG=='ru' else s
-def confirmed(s):return s.strip().lower() in ('yes','да')
+def confirmed(s):return s.strip().lower() in ('y','yes','д','да')
+def confirm_prompt(s):
+ # Keep the delimiter so an unfinished affirmative followed by EOF cancels.
+ builtins.print(tr(s),end='',flush=True)
+ answer=sys.stdin.readline()
+ if not answer.endswith('\n'):raise EOFError
+ return confirmed(answer)
+def select(s,options):
+ builtins.print(tr(s))
+ for n,label in enumerate(options,1):builtins.print(str(n)+') '+tr(label))
+ builtins.print('0) '+tr('Cancel / Back'))
+ while True:
+  answer=ask('> ').strip()
+  if answer=='0':raise KeyboardInterrupt
+  if answer.isascii() and answer.isdigit() and 1<=int(answer)<=len(options):return int(answer)
+  print('Invalid selection; enter a number.')
 def ask(s):return builtins.input(tr(s))
 def hidden_prompt(s):return getpass.getpass(tr(s))
 def print(*args,**kwargs):return builtins.print(*(tr(x) if isinstance(x,str) else x for x in args),**kwargs)
@@ -99,7 +134,9 @@ class SSH:
   if expected is not None and self.fingerprint!=expected:self.close();raise Fault('HOST_IDENTITY_CHANGED; no authentication attempted')
   if public is not None and self.host_key!=public:self.close();raise Fault('HOST_IDENTITY_CHANGED; no authentication attempted')
  def auth(self,user,password=None,identity=None,passphrase=None):
-  if password is not None:self.t.auth_password(user,password,fallback=False)
+  if password is not None:
+   if not password:raise Fault('Empty SSH password refused')
+   self.t.auth_password(user,password,fallback=False)
   else:
    if Path(identity).stat().st_mode&0o077:raise Fault('existing private key must be protected (0600 or stricter); permissions were not changed')
    self.t.auth_publickey(user,paramiko.PKey.from_path(identity,password=passphrase))
@@ -215,13 +252,46 @@ def choose_instance(a):
  hosts=[p.parent.name for p in Path('/etc/twebproxy/instances').glob('*/instance.env')]
  if not hosts:
   print('First configure the HTTPS/domain through the existing normal setup wizard. Bridge preparation follows after local setup succeeds.')
-  if subprocess.run([MANAGER,'add']).returncode:raise Fault('normal instance setup did not complete')
+  args=[MANAGER,'bridge-internal','quick-setup'] if INTERACTIVE else [MANAGER,'add']
+  if subprocess.run(args).returncode:raise Fault('normal instance setup did not complete')
   hosts=[p.parent.name for p in Path('/etc/twebproxy/instances').glob('*/instance.env')]
- name=a.instance or (hosts[0] if len(hosts)==1 else ask('Existing HTTPS hostname: ').strip())
+ hosts.sort()
+ name=a.instance or (hosts[0] if len(hosts)==1 else hosts[select('Choose a managed hostname:',hosts)-1] if INTERACTIVE and hosts else ask('Existing HTTPS hostname: ').strip())
  if name not in hosts:raise Fault('existing managed hostname required')
  info=json.loads(manager('inspect',name))
  if len(info['profiles'])!=1:raise Fault('Gate2 MVP requires an instance with exactly one profile; other instances are preserved')
  return name,info
+
+def bootstrap_program(path,user,size,digest):
+ # Prepare only the public executable prefix, after authenticating the staged
+ # bytes and before the agent switches to its private umask. Existing operator
+ # permissions/symlinks are never silently rewritten. Keep the agent's digest
+ # and restricted-RPC protocol compatible with already enrolled nodes.
+ return f'''import os,stat,hashlib,pwd,json
+p={path!r}
+fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+st=os.fstat(fd)
+assert stat.S_ISREG(st.st_mode) and st.st_size=={size}
+assert st.st_uid==pwd.getpwnam({user!r}).pw_uid and st.st_mode & 0o077==0
+b=os.read(fd,262144);os.close(fd)
+assert hashlib.sha256(b).hexdigest()=={digest!r}
+try:
+ for directory in ('/usr','/usr/local','/usr/local/libexec','/usr/local/libexec/twebproxy-bridge'):
+  created=False
+  try:os.mkdir(directory,0o755);created=True
+  except FileExistsError:pass
+  fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+  try:
+   st=os.fstat(fd)
+   if st.st_uid!=0 or st.st_mode & 0o022:raise PermissionError(directory)
+   if created:os.fchmod(fd,0o755)
+   elif not st.st_mode & 0o001:raise PermissionError(directory)
+  finally:os.close(fd)
+except OSError:
+ print(json.dumps({{'ok':False,'error':'Bridge executable directories are unsafe; inspect /usr, /usr/local and /usr/local/libexec before retry.'}}))
+ raise SystemExit(1)
+exec(compile(b,p,'exec'),{{'__name__':'__main__','__file__':p,'_VERIFIED_PAYLOAD_SHA256':{digest!r}}})
+'''
 
 def stage_bootstrap(t,c,key,user,sudo=False):
  source=(HERE/'agent.py').read_bytes();digest=hashlib.sha256(source).hexdigest();staging='.twebproxy-stage-'+c['id'];sftp=paramiko.SFTPClient.from_transport(t.t)
@@ -230,7 +300,7 @@ def stage_bootstrap(t,c,key,user,sudo=False):
   with sftp.file(path+'/agent.py','wb') as f:f.write(source)
   sftp.chmod(path+'/agent.py',0o600)
   # Root reads regular staged file once, hashes exact bytes, then executes bytes.
-  code='import os,stat,hashlib,pwd; p='+repr(path+'/agent.py')+'; fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW); st=os.fstat(fd); assert stat.S_ISREG(st.st_mode) and st.st_size=='+str(len(source))+'; assert st.st_uid==pwd.getpwnam('+repr(user)+').pw_uid and st.st_mode & 0o077==0; b=os.read(fd,262144); os.close(fd); assert hashlib.sha256(b).hexdigest()=='+repr(digest)+'; exec(compile(b,p,"exec"),{"__name__":"__main__","__file__":p,"_VERIFIED_PAYLOAD_SHA256":'+repr(digest)+'})'
+  code=bootstrap_program(path+'/agent.py',user,len(source),digest)
   command=('sudo -n ' if sudo else '')+'/usr/bin/python3 -c '+shlex.quote(code)
   return t.command(command,{'op':'bootstrap','config':c,'source':base64.b64encode(source).decode(),'public_key':key,'user':user},timeout=600)
  finally:
@@ -238,11 +308,30 @@ def stage_bootstrap(t,c,key,user,sudo=False):
   except Exception:pass
   sftp.close()
 
+def show_plan(hostname,profile,localinfo,remote,digest):
+ if INTERACTIVE:
+  print('Installation plan:')
+  print('Entry OS / foreign OS:',localinfo['version'],'/',remote['version'])
+  print('Running foreign service count:',len(remote['services'].splitlines()))
+  print('Managed hostname / profile:',hostname,'/',profile)
+  print('Automatic: WireGuard keys/private addresses, checked internal ports, private MTProxy and loopback forwarding. The existing client key/link is retained.')
+  print('Affected: owned units/account/restricted SSH, WireGuard/routes/firewall and the selected relay. Connections may be interrupted; unrelated services are retained.')
+  print('Security: foreign root can read the client key. Host-wide procfs protection affects process visibility/monitoring. Enroll only a trusted server.')
+  print('Recovery: partial setup is compensated; incomplete cleanup keeps its identity for Repair. Installed shared packages remain. No SSH password is saved.')
+ else:
+  print(json.dumps({'entry_os':localinfo['version'],'foreign_os':remote['version'],'existing_remote_services':remote['services'],'plan':{'hostname':hostname,'profile':profile,'topology':'one dedicated WireGuard peer, loopback proxyd, stock MTProxy','trust':'Foreign root receives the canonical profile secret; only enroll a trusted exit.','proc_policy':'Host-wide hidepid enforcement; monitoring impact must be accepted.','scoped_system_changes':'owned units/account/key/sudo/sshd Match; apt dependencies retained; host proc hardening; owned nft tables/route; affected relay restart','executor_sha256':digest}},indent=2))
+
 def add(a):
  if STATE.exists():raise Fault('one node already exists or cleanup is pending; use status/repair/remove')
  hostname,info=choose_instance(a)
  if not a.host:
-  a.host=ask('Foreign IPv4/hostname: ').strip();a.port=int(ask('SSH port [22]: ').strip() or '22')
+  a.host=ask('Foreign IPv4/hostname: ').strip()
+  if not INTERACTIVE:a.port=int(ask('SSH port [22]: ').strip() or '22')
+  if not 1<=a.port<=65535:raise Fault('invalid SSH port')
+ if INTERACTIVE and not a.user and a.port==22:
+  settings=select('SSH connection settings:',['Use root on port 22 (standard)','Custom SSH user/port'])
+  if settings==1:a.user='root'
+  else:a.user=ask('SSH username [root]: ').strip() or 'root';a.port=int(ask('SSH port [22]: ').strip() or '22')
   if not 1<=a.port<=65535:raise Fault('invalid SSH port')
  ip=socket.gethostbyname(a.host);addr=ipaddress.IPv4Address(ip)
  if addr.is_loopback or addr.is_unspecified or addr.is_multicast:raise Fault('invalid foreign address')
@@ -253,10 +342,12 @@ def add(a):
   print('SSH host ED25519 fingerprint:',t.fingerprint)
   if not a.fingerprint:
    if ask('Compare through provider/trusted channel; enter full SHA256 fingerprint: ').strip()!=t.fingerprint:raise Fault('host identity not independently approved')
-  password=None;passphrase=None;identity=a.identity;mode=a.auth or ask('Authentication [key/password]: ').strip()
+  password=None;passphrase=None;identity=a.identity
+  mode=a.auth or ('key' if INTERACTIVE and identity else ('password','key')[select('Authentication method:',['SSH password (memory only)','Existing SSH key'])-1] if INTERACTIVE else ask('Authentication [key/password]: ').strip())
   if mode=='password':
    if len(Path('/proc/swaps').read_text().splitlines())>1:raise Fault('password bootstrap requires no active swap in MVP')
    password=hidden_prompt('Initial SSH password (memory only): ')
+   if not password:raise Fault('Empty SSH password refused')
   elif mode=='key':
    identity=identity or ask('Existing private key path: ').strip()
    try:paramiko.PKey.from_path(identity)
@@ -279,8 +370,8 @@ def add(a):
   auditing=t.command(('sudo -n ' if user!='root' else '')+'/usr/bin/python3 -c '+shlex.quote(audit_code),{})
   if auditing['input_logging']:raise Fault('credential-bearing provisioning refused: sudo input logging configured')
   digest=hashlib.sha256(code.encode()).hexdigest()
-  print(json.dumps({'entry_os':localinfo['version'],'foreign_os':remote['version'],'existing_remote_services':remote['services'],'plan':{'hostname':hostname,'profile':profile,'topology':'one dedicated WireGuard peer, loopback proxyd, stock MTProxy','trust':'Foreign root receives the canonical profile secret; only enroll a trusted exit.','proc_policy':'Host-wide hidepid enforcement; monitoring impact must be accepted.','scoped_system_changes':'owned units/account/key/sudo/sshd Match; apt dependencies retained; host proc hardening; owned nft tables/route; affected relay restart','executor_sha256':digest}},indent=2))
-  if not a.approve and not confirmed(ask('Approve installation? [yes/NO]: ')):print('CANCELLED; no Bridge changes applied');return
+  show_plan(hostname,profile,localinfo,remote,digest)
+  if not a.approve and not confirm_prompt('Approve installation? [yes/NO]: '):print('CANCELLED; no Bridge changes applied');return
   ROOT.mkdir(parents=True,exist_ok=True,mode=0o700);os.chmod(ROOT,0o700);creds=ROOT/'credentials';creds.mkdir(mode=0o700)
   keyfile=creds/'management-key';local(['ssh-keygen','-q','-t','ed25519','-N','','-C','twebproxy-managed-'+node,'-f',str(keyfile)])
   s={'schema':1,'id':node,'hostname':hostname,'profile':profile,'previous_port':previous,'ip':ip,'port':a.port,'fingerprint':t.fingerprint,'host_key':t.host_key,'executor_digest':digest,'entry':entry,'exit':exit,'phase':'plan_approved','bootstrap_user':user};journal(s)
@@ -326,7 +417,8 @@ def status(s):
  print(json.dumps({'schema':'twebproxy.bridge.status.v1','id':s['id'],'phase':s['phase'],'hostname':s['hostname'],'generation':1,'observed_at':time.time(),'checks':checks,'remote':remote,'cleanup_debt':s.get('cleanup_debt',[])},indent=2))
 
 def main():
- secret_process();p=argparse.ArgumentParser();p.add_argument('verb',choices=['add','status','diagnose','repair','remove']);p.add_argument('--host');p.add_argument('--user');p.add_argument('--port',type=int,default=22);p.add_argument('--instance');p.add_argument('--identity');p.add_argument('--auth',choices=['key','password']);p.add_argument('--fingerprint');p.add_argument('--entry-endpoint');p.add_argument('--approve',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('verb',choices=['add','status','diagnose','repair','remove']);p.add_argument('--host');p.add_argument('--user');p.add_argument('--port',type=int,default=22);p.add_argument('--instance');p.add_argument('--identity');p.add_argument('--auth',choices=['key','password']);p.add_argument('--fingerprint');p.add_argument('--entry-endpoint');p.add_argument('--approve',action='store_true');a=p.parse_args()
+ secret_process()
  if os.geteuid()!=0:raise Fault('root required')
  if not 1<=a.port<=65535:raise Fault('invalid SSH port')
  with private_lock('controller.lock') as lock:
@@ -338,7 +430,7 @@ def main():
   s=load()
   if a.verb in ('status','diagnose'):status(s)
   elif a.verb=='remove':
-   if not a.approve and not confirmed(ask('Restore local backend and remove owned foreign node? [yes/NO]: ')):return
+   if not a.approve and not confirm_prompt('Restore local backend and remove owned foreign node? [yes/NO]: '):return
    if not rollback(s):raise Fault('PARTIAL: cleanup pending; identity retained for retry')
    print('Node removed; original local profile restored; shared packages retained.');print(json.dumps({'retained_policy':s.get('remote_cleanup_receipt',{}).get('warnings',[])},ensure_ascii=False))
   elif a.verb=='repair':

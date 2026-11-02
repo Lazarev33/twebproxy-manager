@@ -1,4 +1,10 @@
-# Manager self-update: trust policy and release publishing
+# Manager self-update: current and legacy protocols
+
+**v0.2.26 uses the [complete-distribution protocol](DISTRIBUTION-UPDATES.md).**
+The following retained text documents the v0.2.25 script-only transaction and old
+backup format. Its artifact/health/rollback instructions are historical; do not
+use a bare script to install v0.2.26. See the new protocol for authenticated
+bootstrap, coherent updates, current result codes and offline recovery.
 
 This describes `twebproxy check-update` / `twebproxy manager-update` from
 v0.2.20 (Stage F) on. The relay update (`twebproxy update`) is unrelated.
@@ -160,6 +166,15 @@ sudo /usr/local/libexec/twebproxy/restore-update-backup list|restore-latest|rest
   owner or mode is refused and must be fixed by the administrator.
 
 ## Limitations
+
+- **v0.2.26 pre-RC / PRERC-UPDATE-01:** the script-only updater does not deliver
+  a changed optional Bridge bundle. A real v0.2.25 → v0.2.26 test preserved local
+  profiles but left installed foreign-node commands without their newly pinned
+  bundle. Complete verified distribution + repair restored it; script rollback
+  restored v0.2.25. This workaround does not close the release blocker. Existing
+  active/pending Bridge update refusals remain mandatory. No updater redesign,
+  unverified download or legacy-bundle fallback is introduced. See
+  [bounded pre-RC](PRERC-v0.2.26.md).
 
 - No protection against freeze or replay of an older signed "latest" release
   (no timestamp service); `--force` can deliberately reinstall an older signed

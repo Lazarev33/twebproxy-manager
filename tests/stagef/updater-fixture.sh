@@ -20,7 +20,9 @@ f_init "$MGR" || { echo 'updater-fixture: setup failed'; exit 1; }
 trap 'f_case_cleanup 2>/dev/null; f_fini' EXIT
 # No failure snapshot: it probes host services (blocked by the sentinels anyway).
 export TWEBPROXY_NO_LOG=1 TWEBPROXY_ERROR_SNAPSHOT=1 TWEBPROXY_UPDATE_LOCK_WAIT=2
-NEW=0.2.90
+IFS=. read -r F_NEW_MAJOR F_NEW_MINOR F_NEW_PATCH <<< "$F_LOCAL_VERSION"
+export NEW="$F_NEW_MAJOR.$F_NEW_MINOR.$((10#$F_NEW_PATCH + 1))"
+export NEW_NEXT="$F_NEW_MAJOR.$F_NEW_MINOR.$((10#$F_NEW_PATCH + 2))"
 
 pass=0; fail=0
 check() { # check ID description command...
@@ -148,7 +150,7 @@ for variant in \
 done
 
 for variant in 'prerelease|prerelease=true' 'draft|draft=true' 'foreign-html|html_repo=someone/else' \
-               'rc-tag|tag=v0.2.90-rc1'; do
+               "rc-tag|tag=v${NEW}-rc1"; do
   name="${variant%%|*}"; opt="${variant#*|}"
   if begin "f1-release-$name"; then
     f_publish "$NEW" "$opt"
@@ -315,8 +317,8 @@ if begin f2-lock-released-on-return; then
   f_eval '
     probe() { ( exec 9>&-; flock -n "$UPDATE_LOCK_FILE" true ) && echo "LOCK_FREE_AFTER_$1" || echo "LOCK_HELD_AFTER_$1"; }
     f_publish "$F_LOCAL_VERSION"; manager_update_cmd || true; probe CURRENT
-    f_publish 0.2.90 behavior=bad-overview; manager_update_cmd || true; probe ROLLBACK
-    f_publish 0.2.91; manager_update_cmd || true; probe SUCCESS
+    f_publish "$NEW" behavior=bad-overview; manager_update_cmd || true; probe ROLLBACK
+    f_publish "$NEW_NEXT"; manager_update_cmd || true; probe SUCCESS
   ' > "$F_OUT" 2>&1
   check "$CASE_ID.after-current" 'a long-lived process (TUI) releases the lock after an up-to-date answer' grep -q LOCK_FREE_AFTER_CURRENT "$F_OUT"
   check "$CASE_ID.after-rollback" 'after a rolled-back update' grep -q LOCK_FREE_AFTER_ROLLBACK "$F_OUT"
@@ -329,7 +331,7 @@ if begin f2-lock-not-inherited-by-candidate; then
   f_update
   check "$CASE_ID.rolled-back" 'health failure rolled back' out_has '^UPDATE_FAILED_ROLLBACK_SUCCESS'
   check "$CASE_ID.lock-free" 'a process left by the candidate does not keep the update lock' f_lock_free
-  f_publish 0.2.91
+  f_publish "$NEW_NEXT"
   f_update
   check "$CASE_ID.next-update" 'the next legitimate update is not blocked' test "$F_RC" -eq 0
   f_case_cleanup

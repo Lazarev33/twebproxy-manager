@@ -1,5 +1,24 @@
 # Client connection and sanitized evidence
 
+## Current RC — 2026-11-02 UTC
+
+The operator confirmed messages in both directions, photos/video and a file
+through the corrected0.9.0-rc1 HTTPS Bridge on iOS, first with VPN and then over
+mobile without VPN. Network switching continued to work. Exact Telegram/OS
+version and mobile operator were not supplied; full application relaunch was
+not explicitly confirmed. These missing details are not backfilled from the
+older13.1.2 report below. File size, cache state and hash were not measured.
+
+The observed window00:32:29–00:35:36UTC has19samples perhost,52new relay streams,
+32864312up/27433116down relaybytes, zero new backend dial failures/rejections/
+limit hits and no service PID/restart changes. Aggregate counters corroborate
+transport activity, not individual messages or whole-file integrity. Actual
+tested code commitd22d6dc/runtime5f06; later documentation changes do not alter
+the deployment. Current operator confirmation and historical Gate3 remain
+distinct evidence. Other carriers/clients and full relaunch remain unexecuted.
+
+## Historical Gate3 — 2026-10-31
+
 The Gate3 operator actually tested Telegram for iOS 13.1.2 using the RU-facing
 link. They reported successful messages, photos, video messages, a 417 MB file,
 LTE MegaFon, LTE T2 and Wi-Fi, then confirmed full application relaunch and

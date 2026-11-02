@@ -1,10 +1,27 @@
 # TWebProxy Manager
 
-Telegram WEB Proxy Manager for Debian/Ubuntu: HTTPS, обычный сайт и управляемый прокси на одном домене. **GitHub `main` — v0.2.25-beta (development, не stable Release / production).**
+Telegram WEB Proxy Manager for Debian/Ubuntu: HTTPS, обычный сайт и управляемый прокси на одном домене. **GitHub `main` — v0.2.25-beta. Этот пакет — неопубликованный кандидат **v0.9.0-rc1** на основе принятой разработки v0.2.26-beta, не stable Release и не production.**
 
 [Архитектура](#как-это-работает) · [Установка](#начало-работы) · [Команды](#управление) · [Bridge](docs/bridge-gate3/OPERATIONS.md) · [Статус](#статус-и-известные-риски)
 
 В исходники входят `bridge/` и `sites/`; не устанавливайте один отдельно скачанный Bash-файл. Исправления P1 версии 0.2.24 прошли отдельную целевую проверку, а не полную RC-приёмку.
+
+Для PRERC-UPDATE-01 реализовано согласованное обновление **полного дистрибутива**:
+Manager, Bridge, автономные зависимости и встроенный сайт проверяются и
+устанавливаются совместно; ошибка или прерывание восстанавливают предыдущую
+установку. Первый переход с v0.2.25 требует проверенного bootstrap полного пакета;
+обновление одним Bash-файлом не поддерживается и не сообщает ложный успех.
+См. [обновление и откат](docs/DISTRIBUTION-UPDATES.md) и
+[границы приёмки](docs/PRERC-UPDATE01-RESULT.md). PR остаётся draft;
+стабильная готовность и развёртывание не заявляются.
+
+Проверка RC и её границы: [FINAL-RC-ACCEPTANCE.md](docs/FINAL-RC-ACCEPTANCE.md). Изменение номера не означает прохождение недоступных клиентских или платформенных тестов.
+
+Продолжение полевой проверки RC1: [перезагрузки, платформы и границы результатов](docs/RC1-FIELD-ACCEPTANCE.md).
+Исправлены воспроизведённые несовместимости Bash5.1/jq1.6/systemd249;
+локальные установки проверены на настоящих Debian12 и Ubuntu22.04 KVM.
+Публичный Quick Setup подтвердил выпуск сертификата и сайт, но полный
+Telegram-тракт новой NAT-VM не подтверждён. Матрица Bridge от этого не расширяется.
 
 ## Зачем нужен
 
@@ -58,16 +75,29 @@ Telegram WEB client ──HTTPS/WSS :443──> Caddy/Nginx
 
 Базовые требования: Debian 12+ / Ubuntu 22.04+, x86_64, systemd, root, публичный IPv4, DNS `A`, TCP 443 и обычно TCP 80 для ACME. **Bridge реально проверялся только** на Ubuntu 26.04 x86_64 (RU Entry) и Ubuntu 24.04 x86_64 (Exit).
 
-На отдельной тестовой VM:
+В коррекции updater отдельно проверены две изолированные Ubuntu24.04 KVM
+(Entry/Exit). Это не расширяет матрицу реальных публичных VPS или клиентов.
+
+Для этого неопубликованного кандидата используйте полную root-owned `source/` из проверенного
+архива, а не клонирование более старого `main`. На отдельно разрешённой тестовой VM:
 
 ```bash
-git clone https://github.com/Lazarev33/twebproxy-manager.git
-cd twebproxy-manager
+cd /path/to/extracted/source
 sha256sum -c SHA256SUMS
-sudo ./twebproxy-manager.sh menu
+sudo bash ./twebproxy-manager.sh menu
 ```
 
-Выберите язык, домен, встроенный сайт, TLS/Caddy, проверьте план и подтвердите. Для Bridge откройте **Foreign Nodes → Add Foreign Node**, укажите зарубежный VPS и SSH-доступ, **независимо проверьте отпечаток ED25519 host key** и подтвердите установку. В текущем MVP — одна зарубежная нода и один профиль Bridge-инстанса. Не публикуйте секреты подключения.
+Быстрая настройка: язык, домен, проверка DNS/среды/портов, стандартный сайт и
+совместимый HTTPS, план и явное согласие. Имя профиля, secret и внутренние порты
+генерируются автоматически. Неизвестный listener или неподтверждённый DNS
+останавливают Quick; расширенный режим сохраняет ручные настройки.
+[Описание TUI](docs/TUI-SMART-DEFAULTS.md) · [Инвентаризация ввода](TUI-INPUT-INVENTORY.md).
+
+Для Bridge откройте «Зарубежные узлы / Мост → Добавить зарубежный узел», укажите
+адрес и SSH-доступ, **независимо проверьте ED25519 host key**, затем подтвердите
+план. При active/pending состоянии доступны статус/диагностика/repair/remove;
+повторное добавление не перезаписывает узел и не закрывает Manager.
+В MVP — одна зарубежная нода и один профиль Bridge-инстанса.
 
 ## Управление
 
@@ -189,6 +219,15 @@ sha256sum /usr/local/sbin/twebproxy \
 
 </details>
 
+Коррекция v0.2.26 проверена в изолированных fixtures и настоящих Ubuntu24.04 KVM.
+Продолжение RC установило точный полный runtime на RU Entry и проверило четыре
+carrier синтетическим resPQ через публичный HTTPS и два VPS. Оператор подтвердил
+на текущем RC работу Telegram iOS с VPN и на мобильной сети без VPN: сообщения
+в обе стороны, фото/видео и файл. Точная версия клиента и полный перезапуск
+приложения не подтверждены; прежний Gate3 учитывается отдельно.
+См. [актуальную матрицу RC](docs/FINAL-RC-ACCEPTANCE.md) и
+[локальные тесты](tests/tui-smart-defaults/README.md).
+
 ## Статус и известные риски
 
 | Этап | Состояние |
@@ -200,7 +239,7 @@ sha256sum /usr/local/sbin/twebproxy \
 | Gate 2 | CONDITIONAL ACCEPTANCE: 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
 | v0.2.25 / Gate 3 | Источники опубликованы в `main`, HTTPS/сайт/Bridge испытаны на тестовых VPS |
 | Bridge TUI correction | Повторное добавление ноды не должно закрывать всё меню; локальные регрессии PASS, развёртывание коррекции на RU Entry не подтверждено |
-| Smart Defaults / UI | Следующий этап, не входит в v0.2.25 |
+| Smart Defaults / v0.2.26-beta | Неопубликованный кандидат: автоматические значения/пресеты, точечная коррекция подтверждений, локализации и ERR; без развёртывания |
 | Stable Release / полный RC | Не выпущен |
 
 Оператор сообщил об успешной работе **Telegram для iOS 13.1.2** через RU-домен: сообщения, фото, видеосообщения, крупный файл, восстановление после потери сети и Wi-Fi/LTE. Серверные счётчики подтверждают активность, но не было независимой проверки содержимого файла по хешу. **Telegram Desktop и другие клиенты — NOT_EXECUTED** в этом испытании. Подробности — [CLIENT-VALIDATION.md](docs/bridge-gate3/CLIENT-VALIDATION.md).
@@ -226,7 +265,7 @@ sha256sum /usr/local/sbin/twebproxy \
 <details>
 <summary><strong>English — short overview</strong></summary>
 
-TWebProxy Manager **v0.2.25-beta** is a development checkpoint. It supports single-VPS local MTProxy and managed **RU Entry → WireGuard → Foreign Exit** mode with one RU-facing Telegram WEB Proxy link. A static default website ships with the source. Gate 3 includes operator-reported iOS tests but not full platform/client/RC acceptance. GitHub main is not a stable Release.
+GitHub main contains **v0.2.25-beta**; this package is the unpublished **v0.2.26-beta** TUI candidate. Both are development checkpoints. It supports single-VPS local MTProxy and managed **RU Entry → WireGuard → Foreign Exit** mode with one RU-facing Telegram WEB Proxy link. A static default website ships with the source. Gate 3 includes operator-reported iOS tests but not full platform/client/RC acceptance. GitHub main is not a stable Release.
 
 </details>
 

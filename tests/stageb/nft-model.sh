@@ -9,6 +9,10 @@ case "$*" in
     printf 'table inet twebproxy_guard { # progname nft\n\tflags owner\n}\n'; exit 0;;
   *"list tables inet")
     [[ ! -e "$root/fail-query" ]] || exit 1
+    if [[ "$*" != *"-j"* ]]; then
+      [[ ! -f "$root/live" ]] || printf 'table inet twebproxy_backend\n'
+      exit 0
+    fi
     if [[ -f "$root/live" ]]; then
       printf '{"nftables":[{"table":{"family":"inet","name":"twebproxy_backend"}}]}\n'
     else printf '{"nftables":[]}\n'; fi

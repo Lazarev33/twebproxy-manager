@@ -1,0 +1,132 @@
+{
+  "VERSION": {
+    "mode": 420,
+    "sha256": "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15",
+    "size": 6
+  },
+  "bridge/MANIFEST.json": {
+    "mode": 420,
+    "sha256": "c400e10b282cbf00f9291e1c9181acf64d87bdfe83d96afeee07a1bd80564b6d",
+    "size": 1286
+  },
+  "bridge/agent.py": {
+    "mode": 420,
+    "sha256": "9fb73414a807727fcbf82b7c732c6bddfcedf3e5841ea389dd0ac937cd4417b0",
+    "size": 37294
+  },
+  "bridge/controller.py": {
+    "mode": 420,
+    "sha256": "44d5f45f2e53d31fed9b7a56b40c1c9096da5b2daa867b03a699135c943969eb",
+    "size": 38398
+  },
+  "bridge/launcher.py": {
+    "mode": 420,
+    "sha256": "22b591b3312a8d62c9c30f1872a128bd45645563820c1f37889c61431c6bc30a",
+    "size": 3713
+  },
+  "bridge/vendor/bcrypt-5.0.0-cp39-abi3-manylinux_2_34_x86_64.whl": {
+    "mode": 420,
+    "sha256": "611f0a17aa4a25a69362dcc299fda5c8a3d4f160e2abb3831041feb77393a14a",
+    "size": 278240
+  },
+  "bridge/vendor/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl": {
+    "mode": 420,
+    "sha256": "c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf",
+    "size": 221822
+  },
+  "bridge/vendor/cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl": {
+    "mode": 420,
+    "sha256": "b0431303acaea1089ad4b3e9ce4e6518193def1118d4073ca848635ee4ea2e96",
+    "size": 221525
+  },
+  "bridge/vendor/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl": {
+    "mode": 420,
+    "sha256": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079",
+    "size": 4752576
+  },
+  "bridge/vendor/invoke-3.0.3-py3-none-any.whl": {
+    "mode": 420,
+    "sha256": "f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053",
+    "size": 160958
+  },
+  "bridge/vendor/paramiko-5.1.0-py3-none-any.whl": {
+    "mode": 420,
+    "sha256": "d9fe6d67a9d0bbf3eb85b051d26ab850b678c02d060f32915b944e5ca6d0d9e1",
+    "size": 211623
+  },
+  "bridge/vendor/pycparser-3.12-py3-none-any.whl": {
+    "mode": 420,
+    "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+    "size": 62600
+  },
+  "bridge/vendor/pynacl-1.6.2-cp38-abi3-manylinux_2_34_x86_64.whl": {
+    "mode": 420,
+    "sha256": "c8a231e36ec2cab018c4ad4358c386e36eede0319a0c41fed24f840b1dac59f6",
+    "size": 1402859
+  },
+  "sites/podmoskovye/404.html": {
+    "mode": 420,
+    "sha256": "56a9764a85530b14905092445b9dba375d9ab8df00575c77785c21c145e1bd64",
+    "size": 1891
+  },
+  "sites/podmoskovye/ASSET-LICENSES.md": {
+    "mode": 420,
+    "sha256": "2d47fbc8b779434b1834710e47879bf1e0e71de77040f46d1c8fcd84cec6a7c5",
+    "size": 1055
+  },
+  "sites/podmoskovye/MANIFEST.json": {
+    "mode": 420,
+    "sha256": "988bf2a45f56d7fc1dd795d1ddaed766e7a5dff44294a96b46352a2b7075efe8",
+    "size": 880
+  },
+  "sites/podmoskovye/about.html": {
+    "mode": 420,
+    "sha256": "1760b274b187b89bf048861b449c9a0170f109832dce1f64f375daf967faa976",
+    "size": 4283
+  },
+  "sites/podmoskovye/assets/favicon.svg": {
+    "mode": 420,
+    "sha256": "482fb401e1d7cc77d74037e62fc2cde4d07eb95e1abf4d7a1e9d91a64c994835",
+    "size": 218
+  },
+  "sites/podmoskovye/assets/kolomna.svg": {
+    "mode": 420,
+    "sha256": "d1f31f96f8e6270fed7e5ec98410eef4f8c4ddfd0f6a7d64f50813755c642046",
+    "size": 1498
+  },
+  "sites/podmoskovye/assets/posad.svg": {
+    "mode": 420,
+    "sha256": "3528fa6925af20f6559f7cd81f909394f43a558723984864f2c59033d7181e5a",
+    "size": 1480
+  },
+  "sites/podmoskovye/assets/zaraysk.svg": {
+    "mode": 420,
+    "sha256": "51e801e85786ab62b01e59e8413e51fb16c8c71c4f77d989e98841874955428c",
+    "size": 1424
+  },
+  "sites/podmoskovye/index.html": {
+    "mode": 420,
+    "sha256": "f8ed8019cf949edb767373cb2de2b6887a1e75bab8db4e1c4a7285b7251606a0",
+    "size": 10271
+  },
+  "sites/podmoskovye/privacy.html": {
+    "mode": 420,
+    "sha256": "729048a4498367ebe2af2ba5b023157e30abdf659e30a3ffa71fc8eeca9a473f",
+    "size": 2621
+  },
+  "sites/podmoskovye/styles.css": {
+    "mode": 420,
+    "sha256": "eb362cf2619333c3c22cab0c7689b915692ecf59fd9d8b7a87f435154dd91d16",
+    "size": 5919
+  },
+  "tools/default-site-bundle.py": {
+    "mode": 420,
+    "sha256": "3df770e594546e7cb2b6512f04566d5d13da18eefcf365d75c05c67453e3eff6",
+    "size": 821
+  },
+  "updater/engine.py": {
+    "mode": 420,
+    "sha256": "b3ca809b0067e1717639719da10fccb61de596be58a1db439afc188f40d25e2e",
+    "size": 49582
+  }
+}

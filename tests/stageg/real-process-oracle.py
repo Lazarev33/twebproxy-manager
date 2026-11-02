@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Stage G real-process oracle for the two P1 defects found on real Linux in Stage F.
 
+Full-distribution builds deliberately select the retained legacy transaction in
+the sandbox driver below. New-distribution installed acceptance is separate KVM
+evidence under tests/distribution; these checks are not a substitute for it.
+
 Everything that decides the outcome is real: the manager under test runs as its
 own CLI (`twebproxy manager-update --sha256 …`, real main/logging/dispatch), its
 health probes run a candidate built from the real manager, downloads use the
@@ -12,7 +16,7 @@ the manager under test whose path constants (BASE_DIR, MANAGER_BIN, …, the loc
 file) and release URLs are rewritten into a private sandbox, so nothing outside
 it is read or written; the TLS server listens on 127.0.0.1 only. The candidate
 artifact differs from the manager under test only in those constants, its
-version markers (0.2.90) and, for scenario A, one injected line.
+future-version markers and, for scenario A, one injected line.
 
   A  The candidate's first `--help` leaves a background child holding stdout.
      Expected: the update ends within the probe bound, the child does not
@@ -35,7 +39,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 MGR = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 and not re.fullmatch(r'[ABC]', sys.argv[1]) else ROOT / 'twebproxy-manager.sh').resolve()
 WANT = [a for a in sys.argv[1:] if re.fullmatch(r'[ABC]', a)] or ['A', 'B', 'C']
 SLUG = 'Lazarev33/twebproxy-manager'
-NEW = '0.2.90'
+_version = re.search(r'^MANAGER_VERSION="([0-9.]+)"', MGR.read_text(), re.M).group(1).split('.')
+NEW = '.'.join([*_version[:2], str(int(_version[2])+1)])
 CONSTANTS = ('BASE_DIR SITES_DIR TPROXY_SRC MTPROXY_SRC TPROXY_BIN MANAGER_BIN LIBEXEC_DIR SYSTEMD_DIR CADDY_DIR '
              'NGINX_DIR LE_DIR ACME_WEBROOT DPI_NFT_BIN DPI_DOC_DIR PROJECT_DIR UPDATE_BACKUP_PARENT UPDATE_LOCK_FILE').split()
 RESULTS = {'manager': str(MGR), 'scenarios': {}}
@@ -128,6 +133,27 @@ class Sandbox:
         for c in CONSTANTS:
             text, n = re.subn(rf'^{c}="/', f'{c}="{self.root}/', text, count=1, flags=re.M)
             assert n == 1, c
+        # This historical oracle targets the retained script-only transaction,
+        # not full-distribution acceptance. Provide genuine verified components
+        # inside the sandbox for its read-only installed startup guard.
+        if 'stage4_script_update_cmd()' in text:
+            original = 'manager-update) update_rc=0; manager_update_cmd "$@" || update_rc=$?; exit "$update_rc" ;;'
+            assert original in text
+            text = text.replace(original, 'manager-update) stage4_script_update_cmd "$@" ;;')
+            records = json.loads((MGR.parent / 'COMPONENTS.json').read_text())
+            version_bytes = ((version or re.search(r'^MANAGER_VERSION="([^"]+)"$', text, re.M).group(1)) + '\n').encode()
+            records['VERSION']['sha256'] = hashlib.sha256(version_bytes).hexdigest()
+            records['VERSION']['size'] = len(version_bytes)
+            raw = (json.dumps(records, sort_keys=True, indent=2) + '\n').encode()
+            pin = hashlib.sha256(raw).hexdigest()
+            target = self.root / 'opt/twebproxy-manager/distributions' / pin
+            target.mkdir(parents=True, exist_ok=True)
+            for name in records:
+                dst = target / name; dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(MGR.parent / name, dst)
+            (target / 'VERSION').write_bytes(version_bytes)
+            (target / 'COMPONENTS.json').write_bytes(raw)
+            text = re.sub(r'^COMPONENTS_MANIFEST_SHA256="[^"]+"$', 'COMPONENTS_MANIFEST_SHA256="' + pin + '"', text, flags=re.M)
         port = self.server.port
         text, n = re.subn(r'^MANAGER_API_URL=.*$', f'MANAGER_API_URL="https://127.0.0.1:{port}/api/repos/$MANAGER_REPO_SLUG"', text, count=1, flags=re.M); assert n == 1
         text, n = re.subn(r'^MANAGER_RAW_URL=.*$', f'MANAGER_RAW_URL="https://127.0.0.1:{port}/raw"', text, count=1, flags=re.M); assert n == 1

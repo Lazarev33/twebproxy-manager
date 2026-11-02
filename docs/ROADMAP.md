@@ -1,6 +1,14 @@
 # TWebProxy Manager — Development Roadmap
 
-Updated: 2026-10-31. Restored to the pre-Gemini release roadmap; nonessential architectural experiments are parked.
+Updated: 2026-11-01. Stable-first roadmap retained; nonessential architectural experiments are parked.
+
+2026-11-02 field continuation: real two-host OS reboot/recovery and clean
+Debian12/Ubuntu22.04 local installs are now exercised. Three platform compatibility
+blockers are corrected without policy/topology changes; public Quick ACME/site
+passes while its complete native public-IP Telegram journey remains unconfirmed.
+See [RC1-FIELD-ACCEPTANCE.md](RC1-FIELD-ACCEPTANCE.md) and the final handoff matrix
+for application results and remaining gates. This remains unpublished RC1,
+not an accepted stable release; deferred experiments remain deferred.
 
 ## Repository publication and evidence
 
@@ -30,8 +38,8 @@ Keep the public website genuinely functional; do not claim that HTML alone can h
 | Bridge Gate 2 | CONDITIONAL ACCEPTANCE | 17 PASS / 0 FAIL / 8 NOT_EXECUTED |
 | Gate 3 / v0.2.25 | DEVELOPMENT SOURCE IN MAIN | Default site, Bridge and operator-reported iOS test |
 | Bridge menu fix | LOCAL REGRESSION PASS | Not confirmed deployed on RU Entry |
-| Smart Defaults / TUI | NEXT TASK | Automated safe choices and presets; not in 0.2.25 |
-| RC / stable Release | NOT AUTHORIZED | Platform/client matrix, cold boot, security, verified distribution |
+| Smart Defaults / TUI | UNPUBLISHED v0.2.26-beta CANDIDATE | Safe defaults/presets implemented; focused confirmation/localization/ERR corrections; no live deployment |
+| First RC / stable Release | UNPUBLISHED 0.9.0-rc1 PREPARATION / STABLE NOT ACCEPTED | Remaining platform/client/cold-boot matrix; see FINAL-RC-ACCEPTANCE.md |
 
 Current tasks: finish focused CLI/TUI fixes, Smart Defaults and Gate 3 acceptance on the **existing** data path; then validate and publish a stable release. Defer structural changes to [roadmap-test.md](../roadmap-test.md). See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLIENT-VALIDATION.md](bridge-gate3/CLIENT-VALIDATION.md).
 
@@ -54,9 +62,25 @@ Actual Bridge route: RU HTTPS front end → tproxy-server → loopback TCP forwa
 
 Next: verify clean installs, two-host cold boot, safe recovery and removal, TLS/renewal, external backend exposure, supported clients including Desktop and non-tested OS/CPU combinations. Keep synthetic protocol evidence distinct from genuine application tests and operator reports.
 
-Smart Defaults is a separate future stage: inventory technical TUI prompts, replace avoidable input with safe defaults/presets, retain Advanced mode and explicit security/destructive approvals. Do not change the existing six DPI modes or automatically select aggressive modes.
+Smart Defaults is implemented in the unpublished v0.2.26-beta candidate: input inventory, safe defaults/presets, Advanced mode and explicit security/destructive approvals. The focused correction pass fixes restore affirmatives, localization audit, CLI ERR handling and standalone test dependencies. Existing six DPI methods/defaults and the working network path are unchanged. Public Quick TLS, a new two-VPS deployment and application tests are not claimed for this candidate.
 
 Do not conflate a GitHub development source commit with a stable signed Release or trusted automatic update. Prior accepted P1 corrections need a new reproducer before reopening.
+
+## v0.2.26 bounded integration result
+
+The corrected Smart Defaults candidate is integrated for review; it is not in
+main or a stable Release. The original pre-RC reproduced PRERC-UPDATE-01:
+script-only self-update left the newly pinned Bridge bundle absent. A subsequent
+explicitly authorized distribution/updater correction implements authenticated
+complete runtime delivery, versioned components, transaction-local crash undo
+and verified offline rollback. Genuine Ubuntu24.04 KVM upgrade/failure tests are
+recorded separately from models. Legacy v025 requires a verified full-distribution
+bootstrap; passing a new bare script fails health and rolls back. See
+[current update acceptance](PRERC-UPDATE01-RESULT.md) and the retained
+[initial pre-RC scope](PRERC-v0.2.26.md). PR1 remains draft. Stable readiness still
+requires the external/platform/client/cold-boot matrix. Release-first network/
+security freeze and the deferred roadmap-test remain unchanged; this is not a
+general Stage3 recovery system or a new topology.
 
 ## Immediate low-risk corrections — no network architecture changes
 
@@ -131,3 +155,18 @@ The earlier v0.2.6–v0.2.9 baseline delivered Caddy + HTTPS + stock MTProxy, sy
 Earlier planned field tests remain relevant: `https-lanes`, `websocket`, `websocket-lanes`, Nginx + Let's Encrypt, large transfers, sleep/network switch, backend/relay crash, and external backend-port scans. These are incorporated into the client/lab matrix above.
 
 The earlier `0.3 experiment branch` idea (`stock-mtproxy`, `telemt-direct`, `telemt-middle-end`) is **deferred research**, not an approved additional backend for the current 1.0 path. Only evaluate after the stock baseline and WEB/decoy roadmap are proven.
+
+## Current owner-authorized RC checkpoint
+
+The immediate target is **0.9.0-rc1**, not publication of1.0.0. Continue from
+446032d and reuse accepted UPDATE01/Gate1–3 evidence. The clean Foreign bootstrap
+permissions correction and bounded real KVM checks are recorded in
+[FINAL-RC-ACCEPTANCE.md](FINAL-RC-ACCEPTANCE.md). This does not authorize a merge,
+stable release or experiments from roadmap-test.md. Unavailable application,
+public deployment and platform checks remain explicit in the acceptance matrix.
+
+The current corrected RC has an operator-confirmed iOS HTTPS application test:
+VPN then mobile without VPN, messages in both directions, media and a file.
+Server observations are corroboration, not a replacement for that report.
+Exact client version and full relaunch were not confirmed; the broader client,
+platform, cold-boot and stable-release gates remain in the acceptance matrix.
