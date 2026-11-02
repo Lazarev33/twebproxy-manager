@@ -156,3 +156,9 @@ permissions correction and bounded real KVM checks are recorded in
 [FINAL-RC-ACCEPTANCE.md](FINAL-RC-ACCEPTANCE.md). This does not authorize a merge,
 stable release or experiments from roadmap-test.md. Unavailable application,
 public deployment and platform checks remain explicit in the acceptance matrix.
+
+The current corrected RC has an operator-confirmed iOS HTTPS application test:
+VPN then mobile without VPN, messages in both directions, media and a file.
+Server observations are corroboration, not a replacement for that report.
+Exact client version and full relaunch were not confirmed; the broader client,
+platform, cold-boot and stable-release gates remain in the acceptance matrix.

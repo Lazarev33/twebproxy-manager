@@ -136,7 +136,7 @@ The delivered test-only `live_transport_probe.py` reproduces all four protocol
 checks without exporting capabilities, session tokens or private links. This
 continuation changes tests/documentation only; deployed runtime stays byte-exact.
 
-## Current remaining acceptance
+## Remaining acceptance at the first public checkpoint
 
 * Current-RC real Telegram application checks await an operator result. Earlier
   iOS13.1.2 messages/media/417MB/LTE MegaFon/LTE T2/Wi-Fi are retained historical
@@ -181,3 +181,26 @@ on Exit). Actual Foreign help returns0 with swap still active; an actual
 credential operation still refuses it with1. Final Entry health and public
 HTTPS nonce-matched resPQ pass. Passive operator-window metrics collection is
 separate from application success; the private unchanged link is never evidence.
+
+## Current operator-confirmed iOS result — 2026-11-02 UTC
+
+The operator explicitly confirmed working messages in both directions, photos/
+video and file transfer in two phases: iOS with VPN, then mobile without VPN.
+The tested runtime is the corrected5f06 distribution, code commitd22d6dc; these
+are genuine operator-reported application results, not resPQ or counter-only
+inference. Exact app/OS version, mobile carrier, file size/cache/hash and a full
+application relaunch were not provided. HistoricaliOS13.1.2/417MB remains separate.
+
+Message receipt markers bound00:32:29–00:35:36UTC (187.8s); network switch marker
+00:33:43UTC. Nineteen samples per host show52new relay streams,32864312up/
+27433116down bytes, zero new dial failures/rejections/limit hits, no process or
+restart changes, and complementary WireGuard byte totals. These are aggregate
+corroboration with approximately10s sampling, not individual-message inspection
+or whole-file integrity. Configurations, unrelated services and website/TLS were
+preserved. The temporary DEV observer stopped successfully; live Bridge remains.
+
+Current HTTPS iOS connection/messages/media/file/network-switch cases: **PASS**
+in the confirmed scope. Full relaunch and other application/carrier/platform/
+cold-boot/renewal gates remain explicit NOT_EXECUTED. Gate3 acceptance remains
+conditional on its unconfirmed required checks; the blanket current-iOS-client
+pending outcome is superseded. No main merge, tag, release or stable acceptance.
