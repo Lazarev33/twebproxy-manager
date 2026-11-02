@@ -2,6 +2,14 @@
 
 Updated: 2026-11-01. Stable-first roadmap retained; nonessential architectural experiments are parked.
 
+2026-11-02 field continuation: real two-host OS reboot/recovery and clean
+Debian12/Ubuntu22.04 local installs are now exercised. Three platform compatibility
+blockers are corrected without policy/topology changes; public Quick ACME/site
+passes while its complete native public-IP Telegram journey remains unconfirmed.
+See [RC1-FIELD-ACCEPTANCE.md](RC1-FIELD-ACCEPTANCE.md) and the final handoff matrix
+for application results and remaining gates. This remains unpublished RC1,
+not an accepted stable release; deferred experiments remain deferred.
+
 ## Repository publication and evidence
 
 **Stable-first decision:** preserve the existing Gate 3 topology and security invariants. No live-server experiments or route/backend rewrites are authorized by this document. Experimental topics are postponed to [roadmap-test.md](../roadmap-test.md).

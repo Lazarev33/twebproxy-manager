@@ -3605,10 +3605,10 @@ backend_fw_ports_json() {
         | must(.[-1]=={"drop":null})
         | .[0:-1] as $matches
         | must(all($matches[]; keys==["match"]))
-        | [$matches[]|.match|select(.op=="!=" and .left=={"meta":{"key":"iifname"}} and .right=="lo")] as $if
+        | [$matches[]|.match|select(.op=="!=" and .left=={"meta":{"key":"iifname"}} and .right=="lo")] as $interfaces
         | [$matches[]|.match|select(.op=="==" and .left=={"payload":{"protocol":"tcp","field":"dport"}})] as $dp
         | [$matches[]|.match|select(.op=="==" and .left=={"meta":{"key":"l4proto"}} and (.right=="tcp" or .right==6))] as $tcp
-        | must(($if|length)==1 and ($dp|length)==1 and ($tcp|length)==($matches|length)-2)
+        | must(($interfaces|length)==1 and ($dp|length)==1 and ($tcp|length)==($matches|length)-2)
         | $dp[0].right | portlist | map(tostring) | join(",")
       end
   ' "$1"
@@ -3810,14 +3810,16 @@ fw_guard_hold() { # runs as the service main process: HUP must reach this shell
   # nft reads its commands from this pipe; its own output goes to the journal.
   exec {guard_fd}> >(exec "$BF_NFT" -i 8>&-)
   nftpid=$!
-  fw_guard_batch_create "$ports" >&"$guard_fd"
+  # Bash 5.1 declare -f serializes >&"$fd" as &>"$fd" (a filename).
+  # The generated helper must retain descriptor semantics on Ubuntu 22.04.
+  fw_guard_batch_create "$ports" >"/dev/fd/$guard_fd"
   trap 'FW_GUARD_RELOAD=1' HUP
   trap 'exit 0' TERM INT
   while kill -0 "$nftpid" 2>/dev/null; do
     if (( FW_GUARD_RELOAD )); then
       FW_GUARD_RELOAD=0
       if ports="$(backend_fw_collect)"; then
-        fw_guard_batch_update "$ports" >&"$guard_fd"
+        fw_guard_batch_update "$ports" >"/dev/fd/$guard_fd"
       else
         backend_fw_error 'guard: backend state invalid; the previous guard set is kept'
       fi
@@ -4066,7 +4068,7 @@ User=tproxy
 Group=tproxy
 LoadCredential=config.json:/etc/twebproxy/instances/%i/config.json
 LoadCredential=profiles.json:/etc/twebproxy/instances/%i/profiles.json
-ExecStart=/usr/local/bin/tproxy-server -config %d/config.json
+ExecStart=/usr/local/bin/tproxy-server -config ${CREDENTIALS_DIRECTORY}/config.json
 Restart=on-failure
 RestartSec=3s
 TimeoutStopSec=20s

@@ -2,7 +2,7 @@
   "bridge_state_schema": 1,
   "components_sha256": "f03cbdb801afc363565853c50275e20db958ae964b2b7e486fbe26e992ff2ef0",
   "format": "twebproxy.distribution.v1",
-  "manager_sha256": "1683cdeb8af4f0e7d713ac70b415185256e19792dedd3bcdad2c3ae7926d40c8",
+  "manager_sha256": "c2f99fa6f7a1229daf27541b95246478c29938611ef79255d2a471ca9c27d7ea",
   "release_version": "0.9.0-rc1",
   "version": "0.9.0"
 }

@@ -17,6 +17,12 @@ Manager, Bridge, автономные зависимости и встроенн
 
 Проверка RC и её границы: [FINAL-RC-ACCEPTANCE.md](docs/FINAL-RC-ACCEPTANCE.md). Изменение номера не означает прохождение недоступных клиентских или платформенных тестов.
 
+Продолжение полевой проверки RC1: [перезагрузки, платформы и границы результатов](docs/RC1-FIELD-ACCEPTANCE.md).
+Исправлены воспроизведённые несовместимости Bash5.1/jq1.6/systemd249;
+локальные установки проверены на настоящих Debian12 и Ubuntu22.04 KVM.
+Публичный Quick Setup подтвердил выпуск сертификата и сайт, но полный
+Telegram-тракт новой NAT-VM не подтверждён. Матрица Bridge от этого не расширяется.
+
 ## Зачем нужен
 
 TWebProxy использует официальный `tproxy-server` и stock MTProxy, Caddy/Nginx, systemd и nftables. Это **Telegram WEB Proxy**, не VPN общего назначения и не VLESS/Xray.

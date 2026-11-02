@@ -1,5 +1,10 @@
 # First RC checkpoint — unpublished 0.9.0-rc1
 
+Current field continuation: [RC1-FIELD-ACCEPTANCE.md](RC1-FIELD-ACCEPTANCE.md).
+It records the subsequent real two-host OS reboot, clean Debian12/Ubuntu22.04
+local-mode tests, public Quick TLS/site, three reproduced compatibility fixes
+and the remaining limits. Historical results below retain their original scope.
+
 Baseline: `446032d14917de234c14e39cf8034f428d6e6eec`, accepted UPDATE01 handoff
 SHA256 `435a9187aecc2c9b3fd0865c045d97f22eba5d676ab119caa613fc839c1c377a`.
 Branch remains `release-prep/v0.2.26-beta`; PR1 stays draft. No merge, tag

@@ -13,6 +13,20 @@ bash tests/stageb/transaction-fixture.sh
 bash tests/stageb/apply-ambiguity-fixture.sh
 ```
 
+For the subsequent actual Bash/jq/nft and systemd compatibility corrections,
+on a marked root disposable guest (not a live host):
+
+```sh
+python3 tests/final-rc/platform_firewall_compat.py /absolute/source/twebproxy-manager.sh
+python3 tests/final-rc/credential_unit_compat.py /absolute/source/twebproxy-manager.sh
+```
+
+The firewall runner creates a private network namespace before any nft mutation.
+The credential runner uses real PID1 with an independent unprivileged transient
+unit and a root-only nonsecret fixture; only template-generation side effects
+are doubled. These do not constitute Telegram application tests. See
+[field scope and limitations](../../docs/RC1-FIELD-ACCEPTANCE.md).
+
 The nft discovery fixture is a model; bootstrap directories use real chroot/UID
 permissions with doubled SSH/agent body. Neither is a real network/client PASS.
 Legacy updater fixtures are separately labelled, not a replacement for accepted
