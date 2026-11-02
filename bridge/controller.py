@@ -417,7 +417,8 @@ def status(s):
  print(json.dumps({'schema':'twebproxy.bridge.status.v1','id':s['id'],'phase':s['phase'],'hostname':s['hostname'],'generation':1,'observed_at':time.time(),'checks':checks,'remote':remote,'cleanup_debt':s.get('cleanup_debt',[])},indent=2))
 
 def main():
- secret_process();p=argparse.ArgumentParser();p.add_argument('verb',choices=['add','status','diagnose','repair','remove']);p.add_argument('--host');p.add_argument('--user');p.add_argument('--port',type=int,default=22);p.add_argument('--instance');p.add_argument('--identity');p.add_argument('--auth',choices=['key','password']);p.add_argument('--fingerprint');p.add_argument('--entry-endpoint');p.add_argument('--approve',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('verb',choices=['add','status','diagnose','repair','remove']);p.add_argument('--host');p.add_argument('--user');p.add_argument('--port',type=int,default=22);p.add_argument('--instance');p.add_argument('--identity');p.add_argument('--auth',choices=['key','password']);p.add_argument('--fingerprint');p.add_argument('--entry-endpoint');p.add_argument('--approve',action='store_true');a=p.parse_args()
+ secret_process()
  if os.geteuid()!=0:raise Fault('root required')
  if not 1<=a.port<=65535:raise Fault('invalid SSH port')
  with private_lock('controller.lock') as lock:

@@ -6,7 +6,7 @@
   },
   "bridge/MANIFEST.json": {
     "mode": 420,
-    "sha256": "c29e66512f90eea07ec8c59ad0248a1f785e87684cc147b445194fe69ccb47b6",
+    "sha256": "c400e10b282cbf00f9291e1c9181acf64d87bdfe83d96afeee07a1bd80564b6d",
     "size": 1286
   },
   "bridge/agent.py": {
@@ -16,8 +16,8 @@
   },
   "bridge/controller.py": {
     "mode": 420,
-    "sha256": "6698dafdc3142652d9327c3f99ed406516b3cfda52c07e9fbd245bfdf3973b05",
-    "size": 38397
+    "sha256": "44d5f45f2e53d31fed9b7a56b40c1c9096da5b2daa867b03a699135c943969eb",
+    "size": 38398
   },
   "bridge/launcher.py": {
     "mode": 420,

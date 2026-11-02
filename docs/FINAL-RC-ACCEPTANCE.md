@@ -152,3 +152,32 @@ continuation changes tests/documentation only; deployed runtime stays byte-exact
 
 Current deployment is ready for operator application validation. Gate3 current
 application acceptance is conditional; stable publication remains unaccepted.
+
+## Owner-requested two-host update — 2026-11-02 UTC
+
+Updating the separate legacy Foreign Manager reproduced a new bounded health
+failure: `foreign-node --help` ran the no-active-swap credential guard before
+argparse, so a local-mode/Exit host with swap could not pass distribution health.
+The updater returned1 and restored both original Manager copies successfully;
+the working Bridge and unrelated services were preserved. This is distinct from
+the earlier SSH transport failures, and does not reopen accepted UPDATE01 work.
+
+The focused correction moves the unchanged `secret_process()` call immediately
+after argument parsing. Help exits before credential handling; add/status/
+diagnose/repair/remove still enter the exact same core-dump, dumpability, umask
+and no-swap guard before any state access, privilege-dependent operation or lock.
+No security guard, swap configuration, agent, updater or network code is weakened
+or changed. Executable tests extract the actual production functions and cover
+help plus every operation under active swap. The corrected runtime has different
+component/Manager pins; the original f222 runtime and archive remain historical.
+The subsequent live result and exact corrected digest are recorded with the
+operator client-validation evidence, not silently added to the prior74/3/13 matrix.
+
+Both authorized live Managers subsequently report UPDATE_SUCCESS with corrected
+runtime SHA256 `5f06ced876e64d61ff2b5f9a518c0175590ab2b6b29c04826078990b5e99f9e2`.
+All162 Entry/180 Exit canonical files, service PIDs/start/restart/address policies,
+profiles, secrets, site/TLS and routing remained unchanged (global version only
+on Exit). Actual Foreign help returns0 with swap still active; an actual
+credential operation still refuses it with1. Final Entry health and public
+HTTPS nonce-matched resPQ pass. Passive operator-window metrics collection is
+separate from application success; the private unchanged link is never evidence.

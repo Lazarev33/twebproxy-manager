@@ -13,6 +13,7 @@ python3 tests/tui-smart-defaults/test_corrections.py
 bash tests/localization-static-audit.sh
 python3 tests/tui-smart-defaults/test_smart_defaults.py
 python3 tests/bridge-gate3/test_bridge_menu.py
+python3 tests/bridge-gate3/test_help_swap.py
 python3 tests/bridge-gate2/test_safety.py
 python3 tests/bridge-gate3/test_default_site.py
 bash tests/read-only-core-fixture.sh
